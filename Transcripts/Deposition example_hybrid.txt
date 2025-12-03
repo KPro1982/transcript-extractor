@@ -1,0 +1,923 @@
+================================================================================
+PAGE 1 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+================================================================================
+PAGE 2 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · · SUPERIOR COURT OF THE STATE OF CALIFORNIA [100.0%]
+     | · · · · · · · · · ·COUNTY OF SACRAMENTO [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | KIM LEE,· · · · · · · · · · · ) Case No.: 24CV001303 [100.0%]
+     | · · · · · · · · · · · · · · · ) [100.0%]
+     | · · · · ·Plaintiff,· · · · · ·) [100.0%]
+     | v.· · · · · · · · · · · · · · ) [100.0%]
+     | · · · · · · · · · · · · · · · ) [100.0%]
+     | KURIN, INC., a Corporation;· ·) [100.0%]
+     | KEITH NOBILE, an individual;· ) [100.0%]
+     | and DOES 1-25, inclusive,· · ·) [100.0%]
+     | · · · · · · · · · · · · · · · ) [100.0%]
+     | · · · · ·Defendants.· · · · · ) [100.0%]
+     | ______________________________) [100.0%]
+     | · · · · · · · · DEPOSITION OF MATT HEINDEL [100.0%]
+     | · · ·REMOTE VIDEO DEPOSITION OF MATT HEINDEL, 30(b)(6) [100.0%]
+     | located Via Web Video Conference, commencing at 2:00 PM on [100.0%]
+     | Tuesday, September 16, 2025, before NANCY CHAVEZ, [100.0%]
+     | Certified Shorthand Reporter, CSR No. 14580, in and for [100.0%]
+     | the State of California. [100.0%]
+
+================================================================================
+PAGE 3 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+   2 |  [86.0%]
+     | APPEARANCES VIA ZOOM STENO CONNECT: [100.0%]
+     | FOR THE PLAINTIFF: [100.0%]
+     | · · · · · · · TOWER LEGAL GROUP, P.C. [100.0%]
+     | · · · · · · · BY: JAMES A. CLARK, ESQ. [100.0%]
+     | · · · · · · · 11335 GOLD EXPRESS DRIVE, SUITE 105 [100.0%]
+     | · · · · · · · GOLD RIVER, CALIFORNIA 95670 [100.0%]
+     | · · · · · · · (916)361-6009 [100.0%]
+     | · · · · · · · james.clark@towerlegalgroup.com [100.0%]
+     | FOR THE DEFENDANTS AND THE DEPONENT: [100.0%]
+     | · · · · · · · O'HAGAN MEYER [100.0%]
+     | · · · · · · · BY: ANTHONY C. OCEGUERA, ESQ. [100.0%]
+     | · · · · · · · 1201 K STREET, SUITE 1960 [100.0%]
+     | · · · · · · · SACRAMENTO, CALIFORNIA 95814 [100.0%]
+     | · · · · · · · (916)884-0752 [100.0%]
+     | · · · · · · · aoceguera@ohaganmeyer.com [100.0%]
+     | OTHER APPEARANCES: (NONE) [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+
+================================================================================
+PAGE 4 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+   2 | Exhibit 3· ·Matt Heindel Responsive Documents· · · · 22 [90.0%]
+   3 | · · · · · · · · · · · · ·12 Pages [90.0%]
+  12 | · · · · · · · · · · · · ---oOo--- [90.0%]
+  11 |  [90.0%]
+  17 |  [90.0%]
+  22 |  [90.0%]
+   3 |  [90.0%]
+     | · · · · · · · · · · · · · INDEX [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | · · · · · · · · · · · · · · · · · · · · · · · · · · PAGE [100.0%]
+     | EXAMINATION BY:· MR. CLARK· · · · · · · · · · · · · ·5 [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | EXHIBITS [100.0%]
+     | EXHIBITS· · ·DESCRIPTION· · · · · · · · · · · · · · PAGE [100.0%]
+     | Exhibit 1· ·Notice of Deposition· · · · · · · · · · ·11 [100.0%]
+     | · · · · · · · · · · · · ·6 Pages [100.0%]
+     | Exhibit 2· ·Patel - Lee Text Messages· · · · · · · · 17 [100.0%]
+     | · · · · · · · · · · · · ·2 Pages [100.0%]
+     | PREVIOUSLY MARKED EXHIBITS:· (NONE) [100.0%]
+     | HIGHLY CONFIDENTIAL PORTIONS: (NONE) [100.0%]
+     | INFORMATION REQUESTED: (NONE) [100.0%]
+     | QUESTIONS INSTRUCTED NOT TO ANSWER: (NONE) [100.0%]
+
+================================================================================
+PAGE 5 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · TUESDAY, SEPTEMBER 16, 2025, 2:04 PM - 2:42 PM [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | · · ·THE REPORTER:· Good afternoon. [100.0%]
+     | · · · · ·My name is Nancy Chavez.· I'm a Certified [100.0%]
+     | Shorthand Reporter for the State of California, [100.0%]
+     | CSR No. 14580. [100.0%]
+     | · · · · ·Counsel, please state your appearance and whom [100.0%]
+     | you represent. [100.0%]
+     | · · ·MR. CLARK:· My name is James Clark, and I represent [100.0%]
+     | the plaintiff, Kim Lee. [100.0%]
+     | · · ·MR. OCEGUERA:· Anthony Oceguera, and I represent [100.0%]
+     | Defendants and the deponent, Matt Heindel. [100.0%]
+     | · · ·MR. CLARK:· Can we swear in the witness. [100.0%]
+     | · · ·THE WITNESS:· Oh, I think you're on mute, Nancy. [100.0%]
+     | · · ·THE REPORTER:· Thank you so much.· Sorry about that. [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | · · · · · · · · · · ·MATTHEW HEINDEL, [100.0%]
+     | ·called as a witness herein, having been administered an [100.0%]
+     | oath remotely in accordance with C.C.P. Section 2096, was [100.0%]
+     | · · · · · · examined and testified as follows: [100.0%]
+     | · · ·THE WITNESS:· I do. [100.0%]
+     | · · ·THE REPORTER:· Thank you. [100.0%]
+     | · · · · · · · · · · · · ---oOo--- [100.0%]
+     | /// [100.0%]
+     | /// [100.0%]
+
+================================================================================
+PAGE 6 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · · · · · · · · · ·EXAMINATION [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Good evening -- or good afternoon, sir. [100.0%]
+     | · · · · ·Can you state and spell your name for the record. [100.0%]
+     | · · ·A.· Yeah.· It's Matt Heindel -- Matthew Heindel, H-e [100.0%]
+     | -- Matthew, M-a-t-t-h-e-w, H-e-i-n-d-e-l.· A lot of people [100.0%]
+     | say Heindel, so don't worry. [100.0%]
+     | · · ·Q.· Mr. Heindel, have you had your deposition taken [100.0%]
+     | before? [100.0%]
+     | · · ·A.· I have. [100.0%]
+     | · · ·Q.· And when was the last time you had your [100.0%]
+     | deposition taken? [100.0%]
+     | · · ·A.· In approximately May of this year. [100.0%]
+     | · · ·Q.· Okay.· And do you recall the nature of the [100.0%]
+     | matter? [100.0%]
+     | · · ·A.· We have ongoing litigation with a competitor [100.0%]
+     | regarding intellectual property. [100.0%]
+     | · · ·Q.· Okay.· Any other depositions outside of that? [100.0%]
+     | · · ·A.· Well, I've been deposed three times.· This is the [100.0%]
+     | third time, the most recent one. [100.0%]
+     | · · ·Q.· Okay.· And the other two?· Do you recall the [100.0%]
+     | nature of the other two? [100.0%]
+     | · · ·A.· One was similar -- intellectual property; and the [100.0%]
+     | original -- I believe it was a Lanham Act, false [100.0%]
+     | advertisement, all with the same competitor. [100.0%]
+
+================================================================================
+PAGE 7 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·Q.· Okay.· You've just been sworn to tell the truth [100.0%]
+     | under penalty of perjury just like under oath before a [100.0%]
+     | judge and a jury and not telling the truth can lead to [100.0%]
+     | possible incarceration or civil fines; so it's important [100.0%]
+     | you tell the truth. [100.0%]
+     | · · · · ·Do you understand? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And only one person can speak at a time, so [100.0%]
+     | please let me finish the question before you answer. [100.0%]
+     | · · · · ·And we need verbal answers such as "yes" and "no" [100.0%]
+     | and not head nods or shoulder shrugs. [100.0%]
+     | · · · · ·Do you understand? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· After my question, your attorney may make an [100.0%]
+     | objection.· An objection is like a Post-it note.· It goes [100.0%]
+     | on the record, and later the judge will decide the legal [100.0%]
+     | issue.· It's not your job to figure out if the objections [100.0%]
+     | are valid; therefore, after the objection, we'll still be [100.0%]
+     | waiting for your answer unless your attorney instructs you [100.0%]
+     | not to answer. [100.0%]
+     | · · · · ·Do you understand? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And we're entitled to any evidence you may have [100.0%]
+     | whether you heard it secondhand, rumor, or gossip. [100.0%]
+     | · · · · ·We're not entitled to know things you only [100.0%]
+
+================================================================================
+PAGE 8 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | learned through your attorney, but if you knew it before [100.0%]
+     | and only repeated it to your attorney, then the [100.0%]
+     | information is not privileged and we're entitled to know [100.0%]
+     | it. [100.0%]
+     | · · · · ·Do you understand? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And we're also entitled to your best estimate, [100.0%]
+     | but we don't want you to guess. [100.0%]
+     | · · · · ·I'll give you the example that I use as a [100.0%]
+     | difference between an estimate and a guess. [100.0%]
+     | · · · · ·If I asked you to estimate the length of the [100.0%]
+     | table that you're sitting at with your personal knowledge, [100.0%]
+     | you can observe it and estimate how many feet and inches [100.0%]
+     | the table is.· But if I asked you to estimate the table at [100.0%]
+     | my house, you've never been there, you don't know if it's [100.0%]
+     | round or square or even if I have a table, and that would [100.0%]
+     | be a guess. [100.0%]
+     | · · · · ·Do you understand the difference? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And if you don't understand a question, please [100.0%]
+     | let me know; otherwise, I have to assume that you [100.0%]
+     | understood it. [100.0%]
+     | · · · · ·And the following questions we ask everyone and [100.0%]
+     | you're not being singled out. [100.0%]
+     | · · · · ·Were you ever convicted of a felony? [100.0%]
+
+================================================================================
+PAGE 9 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· And are you under the influence of any drugs or [100.0%]
+     | alcohol or medical condition that would interfere with [100.0%]
+     | your ability to give truthful and accurate testimony? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· Have you ever been a plaintiff or a defendant in [100.0%]
+     | a lawsuit? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· And what's your current age? [100.0%]
+     | · · ·A.· Sixty-eight. [100.0%]
+     | · · ·MR. CLARK:· And, Counsel, in lieu of asking the [100.0%]
+     | deponent for his home address, will you stipulate to [100.0%]
+     | receiving trial subpoenas on his behalf? [100.0%]
+     | · · ·MR. OCEGUERA:· Yes, so stipulated. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Mr. Heindel, did you review any documents to [100.0%]
+     | prepare for the deposition? [100.0%]
+     | · · ·A.· When I got the notice for the deposition, I was [100.0%]
+     | asked to search for emails, and there aren't many because [100.0%]
+     | I've not ever met the plaintiff.· So I looked at a couple [100.0%]
+     | of things, but that's the extent of it. [100.0%]
+     | · · ·Q.· Okay.· Did you find any text messages regarding [100.0%]
+     | the plaintiff? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· Did you search for text messages? [100.0%]
+
+================================================================================
+PAGE 10 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And have you ever text messaged Nandita Patel [100.0%]
+     | regarding Kim Lee? [100.0%]
+     | · · ·A.· Not to my knowledge. [100.0%]
+     | · · ·Q.· Okay.· Did you speak to anyone other than your [100.0%]
+     | attorney to prepare for the deposition? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· Mr. Heindel, what is your -- are you currently [100.0%]
+     | employed? [100.0%]
+     | · · ·A.· Not -- well, I am employed.· I don't have any [100.0%]
+     | responsibilities.· I've stepped down from day-to-day [100.0%]
+     | operations quite some time ago. [100.0%]
+     | · · ·Q.· Okay.· Are you on the board of directors? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· And we're referring -- who was your last [100.0%]
+     | employer? [100.0%]
+     | · · ·A.· Kurin. [100.0%]
+     | · · ·Q.· And do you currently re- -- are you currently [100.0%]
+     | employed by Kurin, meaning do you currently receive a [100.0%]
+     | paycheck? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+     | · · ·Q.· And what's your current job title? [100.0%]
+     | · · ·A.· Executive Vice President. [100.0%]
+     | · · ·Q.· And in 2023, were you employed by Kurin? [100.0%]
+     | · · ·A.· Yes. [100.0%]
+
+================================================================================
+PAGE 11 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·Q.· And what was your job title in 2023? [100.0%]
+     | · · ·A.· Vice President Business Development. [100.0%]
+     | · · ·Q.· And what were your roles and responsibilities in [100.0%]
+     | that position? [100.0%]
+     | · · ·A.· Marketing international and business development. [100.0%]
+     | · · ·Q.· Okay.· Did you have any responsibilities over [100.0%]
+     | training? [100.0%]
+     | · · ·A.· That's quite ambiguous. [100.0%]
+     | · · · · ·I hosted training, but other people -- by 2023, [100.0%]
+     | other people were running the training. [100.0%]
+     | · · · · ·I used to run it back in 2018, '19, but that [100.0%]
+     | changed over the years. [100.0%]
+     | · · ·Q.· In 2023, did Nandita Patel report to you? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· Do you know who Ms. Patel reported to? [100.0%]
+     | · · ·A.· Actually, I'm not sure. [100.0%]
+     | · · ·Q.· Okay.· In 2023, I believe, Nandita Patel -- her [100.0%]
+     | last name was Patel.· It could be different now. [100.0%]
+     | · · · · ·Do you understand that? [100.0%]
+     | · · ·A.· Oh.· Yeah, I do understand, but then it was [100.0%]
+     | definitely Patel. [100.0%]
+     | · · ·Q.· Okay.· And we're referring to the same person, [100.0%]
+     | though; correct? [100.0%]
+     | · · ·A.· Correct. [100.0%]
+     | · · ·Q.· There's not multiple Nanditas that work at Kurin; [100.0%]
+
+================================================================================
+PAGE 12 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | correct? [100.0%]
+     | · · ·A.· That is correct. [100.0%]
+     | · · ·Q.· And, Mr. Heindel, I will introduce Exhibit Number [100.0%]
+     | 1 to you.· I guess, before I introduce this:· Did you [100.0%]
+     | produce any documents for the deposition today? [100.0%]
+     | · · ·A.· If that refers -- I did send Anthony a couple of [100.0%]
+     | documents if that's what you're asking about. [100.0%]
+     | · · ·Q.· Okay.· And those were in response to the [100.0%]
+     | deposition notice? [100.0%]
+     | · · ·A.· That is correct. [100.0%]
+     | · · ·Q.· Okay. [100.0%]
+     | · · ·MR. CLARK:· And, Anthony, did you upload those? [100.0%]
+     | · · ·MR. OCEGUERA:· Yeah, they're in the chat right now. [100.0%]
+     | · · ·MR. CLARK:· Okay. [100.0%]
+     | · · · · ·So let's introduce our first exhibit. [100.0%]
+     | · · · · ·And I'll assert to you, Mr. Heindel, that this is [100.0%]
+     | the deposition notice for you to be here today with us. [100.0%]
+     | · · · · · · · (Plaintiff's Exhibit No. 1, Notice of [100.0%]
+     | · · · · · · · ·Deposition, was marked for identification.) [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· And do you recognize this document? [100.0%]
+     | · · ·A.· I do. [100.0%]
+     | · · ·Q.· And this is the document we're referring to that [100.0%]
+     | at the bottom asking for requests for documents; correct? [100.0%]
+     | · · ·A.· That is correct. [100.0%]
+
+================================================================================
+PAGE 13 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·Q.· And there were 13 requests for documents? [100.0%]
+     | · · ·A.· Correct. [100.0%]
+     | · · ·MR. CLARK:· Okay.· We're done with that exhibit. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· And in 2023, Mr. Heindel, did you conduct weekly [100.0%]
+     | training meetings with new hire staff? [100.0%]
+     | · · ·A.· I did not. [100.0%]
+     | · · ·Q.· Okay.· Did you participate in weekly training [100.0%]
+     | meetings with the new hire staff? [100.0%]
+     | · · ·A.· Not usually.· I was no doubt on a couple of [100.0%]
+     | those, but at that point, I was no longer handling those [100.0%]
+     | weekly calls. [100.0%]
+     | · · ·Q.· But you're aware that there were weekly training [100.0%]
+     | calls that occurred in 2023? [100.0%]
+     | · · ·A.· I pause because I assume that was happening, but [100.0%]
+     | I wasn't following those schedules very closely, but it [100.0%]
+     | was our nature to do those calls. [100.0%]
+     | · · ·Q.· But yourself, you did not participate in weekly [100.0%]
+     | training calls in 2023 with Kim Lee; correct? [100.0%]
+     | · · ·A.· I might have been on one or two, but I was not a [100.0%]
+     | regular participant. [100.0%]
+     | · · ·Q.· Okay.· And in 2023, did you ever instruct [100.0%]
+     | Nandita Patel to not interact with Kim Lee for anything [100.0%]
+     | unrelated to training? [100.0%]
+     | · · ·A.· I'm sorry.· I need a clarification on that [100.0%]
+
+================================================================================
+PAGE 14 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | question. [100.0%]
+     | · · ·Q.· Sure. [100.0%]
+     | · · · · ·We know -- you know who I'm referring to with [100.0%]
+     | Nandita Patel; correct? [100.0%]
+     | · · ·A.· Correct. [100.0%]
+     | · · ·Q.· In 2023, did you instruct Ms. Nandita Patel to [100.0%]
+     | only interact with Kim Lee regarding training? [100.0%]
+     | · · ·A.· Nandita and I had a conversation. [100.0%]
+     | · · · · ·She called me because she was troubled about a [100.0%]
+     | conversation with Kim Lee, and I told her that her [100.0%]
+     | responsibility was training. [100.0%]
+     | · · · · ·So I could interpret your question as I was [100.0%]
+     | directing her to focus on training, but I didn't [100.0%]
+     | specifically tell her not to talk to Kim Lee. [100.0%]
+     | · · ·Q.· Okay.· In 2023, did you instruct Nandita Patel [100.0%]
+     | that anything other than training was not anything she [100.0%]
+     | needed to get involved in? [100.0%]
+     | · · ·A.· Yeah.· I'm sorry.· That question is just too [100.0%]
+     | ambiguous for me to give you a straight yes or no. [100.0%]
+     | · · · · ·I specifically recall telling Nandita she -- she [100.0%]
+     | was having a phone call with Kim. [100.0%]
+     | · · · · ·Kim was complaining about her boss. [100.0%]
+     | · · · · ·And I said, "Nandita, that's not your job.· If [100.0%]
+     | she has a complaint about Keith, she should talk to Keith [100.0%]
+     | or Keith's boss." [100.0%]
+
+================================================================================
+PAGE 15 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · · ·So if that -- I don't know how that fits your [100.0%]
+     | question. [100.0%]
+     | · · ·Q.· Okay.· When did you have the discussion with [100.0%]
+     | Nandita regarding Kim Lee's concerns? [100.0%]
+     | · · ·A.· This would've been sometime in late June. [100.0%]
+     | · · ·Q.· And what concerns did Nandita escalate to you? [100.0%]
+     | · · ·A.· She -- all -- it was vague.· She said that Kim [100.0%]
+     | did not like working for Keith. [100.0%]
+     | · · · · ·And I believe she used the word "jerk."· I will [100.0%]
+     | say, with two years time, if it wasn't the word "jerk," it [100.0%]
+     | was a word similar to that, certainly not a compliment. I [100.0%]
+     | think it was "jerk," but that was it.· It was a brief [100.0%]
+     | conversation. [100.0%]
+     | · · · · ·And I just said, "I don't know why you're in the [100.0%]
+     | middle of that.· That's not your training role." [100.0%]
+     | · · ·Q.· Did Nandita express to you that Kim Lee felt [100.0%]
+     | harassed? [100.0%]
+     | · · ·MR. OCEGUERA:· Objection.· Lacks foundation.· Assumes [100.0%]
+     | facts not in evidence. [100.0%]
+     | · · ·THE WITNESS:· I don't know in what way would she have [100.0%]
+     | been -- no, I never heard the word "harassment." [100.0%]
+     | · · · · ·But in what way do you mean harassment? [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· I'm just asking, did she use the word "harass" [100.0%]
+     | when she expressed her concerns? [100.0%]
+
+================================================================================
+PAGE 16 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  15 |  [93.0%]
+     | · · ·A.· Definitely not. [100.0%]
+     | · · ·Q.· But you believe she used the word "jerk" or [100.0%]
+     | something similar to that effect; correct? [100.0%]
+     | · · ·A.· I -- yeah.· I believe what she said was Kim did [100.0%]
+     | not like working for Keith, thought he was a jerk. [100.0%]
+     | · · ·Q.· Okay.· And at the time Nandita Patel was training [100.0%]
+     | Kim Lee; correct? [100.0%]
+     | · · ·A.· She was certainly one of the people training [100.0%]
+     | Kim Lee.· You know, Nandita at that time was still a [100.0%]
+     | clinical outcomes director; so this was something she was [100.0%]
+     | doing in addition to her other role.· She was not [100.0%]
+     | full-time training.· So it wasn't just Nandita.· There [100.0%]
+     | were other people involved. [100.0%]
+     | · · ·Q.· And at the time that -- strike that. [100.0%]
+     | · · · · ·What was your role in the decision to terminate [100.0%]
+     | Kim Lee? [100.0%]
+     | · · ·A.· I have no involvement in any of the sales [100.0%]
+     | decisions.· I was not even aware she was terminated. [100.0%]
+     | · · ·Q.· Okay.· So you -- your testimony today is you had [100.0%]
+     | zero input into the decision to terminate Kim Lee; [100.0%]
+     | correct? [100.0%]
+     | · · ·A.· That is correct. [100.0%]
+     | · · ·Q.· When did you learn that Kim Lee was terminated? [100.0%]
+     | · · ·A.· I don't remember anything specific.· I don't [100.0%]
+     | remember a specific date.· I was sent a letter that she [100.0%]
+
+================================================================================
+PAGE 17 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | sent shortly after her termination, but I can't tell you [100.0%]
+     | if that was a day or a week.· That was about the time we [100.0%]
+     | were having our sales meeting and that was a [100.0%]
+     | responsibility of mine; so I was pretty tied up with the [100.0%]
+     | sales meeting. [100.0%]
+     | · · ·Q.· Do you recall who sent you the email that Ms. Lee [100.0%]
+     | sent to Ms. Patel after her termination? [100.0%]
+     | · · ·A.· It's my best estimate that it would have been [100.0%]
+     | Bob Rogers. [100.0%]
+     | · · ·Q.· Do you know of any investigation that was [100.0%]
+     | conducted once Ms. Lee sent that email to Bob Rogers and [100.0%]
+     | Nandita Patel? [100.0%]
+     | · · ·A.· Don't know.· I don't know of any. [100.0%]
+     | · · ·Q.· And do you know why Nandita Patel reached out to [100.0%]
+     | you to convey her concerns with Kim Lee? [100.0%]
+     | · · ·MR. OCEGUERA:· Calls for speculation. [100.0%]
+     | · · · · ·But go ahead. [100.0%]
+     | · · ·THE WITNESS:· She didn't -- I don't know.· She didn't [100.0%]
+     | say. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· And when you received that information from [100.0%]
+     | Nandita Patel, did you escalate it to anyone? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· Do you know other than yourself who Nandita Patel [100.0%]
+     | conveyed the information regarding Kim Lee to? [100.0%]
+
+================================================================================
+PAGE 18 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  17 |  [94.0%]
+     | · · ·MR. OCEGUERA:· Calls for speculation.· Vague and [100.0%]
+     | ambiguous as to what information about Kim Lee. [100.0%]
+     | · · · · ·Go ahead. [100.0%]
+     | · · ·THE WITNESS:· I'm not sure who else Kim -- or I'm [100.0%]
+     | sorry.· I'm not sure who else Nandita spoke to about Kim. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· And do you know who made the decision to [100.0%]
+     | terminate Kim Lee? [100.0%]
+     | · · ·A.· I do not. [100.0%]
+     | · · ·MR. CLARK:· Okay.· We're just going to take a quick [100.0%]
+     | break for -- until 2:30, so I can review the documents [100.0%]
+     | that were produced, and we'll come back on the record at [100.0%]
+     | 2:30. [100.0%]
+     | · · ·THE WITNESS:· Okay. [100.0%]
+     | · · · · · · · (Break taken from 2:22 PM to 2:31 PM) [100.0%]
+     | · · ·THE REPORTER:· Back on the record. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Mr. Heindel, is there any reason you cannot [100.0%]
+     | continue with truthful and accurate testimony? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·MR. CLARK:· This is -- Exhibit 2 is a document [100.0%]
+     | already exchanged in this litigation.· It's text messages [100.0%]
+     | between Kim Lee and Nandita Patel. [100.0%]
+     | · · · · · · · (Plaintiff's Exhibit No. 2, Text Messages, [100.0%]
+     | · · · · · · · ·was marked for identification.) [100.0%]
+
+================================================================================
+PAGE 19 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Before I ask questions, Mr. Heindel, can you read [100.0%]
+     | the text. [100.0%]
+     | · · ·A.· I can read what you have on the screen.· You'd [100.0%]
+     | have to scroll for me to read the entire thing. [100.0%]
+     | · · ·Q.· Okay.· Let me know when you -- go ahead and read [100.0%]
+     | it to yourself. [100.0%]
+     | · · ·A.· All right.· And I'm sorry.· This is from Kim? [100.0%]
+     | · · ·Q.· This is between Kim Lee on the right and [100.0%]
+     | Nandita Patel on the left. [100.0%]
+     | · · ·A.· I'm sorry.· I'm not seeing who's right and left [100.0%]
+     | here on my screen.· I just see a blue screen. [100.0%]
+     | · · ·Q.· When we get down here, there will be more. [100.0%]
+     | · · ·A.· Oh, there we go.· Got it, got it, got it.· Okay. [100.0%]
+     | · · ·Q.· It's okay. [100.0%]
+     | · · ·A.· You can scroll down.· You can scroll down.· You [100.0%]
+     | can scroll down.· You can scroll down. [100.0%]
+     | · · ·Q.· That's it. [100.0%]
+     | · · ·A.· Oh, that's it.· Okay. [100.0%]
+     | · · ·Q.· So my first question is:· Have you seen this [100.0%]
+     | document before? [100.0%]
+     | · · ·A.· No. [100.0%]
+     | · · ·Q.· And does this refresh you memory when [100.0%]
+     | Nandita Patel reached out to you? [100.0%]
+     | · · ·MR. OCEGUERA:· Objection.· Assumes facts not in [100.0%]
+
+================================================================================
+PAGE 20 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | evidence.· Lacks foundation. [100.0%]
+     | · · ·THE WITNESS:· So this is dated July 5th.· I know I [100.0%]
+     | talked to her in June, late June. [100.0%]
+     | · · · · ·So, yeah.· This is -- there's a lot in here that [100.0%]
+     | is a surprise to me, I was unaware of. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Okay.· But if Ms. Patel testified in her [100.0%]
+     | deposition that "I did reach out to Matt and other [100.0%]
+     | leadership to let them know," -- do you see that?· That [100.0%]
+     | portion there? [100.0%]
+     | · · ·A.· I do see that. [100.0%]
+     | · · ·Q.· Is she being truthful about reaching out to Matt, [100.0%]
+     | meaning yourself? [100.0%]
+     | · · ·MR. OCEGUERA:· Objection.· Vague and ambiguous as to [100.0%]
+     | time.· Lacks foundation.· Assumes facts not in evidence. [100.0%]
+     | Incomplete hypothetical. [100.0%]
+     | · · ·THE WITNESS:· As I mentioned, she called me in late [100.0%]
+     | June, so that is -- if she is referring to that, that is [100.0%]
+     | correct.· I have no knowledge of her reaching out to other [100.0%]
+     | leadership; that is news. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Okay.· And yeah, if somebody says, I did reach [100.0%]
+     | out to someone, and they sent that on July 5th, that means [100.0%]
+     | it happened sometime before that; correct? [100.0%]
+     | · · ·A.· Yes, that's correct. [100.0%]
+
+================================================================================
+PAGE 21 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·Q.· And does the message from Kim Lee that we read at [100.0%]
+     | the start of this exhibit refresh your memory about what [100.0%]
+     | Nandita Patel conveyed to you? [100.0%]
+     | · · ·MR. OCEGUERA:· Objection.· Lacks foundation.· Assumes [100.0%]
+     | facts not in evidence.· Asked and answered. [100.0%]
+     | · · ·THE WITNESS:· No, because none of this was relayed to [100.0%]
+     | me from Nandita.· I -- this is all -- all these sentences, [100.0%]
+     | all these comments, everything I am reading there, is news [100.0%]
+     | to me. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Okay.· And midway through this document, on [100.0%]
+     | July 3rd, 2023, it says:· When I first started with Kurin, [100.0%]
+     | I asked Keith who can I reach out to about benefits in HR, [100.0%]
+     | and he said we don't have an HR department or person. [100.0%]
+     | · · · · ·Do you see that statement? [100.0%]
+     | · · ·A.· I do see that statement. [100.0%]
+     | · · ·Q.· Was that correct in January of 2023? [100.0%]
+     | · · ·A.· In July of 2023? [100.0%]
+     | · · ·Q.· Well, she started in January -- [100.0%]
+     | · · ·A.· Oh, okay.· Okay.· I'm sorry. [100.0%]
+     | · · · · ·So that is correct, but there is an employee [100.0%]
+     | handbook that I know I had to sign for that tells you what [100.0%]
+     | to do for HR things, and that's -- and you would contact [100.0%]
+     | Chuck Covington, our CFO.· So yeah.· That's correct.· We [100.0%]
+     | didn't have an HR department, but we did have a [100.0%]
+
+================================================================================
+PAGE 22 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | connection. [100.0%]
+     | · · ·Q.· Okay.· So the employee handbook in 2023 [100.0%]
+     | instructed employees to contact Chuck Covington for sexual [100.0%]
+     | harassment? [100.0%]
+     | · · ·MR. OCEGUERA:· Objection.· Misstates testimony. [100.0%]
+     | · · ·THE WITNESS:· I do not -- I've not read that entire [100.0%]
+     | document since I've signed it.· My recollection is it [100.0%]
+     | tells you to take it to the CEO, the CFO, or an Executive [100.0%]
+     | VP. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· Okay. [100.0%]
+     | · · ·A.· There is a specific section on harassment for [100.0%]
+     | that. [100.0%]
+     | · · ·Q.· Okay.· And did you -- [100.0%]
+     | · · ·A.· I'm sorry.· I'm sorry to interrupt. [100.0%]
+     | · · · · ·I just realized I'm calling it "employee [100.0%]
+     | handbook."· I'm old school.· I actually don't think that's [100.0%]
+     | what it's called.· I believe it's got the word "people" in [100.0%]
+     | the title, maybe "People Guideline" or something like [100.0%]
+     | that. [100.0%]
+     | · · ·Q.· Okay. [100.0%]
+     | · · ·A.· Just to be clear. [100.0%]
+     | · · ·Q.· And does that document outline the company's [100.0%]
+     | policies and procedures? [100.0%]
+     | · · ·A.· It does. [100.0%]
+
+================================================================================
+PAGE 23 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·Q.· And you can see in this text message from [100.0%]
+     | Ms. Patel at the bottom she says:· They said they would [100.0%]
+     | look into it and do what they think is best. [100.0%]
+     | · · · · ·Do you see that? [100.0%]
+     | · · ·A.· I see that. [100.0%]
+     | · · ·Q.· Did you -- is that the response you gave to [100.0%]
+     | Ms. Patel when she reached out to you? [100.0%]
+     | · · ·A.· She did not ask me to look into anything, so this [100.0%]
+     | is again -- I don't know if she talked to other [100.0%]
+     | leadership. [100.0%]
+     | · · ·Q.· But from your memory, did you ever inform [100.0%]
+     | Ms. Lee -- I'm sorry -- Ms. Patel that you would look into [100.0%]
+     | it and do what's best? [100.0%]
+     | · · ·A.· No.· And I was never asked to. [100.0%]
+     | · · ·MR. CLARK:· The next exhibit we have is Exhibit 3. [100.0%]
+     | · · · · · · · (Plaintiff's Exhibit No. 3, Responsive [100.0%]
+     | · · · · · · · ·Documents, was marked for identification.) [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· These are the documents that were produced today. [100.0%]
+     | · · · · ·I'm just going to -- I assume you're familiar [100.0%]
+     | with them, Mr. Heindel?· There are 12 pages. [100.0%]
+     | · · ·A.· I mean, if they are what I sent to Anthony, then [100.0%]
+     | yes, but you zoomed through it a little quickly. [100.0%]
+     | · · ·Q.· My only question is:· On page 9 of the 12 of the [100.0%]
+     | documents you produced for today is an email from [100.0%]
+
+================================================================================
+PAGE 24 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | Nandita Patel to yourself and someone named Ben Phillips. [100.0%]
+     | · · · · ·Do you see that? [100.0%]
+     | · · ·A.· I do. [100.0%]
+     | · · ·Q.· And the Subject says: Feedback from Competency [100.0%]
+     | Assessment and Next Steps. [100.0%]
+     | · · · · ·Did you ask Ms. Patel to email you regarding [100.0%]
+     | Kim Lee and her competency assessment? [100.0%]
+     | · · ·A.· I did not. [100.0%]
+     | · · ·Q.· Do you know why you received this email? [100.0%]
+     | · · ·A.· I have no idea. [100.0%]
+     | · · ·Q.· And once you received it, did you -- how did you [100.0%]
+     | react, or who did you forward it to? [100.0%]
+     | · · ·A.· I didn't forward it to anybody. [100.0%]
+     | · · · · ·I believe -- and it might be in that thread -- I [100.0%]
+     | believe I responded back to her. [100.0%]
+     | · · · · ·If you could scan, it might refresh my memory. [100.0%]
+     | · · ·Q.· Sure.· You want me to go up or down? [100.0%]
+     | · · ·A.· Let's start with up. [100.0%]
+     | · · ·Q.· It looks like the original part of the email was [100.0%]
+     | deleted. [100.0%]
+     | · · ·A.· Oh. [100.0%]
+     | · · ·MR. OCEGUERA:· Yeah.· I think that's an [100.0%]
+     | administrative issue on my end.· I think that was him [100.0%]
+     | forwarding the email to us -- [100.0%]
+     | · · ·THE WITNESS:· Oh, okay. [100.0%]
+
+================================================================================
+PAGE 25 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·MR. OCEGUERA:· -- and with the comments. [100.0%]
+     | · · · · ·I think we redacted that, but, of course, my [100.0%]
+     | assistant didn't redact it the way I would have redacted [100.0%]
+     | it.· That's why there's a gap there. [100.0%]
+     | · · ·THE WITNESS:· Then perhaps scan down. [100.0%]
+     | · · ·MR. CLARK:· Sure. [100.0%]
+     | BY MR. CLARK: [100.0%]
+     | · · ·Q.· And that's it. [100.0%]
+     | · · ·A.· Oh. [100.0%]
+     | · · ·Q.· So the last three pages appear to be [100.0%]
+     | Nandita Patel forwarding you an email that was originally [100.0%]
+     | an email that she had sent to Kim Lee. [100.0%]
+     | · · ·A.· Yeah.· I remember being confused when -- if you [100.0%]
+     | look at the second paragraph: (As read:) I asked not to [100.0%]
+     | forward the original email to Kim primarily withhold [100.0%]
+     | managerial observations. [100.0%]
+     | · · · · ·Actually, that doesn't make sense to me. [100.0%]
+     | · · · · ·I don't know what she is talking about, but it [100.0%]
+     | just wasn't that relevant to me; so I didn't even address [100.0%]
+     | it. [100.0%]
+     | · · ·Q.· Okay.· And so -- so there was no follow-up to [100.0%]
+     | this email from Nandita to yourself and Ben Phillips; [100.0%]
+     | correct? [100.0%]
+     | · · ·A.· Certainly not between Nandita and me.· I do not [100.0%]
+     | know if Ben Phillips was involved other than being copied [100.0%]
+
+================================================================================
+PAGE 26 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | on this, and if so, did he follow up. [100.0%]
+     | · · · · ·That's beyond my knowledge. [100.0%]
+     | · · ·Q.· Okay.· And do you know who Ben Phillips is? [100.0%]
+     | · · ·A.· I do. [100.0%]
+     | · · ·Q.· And is he still employed with Kurin? [100.0%]
+     | · · ·A.· He is not. [100.0%]
+     | · · ·Q.· What was his role in June of 2023? [100.0%]
+     | · · ·A.· I believe his -- he worked in marketing for me, [100.0%]
+     | and I believe his title was Marketing Manager. [100.0%]
+     | · · ·Q.· Do you know who Nandita Patel reported to in June [100.0%]
+     | of 2023? [100.0%]
+     | · · ·A.· No.· You asked that and I'm struggling to [100.0%]
+     | remember.· I -- she's worked for different people; so I'm [100.0%]
+     | just not sure.· She was clinical outcomes director at the [100.0%]
+     | time, so it was probably the director of clinical [100.0%]
+     | outcomes, but I don't remember if that was Molly or Abbey. [100.0%]
+     | · · ·Q.· Okay. [100.0%]
+     | · · ·THE REPORTER:· Director of what, sir? [100.0%]
+     | · · ·THE WITNESS:· I'm sorry? [100.0%]
+     | · · ·THE REPORTER:· Director of what? [100.0%]
+     | · · ·THE WITNESS:· Director of clinical outcomes. [100.0%]
+     | · · ·THE REPORTER:· Oh, thank you. [100.0%]
+     | · · ·MR. CLARK:· Okay.· Mr. Heindel, I have no further [100.0%]
+     | questions.· So unless my colleague has questions for you, [100.0%]
+     | we will be done. [100.0%]
+
+================================================================================
+PAGE 27 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · ·MR. OCEGUERA:· No questions for me. [100.0%]
+     | · · ·THE WITNESS:· Thank you for your time, everybody. [100.0%]
+     | · · ·THE REPORTER:· And Mr. -- [100.0%]
+     | · · ·MR. OCEGUERA:· Don't log off quite yet; Ms. Chavez [100.0%]
+     | might have some spelling questions. [100.0%]
+     | · · ·THE REPORTER:· Well, Mr. Oceguera, do you want a -- [100.0%]
+     | do you need a copy of -- an electronic copy of this [100.0%]
+     | transcript? [100.0%]
+     | · · · · ·"No, thank you"? [100.0%]
+     | · · ·MR. OCEGUERA:· Electronic is fine, yes, thank you. [100.0%]
+     | · · ·THE REPORTER:· Oh, thank you. [100.0%]
+     | · · · · · · · (Proceedings were concluded at 2:42 PM) [100.0%]
+
+================================================================================
+PAGE 28 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · · · · · · · · · · · -oOo- [100.0%]
+     | · · · · · · · · · · PENALTY OF PERJURY [100.0%]
+     | · · · · ·I, MATT HEINDEL, do hereby declare under penalty [100.0%]
+     | of perjury that I have read the foregoing transcript; that [100.0%]
+     | I have made any corrections as appear noted, in ink, [100.0%]
+     | initialed by me, or attached hereto; that my testimony as [100.0%]
+     | contained herein, as corrected, is true and correct. [100.0%]
+     | · · · · ·Executed this _______day of _________________, [100.0%]
+     | ·20______, at ____________________, _____________________. [100.0%]
+     | · · · · · · · · ·(City)· · · · · · · · · ·(State) [100.0%]
+     | · · · · · · · · · · · · · · ____________________________ [100.0%]
+     | · · · · · · · · · · · · · · · Signature of the Deponent [100.0%]
+
+================================================================================
+PAGE 29 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+     | · · · · · · · · ·CERTIFICATE OF REPORTER [100.0%]
+     | · · · · · · · · · · · · · -oOo- [100.0%]
+     | · · · · ·I, the undersigned, a Certified Shorthand [100.0%]
+     | Reporter, licensed by the State of California, being [100.0%]
+     | empowered to administer oaths and affirmations remotely [100.0%]
+     | pursuant to Section 2093(b) of the Code of Civil [100.0%]
+     | Procedure, do hereby certify: [100.0%]
+     | · · · · ·That the foregoing proceedings were taken [100.0%]
+     | remotely before me at the time and place herein set forth; [100.0%]
+     | that any witness in the foregoing proceedings, prior to [100.0%]
+     | testifying, were placed under oath; that a verbatim record [100.0%]
+     | of the proceedings was made by me using shorthand which [100.0%]
+     | was thereafter transcribed under my direction; further, [100.0%]
+     | that the foregoing is an accurate transcription thereof. [100.0%]
+     | · · · · ·Further, that if the foregoing pertains to the [100.0%]
+     | original transcript of a deposition in a Federal Case, [100.0%]
+     | before completion of the proceedings, review of the [100.0%]
+     | transcript [ ] was [ ] was not requested. [100.0%]
+     | · · · · ·I further certify that I am neither financially [100.0%]
+     | interested in the action nor a relative or employee of any [100.0%]
+     | attorney or any of the parties. [100.0%]
+     | · · · · ·IN WITNESS WHEREOF, I have this date subscribed [100.0%]
+     | my name. [100.0%]
+     | DATED: September 22, 2025. [100.0%]
+     | · · · · · · · · · · · ·_________________________________ [100.0%]
+     | · · · · · · · · · · · · · ·Nancy Chavez, CSR No. 14580 [100.0%]
+
+================================================================================
+PAGE 30 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  29 | __________________________________________________________ [93.0%]
+     | · · · · · · · · · CHANGES AND SIGNATURE [100.0%]
+     | WITNESS NAME: MATT HEINDEL [100.0%]
+     | DATE: [100.0%]
+     | PAGE/LINE· · · · · · · · CHANGE· · · · · · · · REASON [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | __________________________________________________________ [100.0%]
+     | Executed this _____ day of ____________________, ________. [100.0%]
+     | · · · · · · · · · ·_____________________________________ [100.0%]
+     | · · · · · · · · · · · · · MATT HEINDEL (Witness Name) [100.0%]
+
+================================================================================
+PAGE 31 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+   1 |  [82.0%]
+  12 |  [82.0%]
+  13 |  [82.0%]
+  16 |  [82.0%]
+  19 |  [82.0%]
+   2 |  [82.0%]
+  11 |  [82.0%]
+   3 |  [82.0%]
+   3 |  [82.0%]
+   5 |  [82.0%]
+   9 |  [82.0%]
+  12 |  [82.0%]
+  64 |  [82.0%]
+
+================================================================================
+PAGE 32 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  45 |  [87.0%]
+  23 |  [87.0%]
+  25 |  [87.0%]
+  19 |  [87.0%]
+   5 |  [87.0%]
+  24 |  [87.0%]
+  64 |  [87.0%]
+
+================================================================================
+PAGE 33 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  15 |  [87.0%]
+  18 |  [87.0%]
+
+================================================================================
+PAGE 34 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  25 |  [86.0%]
+  23 |  [86.0%]
+  11 |  [86.0%]
+
+================================================================================
+PAGE 35 (612 x 792) - Confidence: 100.0%
+================================================================================
+
+--- CONTENT ---
+  24 |  [86.0%]
+  12 |  [86.0%]
+  21 |  [86.0%]
+  18 |  [86.0%]
+

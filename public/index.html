@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Reader - Legal Transcript Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-panel: #12121a;
+            --bg-card: #1a1a24;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --text: #e4e4e7;
+            --text-dim: #71717a;
+            --border: #27272a;
+            --line-num: #fbbf24;
+            --success: #22c55e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* Upload Area */
+        .upload-container {
+            max-width: 600px;
+            margin: 80px auto;
+            padding: 20px;
+        }
+
+        .upload-area {
+            background: var(--bg-card);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-icon { font-size: 3rem; margin-bottom: 16px; }
+        .upload-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; }
+        .upload-subtitle { color: var(--text-dim); }
+        input[type="file"] { display: none; }
+
+        /* Main Viewer */
+        .viewer {
+            display: none;
+            height: calc(100vh - 73px);
+        }
+
+        .viewer.active { display: flex; }
+
+        /* PDF Panel */
+        .pdf-panel {
+            flex: 1;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .panel-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+        }
+
+        .panel-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pdf-container {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px;
+            background: #000;
+        }
+
+        .pdf-image {
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        /* Text Panel */
+        .text-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .text-container {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            background: var(--bg-dark);
+        }
+
+        .text-line {
+            display: flex;
+            padding: 2px 0;
+        }
+
+        .text-line:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .line-number {
+            width: 40px;
+            flex-shrink: 0;
+            color: var(--line-num);
+            text-align: right;
+            padding-right: 16px;
+            user-select: none;
+            font-weight: 500;
+        }
+
+        .line-content {
+            flex: 1;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .line-empty {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        /* Navigation */
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .page-info strong {
+            color: var(--text);
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:hover { filter: brightness(1.1); }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .loading-overlay.active { display: flex; }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+
+        .loading-progress {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        /* Status bar */
+        .status-bar {
+            padding: 8px 20px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">📄</div>
+            <span>PDF Reader</span>
+        </div>
+        <div class="header-controls" id="headerControls" style="display: none;">
+            <div class="nav-controls">
+                <button class="nav-btn" id="prevBtn" title="Previous page">◀</button>
+                <span class="page-info">Page <strong id="currentPage">1</strong> of <strong id="totalPages">1</strong></span>
+                <button class="nav-btn" id="nextBtn" title="Next page">▶</button>
+            </div>
+            <button class="btn btn-outline" id="downloadBtn">Download TXT</button>
+            <button class="btn btn-outline" id="newFileBtn">New File</button>
+        </div>
+    </header>
+
+    <!-- Upload Screen -->
+    <div class="upload-container" id="uploadContainer">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-title">Drop PDF here or click to browse</div>
+            <div class="upload-subtitle">Legal transcript viewer with line numbers</div>
+            <input type="file" id="fileInput" accept=".pdf">
+        </div>
+    </div>
+
+    <!-- Main Viewer -->
+    <div class="viewer" id="viewer">
+        <div class="pdf-panel">
+            <div class="panel-header">
+                <span class="panel-title">PDF Document</span>
+                <span id="pdfFileName"></span>
+            </div>
+            <div class="pdf-container">
+                <img class="pdf-image" id="pdfImage" alt="PDF Page">
+            </div>
+        </div>
+        <div class="text-panel">
+            <div class="panel-header">
+                <span class="panel-title">Extracted Text</span>
+                <span id="lineCount"></span>
+            </div>
+            <div class="text-container" id="textContainer"></div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="status-dot"></span>
+                    <span>Line numbers: 1-25 per page</span>
+                </div>
+                <div class="status-item" id="extractionInfo"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Processing PDF...</div>
+        <div class="loading-progress" id="loadingProgress"></div>
+    </div>
+
+    <script>
+        // Elements
+        const uploadContainer = document.getElementById('uploadContainer');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const viewer = document.getElementById('viewer');
+        const headerControls = document.getElementById('headerControls');
+        const pdfImage = document.getElementById('pdfImage');
+        const textContainer = document.getElementById('textContainer');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const currentPageEl = document.getElementById('currentPage');
+        const totalPagesEl = document.getElementById('totalPages');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const newFileBtn = document.getElementById('newFileBtn');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const loadingProgress = document.getElementById('loadingProgress');
+        const pdfFileName = document.getElementById('pdfFileName');
+        const lineCount = document.getElementById('lineCount');
+        const extractionInfo = document.getElementById('extractionInfo');
+
+        // State
+        let pages = [];
+        let currentPage = 0;
+        let selectedFile = null;
+
+        // Upload handlers
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        async function handleFile(file) {
+            if (!file || file.type !== 'application/pdf') {
+                alert('Please select a valid PDF file');
+                return;
+            }
+
+            selectedFile = file;
+            pdfFileName.textContent = file.name;
+
+            // Show loading
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'Processing PDF...';
+            loadingProgress.textContent = 'Converting pages to images and extracting text';
+
+            try {
+                const formData = new FormData();
+                formData.append('pdf', file);
+
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || 'Extraction failed');
+                }
+
+                pages = result.pages;
+                currentPage = 0;
+
+                // Update UI
+                totalPagesEl.textContent = pages.length;
+                extractionInfo.textContent = `${pages.length} pages extracted`;
+
+                // Show viewer
+                uploadContainer.style.display = 'none';
+                viewer.classList.add('active');
+                headerControls.style.display = 'flex';
+
+                renderPage(0);
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        function renderPage(index) {
+            if (index < 0 || index >= pages.length) return;
+
+            currentPage = index;
+            const page = pages[index];
+
+            // Update page info
+            currentPageEl.textContent = index + 1;
+
+            // Update navigation buttons
+            prevBtn.disabled = index === 0;
+            nextBtn.disabled = index === pages.length - 1;
+
+            // Render PDF image
+            pdfImage.src = page.imageUrl;
+
+            // Render text with line numbers
+            textContainer.innerHTML = '';
+            
+            const lines = page.lines || [];
+            lineCount.textContent = `${lines.filter(l => l.text.trim()).length} lines with content`;
+
+            lines.forEach(line => {
+                const lineEl = document.createElement('div');
+                lineEl.className = 'text-line';
+
+                const numEl = document.createElement('span');
+                numEl.className = 'line-number';
+                numEl.textContent = line.lineNumber || '';
+
+                const contentEl = document.createElement('span');
+                contentEl.className = 'line-content' + (line.text.trim() ? '' : ' line-empty');
+                contentEl.textContent = line.text || '(empty)';
+
+                lineEl.appendChild(numEl);
+                lineEl.appendChild(contentEl);
+                textContainer.appendChild(lineEl);
+            });
+
+            // Add unmatched content if any
+            if (page.unmatched && page.unmatched.length > 0) {
+                const divider = document.createElement('div');
+                divider.style.cssText = 'padding: 10px 0; color: var(--text-dim); border-top: 1px solid var(--border); margin-top: 10px;';
+                divider.textContent = '— Additional content (not matched to line numbers) —';
+                textContainer.appendChild(divider);
+
+                page.unmatched.forEach(text => {
+                    const lineEl = document.createElement('div');
+                    lineEl.className = 'text-line';
+                    
+                    const numEl = document.createElement('span');
+                    numEl.className = 'line-number';
+                    numEl.textContent = '';
+
+                    const contentEl = document.createElement('span');
+                    contentEl.className = 'line-content';
+                    contentEl.textContent = text;
+
+                    lineEl.appendChild(numEl);
+                    lineEl.appendChild(contentEl);
+                    textContainer.appendChild(lineEl);
+                });
+            }
+        }
+
+        // Navigation
+        prevBtn.addEventListener('click', () => renderPage(currentPage - 1));
+        nextBtn.addEventListener('click', () => renderPage(currentPage + 1));
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!viewer.classList.contains('active')) return;
+            if (e.key === 'ArrowLeft') renderPage(currentPage - 1);
+            if (e.key === 'ArrowRight') renderPage(currentPage + 1);
+        });
+
+        // Download
+        downloadBtn.addEventListener('click', () => {
+            let text = '';
+            pages.forEach((page, idx) => {
+                text += `\n${'='.repeat(60)}\n`;
+                text += `PAGE ${idx + 1}\n`;
+                text += `${'='.repeat(60)}\n\n`;
+                
+                (page.lines || []).forEach(line => {
+                    const num = (line.lineNumber || '').toString().padStart(4);
+                    text += `${num} | ${line.text}\n`;
+                });
+
+                if (page.unmatched && page.unmatched.length > 0) {
+                    text += '\n--- Unmatched content ---\n';
+                    page.unmatched.forEach(t => text += `     | ${t}\n`);
+                }
+            });
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (selectedFile?.name || 'document').replace('.pdf', '_extracted.txt');
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // New file
+        newFileBtn.addEventListener('click', () => {
+            pages = [];
+            currentPage = 0;
+            selectedFile = null;
+            fileInput.value = '';
+            viewer.classList.remove('active');
+            headerControls.style.display = 'none';
+            uploadContainer.style.display = 'block';
+        });
+    </script>
+</body>
+</html>

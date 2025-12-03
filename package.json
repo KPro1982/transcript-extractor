@@ -1,0 +1,37 @@
+{
+  "name": "pdf-reader",
+  "version": "1.0.0",
+  "description": "Extract text from PDFs with line numbers, headers, and footers",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "serve": "node server.js",
+    "ocr": "ts-node src/index-ocr.ts",
+    "ocr:build": "npm run build && node dist/index-ocr.js",
+    "hybrid": "ts-node src/index-hybrid.ts",
+    "hybrid:build": "npm run build && node dist/index-hybrid.js",
+    "diagnostic": "ts-node src/diagnostic-tool.ts",
+    "test-ocr": "ts-node src/test-ocr-direct.ts"
+  },
+  "keywords": [
+    "pdf",
+    "text-extraction"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pdf-ts": "^0.0.2",
+    "pdf2pic": "^3.2.0",
+    "pdfjs-dist": "^3.11.174",
+    "sharp": "^0.34.5",
+    "tesseract.js": "^6.0.1",
+    "canvas": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
