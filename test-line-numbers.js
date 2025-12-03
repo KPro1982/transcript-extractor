@@ -211,3 +211,4 @@ const pageNum = parseInt(process.argv[3]) || 5; // Page 5 should have content wi
 
 testLineNumberExtraction(pdfPath, pageNum).catch(console.error);
 
+

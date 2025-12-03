@@ -9,3 +9,4 @@ console.log('"2025":', pattern.test('2025'));
 console.log('"25":', pattern.test('25'));
 console.log('"5":', pattern.test('5'));
 
+

@@ -66,6 +66,50 @@
             gap: 16px;
         }
 
+        /* Page number offset control */
+        .offset-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .offset-control label {
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+
+        .offset-input {
+            width: 50px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .offset-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .printed-page {
+            color: var(--line-num);
+            font-weight: 600;
+        }
+
+        .digital-page {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
         /* Upload Area */
         .upload-container {
             max-width: 600px;
@@ -331,8 +375,15 @@
         <div class="header-controls" id="headerControls" style="display: none;">
             <div class="nav-controls">
                 <button class="nav-btn" id="prevBtn" title="Previous page">◀</button>
-                <span class="page-info">Page <strong id="currentPage">1</strong> of <strong id="totalPages">1</strong></span>
+                <span class="page-info">
+                    Page <strong class="printed-page" id="printedPage">—</strong>
+                    <span class="digital-page">(digital <span id="currentPage">1</span>/<span id="totalPages">1</span>)</span>
+                </span>
                 <button class="nav-btn" id="nextBtn" title="Next page">▶</button>
+            </div>
+            <div class="offset-control" title="Which digital page has '1' printed on it? Look at the PDF footer.">
+                <label>Pg 1 is digital:</label>
+                <input type="number" id="pageOffset" class="offset-input" value="3" min="1" max="100">
             </div>
             <button class="btn btn-outline" id="downloadBtn">Download TXT</button>
             <button class="btn btn-outline" id="newFileBtn">New File</button>
@@ -362,14 +413,14 @@
         </div>
         <div class="text-panel">
             <div class="panel-header">
-                <span class="panel-title">Extracted Text</span>
+                <span class="panel-title">Page <strong class="printed-page" id="textPanelPage">—</strong></span>
                 <span id="lineCount"></span>
             </div>
             <div class="text-container" id="textContainer"></div>
             <div class="status-bar">
                 <div class="status-item">
                     <span class="status-dot"></span>
-                    <span>Line numbers: 1-25 per page</span>
+                    <span>Lines 1-25 • Check footer for printed page number</span>
                 </div>
                 <div class="status-item" id="extractionInfo"></div>
             </div>
@@ -404,11 +455,41 @@
         const pdfFileName = document.getElementById('pdfFileName');
         const lineCount = document.getElementById('lineCount');
         const extractionInfo = document.getElementById('extractionInfo');
+        const pageOffsetInput = document.getElementById('pageOffset');
+        const printedPageEl = document.getElementById('printedPage');
+        const textPanelPageEl = document.getElementById('textPanelPage');
 
         // State
         let pages = [];
         let currentPage = 0;
         let selectedFile = null;
+        let pageOffset = 0; // Offset to calculate printed page number
+
+        // firstNumberedPage: which digital page (1-based) is printed page 1
+        let firstNumberedPage = 1;
+
+        // Calculate printed page number from digital index
+        function getPrintedPageNumber(digitalIndex) {
+            // digitalIndex is 0-based
+            // firstNumberedPage is 1-based (which digital page = printed page 1)
+            // So digital page 3 (index 2) being printed page 1 means:
+            //   index 0 → printed -1 (title), index 1 → printed 0 (title), index 2 → printed 1
+            const printedPage = (digitalIndex + 1) - firstNumberedPage + 1;
+            return printedPage;
+        }
+
+        function formatPrintedPage(digitalIndex) {
+            const printed = getPrintedPageNumber(digitalIndex);
+            if (printed < 1) {
+                return '—'; // Title/unnumbered page
+            }
+            return printed.toString();
+        }
+        
+        // Update firstNumberedPage from input
+        function updateFirstNumberedPage() {
+            firstNumberedPage = parseInt(pageOffsetInput.value) || 1;
+        }
 
         // Upload handlers
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -459,9 +540,18 @@
                 pages = result.pages;
                 currentPage = 0;
 
+                // Auto-set firstNumberedPage from server detection
+                const detected = result.firstNumberedPage || 1;
+                firstNumberedPage = detected;
+                pageOffsetInput.value = firstNumberedPage;
+
                 // Update UI
                 totalPagesEl.textContent = pages.length;
-                extractionInfo.textContent = `${pages.length} pages extracted`;
+                const titlePages = firstNumberedPage - 1;
+                const detectionNote = detected > 1 ? ' ✓ detected' : '';
+                extractionInfo.textContent = titlePages > 0 
+                    ? `${titlePages} title page${titlePages > 1 ? 's' : ''}${detectionNote}`
+                    : `${pages.length} pages`;
 
                 // Show viewer
                 uploadContainer.style.display = 'none';
@@ -483,8 +573,13 @@
             currentPage = index;
             const page = pages[index];
 
-            // Update page info
+            // Update page info (digital page)
             currentPageEl.textContent = index + 1;
+            
+            // Update printed page number
+            const printedPage = formatPrintedPage(index);
+            printedPageEl.textContent = printedPage;
+            textPanelPageEl.textContent = printedPage;
 
             // Update navigation buttons
             prevBtn.disabled = index === 0;
@@ -546,6 +641,12 @@
         prevBtn.addEventListener('click', () => renderPage(currentPage - 1));
         nextBtn.addEventListener('click', () => renderPage(currentPage + 1));
 
+        // Page offset change - update displayed page numbers
+        pageOffsetInput.addEventListener('input', () => {
+            updateFirstNumberedPage();
+            renderPage(currentPage); // Re-render to update page number display
+        });
+
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             if (!viewer.classList.contains('active')) return;
@@ -557,8 +658,11 @@
         downloadBtn.addEventListener('click', () => {
             let text = '';
             pages.forEach((page, idx) => {
+                const printedPage = formatPrintedPage(idx);
+                const pageLabel = printedPage === '—' ? 'TITLE PAGE' : `PAGE ${printedPage}`;
+                
                 text += `\n${'='.repeat(60)}\n`;
-                text += `PAGE ${idx + 1}\n`;
+                text += `${pageLabel}\n`;
                 text += `${'='.repeat(60)}\n\n`;
                 
                 (page.lines || []).forEach(line => {
@@ -587,6 +691,8 @@
             currentPage = 0;
             selectedFile = null;
             fileInput.value = '';
+            firstNumberedPage = 1;
+            pageOffsetInput.value = '1';
             viewer.classList.remove('active');
             headerControls.style.display = 'none';
             uploadContainer.style.display = 'block';
