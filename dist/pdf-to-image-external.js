@@ -64,7 +64,6 @@ class ExternalPDFToImageConverter {
         ];
         for (const converter of converters) {
             if (await this.isAvailable(converter.name)) {
-                console.log(`Using ${converter.name} for PDF conversion...`);
                 return await converter.cmd(pdfPath);
             }
         }
@@ -84,13 +83,10 @@ class ExternalPDFToImageConverter {
             magick: 'magick --version',
         };
         try {
-            console.log(`  Testing ${tool}: ${commands[tool]}`);
-            const result = await execAsync(commands[tool]);
-            console.log(`  ✓ ${tool} available`);
+            await execAsync(commands[tool]);
             return true;
         }
         catch (error) {
-            console.log(`  ✗ ${tool} not found: ${error.message}`);
             return false;
         }
     }
@@ -123,7 +119,6 @@ class ExternalPDFToImageConverter {
                 width: Math.floor(8.5 * this.options.dpi),
                 height: Math.floor(11 * this.options.dpi),
             });
-            console.log(`  ✓ Page ${page}/${pageCount} converted`);
         }
         return results;
     }

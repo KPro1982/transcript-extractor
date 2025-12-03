@@ -420,7 +420,7 @@
             <div class="status-bar">
                 <div class="status-item">
                     <span class="status-dot"></span>
-                    <span>Lines 1-25 • Check footer for printed page number</span>
+                    <span>Lines 1-25 • Set page offset to match printed numbers</span>
                 </div>
                 <div class="status-item" id="extractionInfo"></div>
             </div>
@@ -540,18 +540,13 @@
                 pages = result.pages;
                 currentPage = 0;
 
-                // Auto-set firstNumberedPage from server detection
-                const detected = result.firstNumberedPage || 1;
-                firstNumberedPage = detected;
+                // Default to 3 for legal transcripts (typically 2 title pages)
+                firstNumberedPage = 3;
                 pageOffsetInput.value = firstNumberedPage;
 
                 // Update UI
                 totalPagesEl.textContent = pages.length;
-                const titlePages = firstNumberedPage - 1;
-                const detectionNote = detected > 1 ? ' ✓ detected' : '';
-                extractionInfo.textContent = titlePages > 0 
-                    ? `${titlePages} title page${titlePages > 1 ? 's' : ''}${detectionNote}`
-                    : `${pages.length} pages`;
+                extractionInfo.textContent = `${pages.length} pages`;
 
                 // Show viewer
                 uploadContainer.style.display = 'none';
