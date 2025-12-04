@@ -26,6 +26,7 @@
             --question-bg: rgba(56, 139, 253, 0.1);
             --answer-bg: rgba(63, 185, 80, 0.1);
             --colloquy-bg: rgba(210, 153, 34, 0.1);
+            --summary-bg: rgba(168, 85, 247, 0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -469,7 +470,7 @@
         /* Q/A Results Screen */
         .results-screen {
             display: none;
-            padding: 16px 24px;
+            padding: 10px 20px;
             max-width: 1000px;
             margin: 0 auto;
             height: calc(100vh - 57px);
@@ -485,65 +486,28 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             flex-shrink: 0;
         }
 
-        .results-title {
-            font-family: 'Crimson Pro', Georgia, serif;
-            font-size: 1.4rem;
-            font-weight: 600;
-        }
-
-        .results-stats {
-            display: flex;
-            gap: 16px;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--accent-gold);
-        }
-
-        .stat-label {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Q/A Navigation */
-        .qa-navigator {
+        .results-header-left {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 16px;
-            margin-bottom: 12px;
-            padding: 8px;
-            background: var(--bg-surface);
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            flex-shrink: 0;
+            gap: 10px;
         }
 
         .qa-nav-btn {
             background: var(--bg-elevated);
             border: 1px solid var(--border);
             color: var(--text-primary);
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             transition: all 0.2s;
         }
 
@@ -561,13 +525,14 @@
         .qa-counter {
             font-family: 'JetBrains Mono', monospace;
             font-size: 1rem;
-            min-width: 80px;
+            min-width: 60px;
             text-align: center;
         }
 
         .qa-counter-current {
             color: var(--accent-gold);
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 1.1rem;
         }
 
         /* Q/A Card */
@@ -576,22 +541,33 @@
             border-radius: 10px;
             border: 1px solid var(--border);
             overflow: hidden;
-            flex: 1;
             display: flex;
             flex-direction: column;
-            min-height: 0;
+            max-height: calc(100vh - 220px);
         }
 
         .qa-section {
-            padding: 12px 16px;
+            padding: 8px 14px;
             border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
+            max-height: 120px;
+            overflow: auto;
+        }
+
+        .qa-section.question {
+            max-height: 100px;
         }
 
         .qa-section.answer {
+            max-height: 140px;
             flex: 1;
-            overflow: auto;
-            min-height: 60px;
+        }
+
+        .qa-section.colloquy {
+            max-height: 60px;
+        }
+
+        .qa-section.summary {
+            max-height: 80px;
         }
 
         .qa-section:last-child {
@@ -602,15 +578,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .qa-section-label {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             font-weight: 600;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -620,13 +596,13 @@
         .qa-section-label.colloquy { color: #d29922; }
 
         .qa-section-label-icon {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 11px;
+            font-size: 10px;
         }
 
         .qa-section-label.question .qa-section-label-icon { background: var(--question-bg); }
@@ -635,29 +611,35 @@
 
         .qa-location {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: var(--text-muted);
             background: var(--bg-elevated);
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
         }
 
         .qa-text {
             font-family: 'Crimson Pro', Georgia, serif;
-            font-size: 1rem;
-            line-height: 1.5;
+            font-size: 0.95rem;
+            line-height: 1.4;
             color: var(--text-primary);
         }
 
         .qa-section.question { background: var(--question-bg); }
         .qa-section.answer { background: var(--answer-bg); }
         .qa-section.colloquy { background: var(--colloquy-bg); }
-        .qa-section.colloquy.empty { padding: 8px 16px; background: transparent; }
+        .qa-section.colloquy.hidden { display: none; }
+        .qa-section.summary { 
+            background: linear-gradient(135deg, var(--summary-bg), rgba(168, 85, 247, 0.05)); 
+            border-left: 3px solid #a855f7;
+        }
+        .qa-section-label.summary { color: #a855f7; }
+        .qa-section-label.summary .qa-section-label-icon { background: var(--summary-bg); }
 
         .qa-empty-note {
             color: var(--text-muted);
             font-style: italic;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
 
         .qa-card-container {
@@ -665,6 +647,7 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            max-height: calc(100vh - 180px);
         }
 
         /* View toggle */
@@ -700,7 +683,9 @@
             background: var(--bg-surface);
             border-radius: 12px;
             border: 1px solid var(--border);
-            overflow: hidden;
+            overflow: auto;
+            max-height: calc(100vh - 200px);
+            flex: 1;
         }
 
         .qa-table-container.active { display: block; }
@@ -768,6 +753,9 @@
         
         .legend-colloquy { color: #d29922; }
         .legend-colloquy::before { background: rgba(210, 153, 34, 0.3); border: 1px solid #d29922; }
+        
+        .legend-summary { color: #a855f7; }
+        .legend-summary::before { background: rgba(168, 85, 247, 0.3); border: 1px solid #a855f7; }
 
         .text-view-content {
             flex: 1;
@@ -837,6 +825,97 @@
         .text-view-page-header:first-child {
             margin-top: 0;
         }
+        
+        /* Q&A Block with Summary - side by side layout */
+        .qa-block-container {
+            display: flex;
+            margin: 12px 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-surface);
+        }
+        
+        .qa-block-transcript {
+            flex: 1;
+            padding: 12px;
+            border-right: 1px solid var(--border);
+            max-width: 60%;
+        }
+        
+        .qa-block-summary {
+            width: 40%;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(168, 85, 247, 0.03));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .qa-block-summary-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #a855f7;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+        
+        .qa-block-summary-label::before {
+            content: '✓';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: rgba(168, 85, 247, 0.2);
+            border-radius: 4px;
+            font-size: 10px;
+        }
+        
+        .qa-block-summary-text {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .qa-block-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background: var(--accent-gold);
+            color: var(--bg-deep);
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        
+        .qa-block-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .qa-block-location {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+        
+        .qa-block-container.current-qa {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.3);
+        }
 
         .qa-table {
             width: 100%;
@@ -874,7 +953,7 @@
 
         .qa-table-text {
             font-family: 'Crimson Pro', Georgia, serif;
-            max-width: 350px;
+            max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -1008,33 +1087,24 @@
     <!-- Screen 3: Q/A Results -->
     <div class="results-screen" id="resultsScreen">
         <div class="results-header">
-            <h1 class="results-title">Examination Q&A</h1>
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div class="results-stats">
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalQACount">0</div>
-                        <div class="stat-label">Q&A Pairs</div>
-                    </div>
+            <div class="results-header-left">
+                <button class="qa-nav-btn" id="qaPrevBtn" title="Previous Q&A">◀</button>
+                <div class="qa-counter">
+                    <span class="qa-counter-current" id="qaCurrentNum">1</span>
+                    <span style="color: var(--text-muted);"> / </span>
+                    <span id="qaTotalNum" style="color: var(--text-muted);">0</span>
                 </div>
-                <div class="view-toggle">
-                    <button class="view-toggle-btn active" id="cardViewBtn">Card</button>
-                    <button class="view-toggle-btn" id="tableViewBtn">Table</button>
-                    <button class="view-toggle-btn" id="textViewBtn">Text</button>
-                </div>
+                <button class="qa-nav-btn" id="qaNextBtn" title="Next Q&A">▶</button>
+            </div>
+            <div class="view-toggle">
+                <button class="view-toggle-btn active" id="cardViewBtn">Card</button>
+                <button class="view-toggle-btn" id="tableViewBtn">Table</button>
+                <button class="view-toggle-btn" id="textViewBtn">Text</button>
             </div>
         </div>
 
         <!-- Card View -->
         <div class="qa-card-container" id="qaCardContainer">
-            <div class="qa-navigator">
-                <button class="qa-nav-btn" id="qaPrevBtn" title="Previous Q&A">◀</button>
-                <div class="qa-counter">
-                    <span class="qa-counter-current" id="qaCurrentNum">1</span>
-                    <span> / </span>
-                    <span id="qaTotalNum">0</span>
-                </div>
-                <button class="qa-nav-btn" id="qaNextBtn" title="Next Q&A">▶</button>
-            </div>
 
             <div class="qa-card" id="qaCard">
                 <div class="qa-section question">
@@ -1069,6 +1139,16 @@
                     </div>
                     <div class="qa-text" id="qaAnswerText">—</div>
                 </div>
+                
+                <div class="qa-section summary">
+                    <div class="qa-section-header">
+                        <div class="qa-section-label summary">
+                            <span class="qa-section-label-icon">✓</span>
+                            Summary
+                        </div>
+                    </div>
+                    <div class="qa-text" id="qaSummaryText" style="font-weight: 500;">—</div>
+                </div>
             </div>
         </div>
 
@@ -1082,6 +1162,7 @@
                         <th>Loc</th>
                         <th>Answer</th>
                         <th>Loc</th>
+                        <th>Summary</th>
                         <th>Objection</th>
                     </tr>
                 </thead>
@@ -1104,6 +1185,7 @@
                 <span class="legend-item legend-question">Question</span>
                 <span class="legend-item legend-answer">Answer</span>
                 <span class="legend-item legend-colloquy">Colloquy</span>
+                <span class="legend-item legend-summary">Summary</span>
             </div>
             <div class="text-view-content" id="textViewContent"></div>
         </div>
@@ -1165,7 +1247,6 @@
         const qaNextBtn = document.getElementById('qaNextBtn');
         const qaCurrentNum = document.getElementById('qaCurrentNum');
         const qaTotalNum = document.getElementById('qaTotalNum');
-        const totalQACount = document.getElementById('totalQACount');
         
         // Text view elements
         const textViewContent = document.getElementById('textViewContent');
@@ -1422,7 +1503,6 @@
                     return;
                 }
 
-                totalQACount.textContent = qaItems.length;
                 qaTotalNum.textContent = qaItems.length;
                 textTotalNum.textContent = qaItems.length;
                 
@@ -1456,15 +1536,16 @@
             document.getElementById('qaAnswerText').textContent = qa.answer;
             document.getElementById('qaAnswerLoc').textContent = qa.answerLocation;
             
+            // Display summary
+            document.getElementById('qaSummaryText').textContent = qa.summary || 'No summary available';
+            
             const colloquySection = document.getElementById('qaColloquySection');
             if (qa.colloquy) {
-                colloquySection.classList.remove('empty');
+                colloquySection.classList.remove('hidden');
                 document.getElementById('qaColloquyText').textContent = qa.colloquy;
                 document.getElementById('qaColloquyLoc').textContent = qa.colloquyLocation;
             } else {
-                colloquySection.classList.add('empty');
-                document.getElementById('qaColloquyText').innerHTML = '<span class="qa-empty-note">No objection or colloquy</span>';
-                document.getElementById('qaColloquyLoc').textContent = '';
+                colloquySection.classList.add('hidden');
             }
             
             qaPrevBtn.disabled = index === 0;
@@ -1488,12 +1569,15 @@
                 
                 tr.innerHTML = `
                     <td class="qa-table-num">${index + 1}</td>
-                    <td class="qa-table-text" title="${escapeHtml(qa.question)}">${escapeHtml(truncate(qa.question, 60))}</td>
+                    <td class="qa-table-text" title="${escapeHtml(qa.question)}">${escapeHtml(truncate(qa.question, 50))}</td>
                     <td class="qa-table-location">${qa.questionLocation}</td>
-                    <td class="qa-table-text" title="${escapeHtml(qa.answer)}">${escapeHtml(truncate(qa.answer, 60))}</td>
+                    <td class="qa-table-text" title="${escapeHtml(qa.answer)}">${escapeHtml(truncate(qa.answer, 50))}</td>
                     <td class="qa-table-location">${qa.answerLocation}</td>
+                    <td class="qa-table-text" style="color: #a855f7; font-weight: 500;" title="${escapeHtml(qa.summary || '')}">
+                        ${escapeHtml(truncate(qa.summary || '', 50))}
+                    </td>
                     <td class="qa-table-text" style="color: ${qa.colloquy ? 'var(--warning)' : 'var(--text-muted)'}">
-                        ${qa.colloquy ? escapeHtml(truncate(qa.colloquy, 30)) : '—'}
+                        ${qa.colloquy ? escapeHtml(truncate(qa.colloquy, 25)) : '—'}
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -1568,15 +1652,20 @@
             qaCurrentNum.textContent = currentQAIndex + 1;
         }
 
-        // Render full text view with highlighting
+        // Render full text view with highlighting and summaries alongside
         function renderTextView() {
             if (!pages || pages.length === 0) return;
             
             textViewContent.innerHTML = '';
             textTotalNum.textContent = qaItems.length;
             
-            // Build a map of line locations to highlight types
+            // Build a map of line locations to highlight types and Q&A info
             const highlights = buildHighlightMap();
+            const qaRanges = buildQARanges();
+            
+            // Track which Q&A we're currently rendering
+            let currentQABlock = null;
+            let currentQAIdx = -1;
             
             // Render all pages
             pages.forEach((page, pageIdx) => {
@@ -1594,31 +1683,179 @@
                 const lines = page.lines || [];
                 lines.forEach(line => {
                     const lineKey = `${printedPage}:${line.lineNumber}`;
-                    const lineEl = document.createElement('div');
-                    lineEl.className = 'text-view-line';
-                    lineEl.dataset.page = printedPage;
-                    lineEl.dataset.line = line.lineNumber;
-                    
-                    // Check for highlights
                     const highlight = highlights[lineKey];
-                    if (highlight) {
-                        lineEl.classList.add(`highlight-${highlight.type}`);
-                        lineEl.dataset.qaIndex = highlight.qaIndex;
+                    
+                    // Check if this line starts a new Q&A block
+                    if (highlight && highlight.type === 'question') {
+                        const qaIdx = highlight.qaIndex;
+                        
+                        // If we're starting a new Q&A, create a block
+                        if (qaIdx !== currentQAIdx) {
+                            // Close previous block if exists
+                            if (currentQABlock) {
+                                textViewContent.appendChild(currentQABlock);
+                            }
+                            
+                            currentQAIdx = qaIdx;
+                            currentQABlock = createQABlock(qaIdx);
+                        }
                     }
                     
-                    const numEl = document.createElement('span');
-                    numEl.className = 'text-view-line-num';
-                    numEl.textContent = `${printedPage}:${line.lineNumber}`;
-                    
-                    const textEl = document.createElement('span');
-                    textEl.className = 'text-view-line-text';
-                    textEl.textContent = line.text || '';
-                    
-                    lineEl.appendChild(numEl);
-                    lineEl.appendChild(textEl);
-                    textViewContent.appendChild(lineEl);
+                    // If we have a current Q&A block and this line belongs to it
+                    if (currentQABlock && highlight && highlight.qaIndex === currentQAIdx) {
+                        const transcriptArea = currentQABlock.querySelector('.qa-block-transcript');
+                        const lineEl = createTranscriptLine(printedPage, line, highlight);
+                        transcriptArea.appendChild(lineEl);
+                    } else if (!highlight) {
+                        // Non-Q&A line - close current block if exists and render normally
+                        if (currentQABlock) {
+                            textViewContent.appendChild(currentQABlock);
+                            currentQABlock = null;
+                            currentQAIdx = -1;
+                        }
+                        
+                        const lineEl = document.createElement('div');
+                        lineEl.className = 'text-view-line';
+                        lineEl.dataset.page = printedPage;
+                        lineEl.dataset.line = line.lineNumber;
+                        
+                        const numEl = document.createElement('span');
+                        numEl.className = 'text-view-line-num';
+                        numEl.textContent = `${printedPage}:${line.lineNumber}`;
+                        
+                        const textEl = document.createElement('span');
+                        textEl.className = 'text-view-line-text';
+                        textEl.textContent = line.text || '';
+                        
+                        lineEl.appendChild(numEl);
+                        lineEl.appendChild(textEl);
+                        textViewContent.appendChild(lineEl);
+                    } else if (highlight && highlight.qaIndex !== currentQAIdx) {
+                        // Line belongs to a different Q&A (answer continuing)
+                        if (currentQABlock && highlight.qaIndex === currentQAIdx) {
+                            const transcriptArea = currentQABlock.querySelector('.qa-block-transcript');
+                            const lineEl = createTranscriptLine(printedPage, line, highlight);
+                            transcriptArea.appendChild(lineEl);
+                        } else if (currentQABlock) {
+                            // Close current block
+                            textViewContent.appendChild(currentQABlock);
+                            currentQABlock = null;
+                            currentQAIdx = -1;
+                        }
+                    }
                 });
             });
+            
+            // Don't forget the last block
+            if (currentQABlock) {
+                textViewContent.appendChild(currentQABlock);
+            }
+        }
+        
+        function createQABlock(qaIndex) {
+            const qa = qaItems[qaIndex];
+            
+            const container = document.createElement('div');
+            container.className = 'qa-block-container';
+            container.dataset.qaIndex = qaIndex;
+            
+            // Transcript side (left)
+            const transcriptDiv = document.createElement('div');
+            transcriptDiv.className = 'qa-block-transcript';
+            
+            // Header with Q&A number
+            const header = document.createElement('div');
+            header.className = 'qa-block-header';
+            
+            const numBadge = document.createElement('span');
+            numBadge.className = 'qa-block-number';
+            numBadge.textContent = qaIndex + 1;
+            
+            const locSpan = document.createElement('span');
+            locSpan.className = 'qa-block-location';
+            locSpan.textContent = `Q: ${qa.questionLocation} | A: ${qa.answerLocation}`;
+            
+            header.appendChild(numBadge);
+            header.appendChild(locSpan);
+            transcriptDiv.appendChild(header);
+            
+            // Summary side (right)
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'qa-block-summary';
+            
+            const summaryLabel = document.createElement('div');
+            summaryLabel.className = 'qa-block-summary-label';
+            summaryLabel.textContent = 'Summary';
+            
+            const summaryText = document.createElement('div');
+            summaryText.className = 'qa-block-summary-text';
+            summaryText.textContent = qa.summary || 'No summary available';
+            
+            summaryDiv.appendChild(summaryLabel);
+            summaryDiv.appendChild(summaryText);
+            
+            container.appendChild(transcriptDiv);
+            container.appendChild(summaryDiv);
+            
+            // Click to navigate
+            container.addEventListener('click', () => {
+                currentQAIndex = qaIndex;
+                updateTextViewNav();
+                renderQACard(qaIndex);
+                highlightCurrentQABlock();
+            });
+            
+            return container;
+        }
+        
+        function createTranscriptLine(printedPage, line, highlight) {
+            const lineEl = document.createElement('div');
+            lineEl.className = 'text-view-line';
+            lineEl.dataset.page = printedPage;
+            lineEl.dataset.line = line.lineNumber;
+            
+            if (highlight) {
+                lineEl.classList.add(`highlight-${highlight.type}`);
+            }
+            
+            const numEl = document.createElement('span');
+            numEl.className = 'text-view-line-num';
+            numEl.textContent = `${printedPage}:${line.lineNumber}`;
+            
+            const textEl = document.createElement('span');
+            textEl.className = 'text-view-line-text';
+            textEl.textContent = line.text || '';
+            
+            lineEl.appendChild(numEl);
+            lineEl.appendChild(textEl);
+            
+            return lineEl;
+        }
+        
+        function buildQARanges() {
+            const ranges = [];
+            qaItems.forEach((qa, index) => {
+                ranges.push({
+                    index,
+                    questionLocation: qa.questionLocation,
+                    answerLocation: qa.answerLocation,
+                    colloquyLocation: qa.colloquyLocation
+                });
+            });
+            return ranges;
+        }
+        
+        function highlightCurrentQABlock() {
+            // Remove previous highlights
+            document.querySelectorAll('.qa-block-container.current-qa').forEach(el => {
+                el.classList.remove('current-qa');
+            });
+            
+            // Add highlight to current
+            const currentBlock = document.querySelector(`.qa-block-container[data-qa-index="${currentQAIndex}"]`);
+            if (currentBlock) {
+                currentBlock.classList.add('current-qa');
+            }
         }
 
         // Build a map of page:line -> highlight type
@@ -1681,28 +1918,37 @@
         function scrollToCurrentQA() {
             if (qaItems.length === 0) return;
             
-            const qa = qaItems[currentQAIndex];
-            const qLoc = qa.questionLocation;
-            
             // Remove previous current highlight
+            document.querySelectorAll('.qa-block-container.current-qa').forEach(el => {
+                el.classList.remove('current-qa');
+            });
             document.querySelectorAll('.text-view-line.current-qa').forEach(el => {
                 el.classList.remove('current-qa');
             });
             
-            // Parse the location to find the first line
-            const match = qLoc.match(/^(\d+):(\d+)/);
-            if (match) {
-                const page = match[1];
-                const line = match[2];
-                
-                // Find the line element and scroll to it
-                const lineEl = textViewContent.querySelector(
-                    `.text-view-line[data-page="${page}"][data-line="${line}"]`
-                );
-                
-                if (lineEl) {
-                    lineEl.classList.add('current-qa');
-                    lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Find the Q&A block and scroll to it
+            const qaBlock = textViewContent.querySelector(
+                `.qa-block-container[data-qa-index="${currentQAIndex}"]`
+            );
+            
+            if (qaBlock) {
+                qaBlock.classList.add('current-qa');
+                qaBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                // Fallback to old line-based scroll if block not found
+                const qa = qaItems[currentQAIndex];
+                const qLoc = qa.questionLocation;
+                const match = qLoc.match(/^(\d+):(\d+)/);
+                if (match) {
+                    const page = match[1];
+                    const line = match[2];
+                    const lineEl = textViewContent.querySelector(
+                        `.text-view-line[data-page="${page}"][data-line="${line}"]`
+                    );
+                    if (lineEl) {
+                        lineEl.classList.add('current-qa');
+                        lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 }
             }
         }

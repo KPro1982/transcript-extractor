@@ -143,7 +143,8 @@ function parseExamination(pages, firstPrintedPage) {
                     answer: currentA.text,
                     answerLocation: formatLocation(currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
-                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
+                    summary: generateSummary(currentQ.text, currentA.text)
                 });
             }
             break;
@@ -158,7 +159,8 @@ function parseExamination(pages, firstPrintedPage) {
                     answer: currentA.text,
                     answerLocation: formatLocation(currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
-                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
+                    summary: generateSummary(currentQ.text, currentA.text)
                 });
             }
             
@@ -247,7 +249,8 @@ function parseExamination(pages, firstPrintedPage) {
             answer: currentA.text,
             answerLocation: formatLocation(currentA),
             colloquy: currentColloquy ? currentColloquy.text : '',
-            colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+            colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
+            summary: generateSummary(currentQ.text, currentA.text)
         });
     }
     
@@ -283,6 +286,257 @@ function cleanColloquyText(text) {
         .replace(/·/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+/**
+ * Generate a summary statement from a Q&A pair
+ * Converts question-answer format into a single affirmative statement
+ */
+function generateSummary(question, answer) {
+    if (!question || !answer) return '';
+    
+    // Clean up input
+    let q = question.trim().replace(/\?$/, '').trim();
+    let a = answer.trim().replace(/\.$/, '').trim();
+    
+    // Normalize answer for checking
+    const aLower = a.toLowerCase();
+    
+    // Check for yes/no type answers
+    const isYes = /^(yes|yeah|yep|correct|that's correct|that is correct|right|affirmative|i do|i did|i have|i was|i am|i can|it is|it was|they are|they were|there is|there are|uh-huh)\.?$/i.test(aLower);
+    const isNo = /^(no|nope|nah|incorrect|that's incorrect|negative|i don't|i didn't|i haven't|i wasn't|i'm not|i cannot|it isn't|it wasn't|they aren't|they weren't|there isn't|there aren't|uh-uh|not that i)\.?$/i.test(aLower);
+    
+    if (isYes) {
+        return convertQuestionToAffirmative(q);
+    }
+    
+    if (isNo) {
+        return convertQuestionToNegative(q);
+    }
+    
+    // For substantive answers, create combined statement
+    return createSubstantiveSummary(q, a);
+}
+
+function convertQuestionToAffirmative(q) {
+    const qLower = q.toLowerCase();
+    
+    // "Have you had your deposition taken" -> "The witness has been deposed before"
+    if (qLower.match(/have you (had your|ever had your|ever given a) deposition/)) {
+        return 'The witness has been deposed before.';
+    }
+    
+    // "Have you ever..." -> "The witness has..."
+    if (qLower.match(/^have you (ever )?/)) {
+        const rest = q.replace(/^have you (ever )?/i, '');
+        return 'The witness has ' + rest + '.';
+    }
+    
+    // "Had you ever..." -> "The witness had..."
+    if (qLower.match(/^had you (ever )?/)) {
+        const rest = q.replace(/^had you (ever )?/i, '');
+        return 'The witness had ' + rest + '.';
+    }
+    
+    // "Did you..." -> "The witness [past tense action]"
+    if (qLower.match(/^did you\s+/)) {
+        const action = q.replace(/^did you\s+/i, '');
+        return 'The witness ' + action + '.';
+    }
+    
+    // "Were you..." -> "The witness was..."
+    if (qLower.match(/^were you\s+/)) {
+        const state = q.replace(/^were you\s+/i, '');
+        return 'The witness was ' + state + '.';
+    }
+    
+    // "Are you..." -> "The witness is..."
+    if (qLower.match(/^are you\s+/)) {
+        const state = q.replace(/^are you\s+/i, '');
+        return 'The witness is ' + state + '.';
+    }
+    
+    // "Do you..." -> "The witness does..."
+    if (qLower.match(/^do you\s+/)) {
+        const action = q.replace(/^do you\s+/i, '');
+        return 'The witness ' + conjugateVerb(action) + '.';
+    }
+    
+    // "Can you..." -> "The witness can..."
+    if (qLower.match(/^can you\s+/)) {
+        const action = q.replace(/^can you\s+/i, '');
+        return 'The witness can ' + action + '.';
+    }
+    
+    // "Would you..." -> "The witness would..."
+    if (qLower.match(/^would you\s+/)) {
+        const action = q.replace(/^would you\s+/i, '');
+        return 'The witness would ' + action + '.';
+    }
+    
+    // "Is it true/correct that..." -> statement
+    if (qLower.match(/^is it (true|correct|fair to say) that\s+/)) {
+        const statement = q.replace(/^is it (true|correct|fair to say) that\s+/i, '');
+        return capitalizeFirst(statement) + '.';
+    }
+    
+    // "Is that..." / "Is this..." -> "That/This is..."
+    if (qLower.match(/^is (that|this)\s+/)) {
+        const rest = q.replace(/^is (that|this)\s+/i, '');
+        return capitalizeFirst(q.match(/^is (that|this)/i)[1]) + ' is ' + rest + '.';
+    }
+    
+    // Default: affirm
+    return 'The witness confirmed this.';
+}
+
+function convertQuestionToNegative(q) {
+    const qLower = q.toLowerCase();
+    
+    // "Have you ever..." -> "The witness has never..."
+    if (qLower.match(/^have you (ever )?/)) {
+        const rest = q.replace(/^have you (ever )?/i, '');
+        return 'The witness has not ' + rest + '.';
+    }
+    
+    // "Did you..." -> "The witness did not..."
+    if (qLower.match(/^did you\s+/)) {
+        const action = q.replace(/^did you\s+/i, '');
+        return 'The witness did not ' + action + '.';
+    }
+    
+    // "Were you..." -> "The witness was not..."
+    if (qLower.match(/^were you\s+/)) {
+        const state = q.replace(/^were you\s+/i, '');
+        return 'The witness was not ' + state + '.';
+    }
+    
+    // "Are you..." -> "The witness is not..."
+    if (qLower.match(/^are you\s+/)) {
+        const state = q.replace(/^are you\s+/i, '');
+        return 'The witness is not ' + state + '.';
+    }
+    
+    // "Do you..." -> "The witness does not..."
+    if (qLower.match(/^do you\s+/)) {
+        const action = q.replace(/^do you\s+/i, '');
+        return 'The witness does not ' + action + '.';
+    }
+    
+    // Default: deny
+    return 'The witness denied this.';
+}
+
+function createSubstantiveSummary(q, a) {
+    const qLower = q.toLowerCase();
+    
+    // "What is/was your [X]" -> "The witness's [X] is/was [answer]"
+    const whatIsYourMatch = qLower.match(/^what (is|was|are|were) your\s+(.+)/);
+    if (whatIsYourMatch) {
+        const verb = whatIsYourMatch[1];
+        const subject = whatIsYourMatch[2];
+        return `The witness's ${subject} ${verb} ${a}.`;
+    }
+    
+    // "What is/was your [X] in [time]" -> preserve time context
+    const whatIsYourTimeMatch = qLower.match(/^what (is|was|are|were) your\s+(.+?)\s+in\s+(\d{4}|\w+)/);
+    if (whatIsYourTimeMatch) {
+        const verb = whatIsYourTimeMatch[1];
+        const subject = whatIsYourTimeMatch[2];
+        const time = whatIsYourTimeMatch[3];
+        return `The witness's ${subject} in ${time} ${verb} ${a}.`;
+    }
+    
+    // "What is/was the [X]" -> "The [X] is/was [answer]"
+    const whatIsTheMatch = qLower.match(/^what (is|was|are|were) the\s+(.+)/);
+    if (whatIsTheMatch) {
+        const verb = whatIsTheMatch[1];
+        const subject = whatIsTheMatch[2];
+        return `The ${subject} ${verb} ${a}.`;
+    }
+    
+    // "What [X] do/did you [verb]" -> "The witness [verb]s/[verb]ed [answer]"
+    if (qLower.match(/^what\s+.+\s+do you\s+/)) {
+        return `The witness's answer: ${a}.`;
+    }
+    
+    // "Where do/did you [verb]" -> "The witness [verb]s/[verb]ed at [answer]"
+    if (qLower.match(/^where (do|did|does) you\s+(live|work|reside)/)) {
+        const verb = qLower.match(/(live|work|reside)/)[1];
+        const tense = qLower.includes('did') ? 'ed' : 's';
+        return `The witness ${verb}${tense === 'ed' ? 'd' : 's'} at ${a}.`;
+    }
+    
+    // "How many..." -> "[Answer] [rest of question context]"
+    if (qLower.match(/^how many\s+/)) {
+        return `${a}.`;
+    }
+    
+    // "How long..." -> "The duration was [answer]"
+    if (qLower.match(/^how long\s+/)) {
+        return `The duration was ${a}.`;
+    }
+    
+    // "Who is/was..." -> "[Answer] is/was [context]"
+    if (qLower.match(/^who (is|was|are|were)\s+/)) {
+        return `${a}.`;
+    }
+    
+    // "When did..." -> "[Event] occurred [answer]"
+    if (qLower.match(/^when (did|do|does|was|were)\s+/)) {
+        return `This occurred ${a}.`;
+    }
+    
+    // "Can you state and spell your name" -> "The witness's name is [answer]"
+    if (qLower.match(/state.*(and|&)?\s*spell.*name/)) {
+        // Extract just the name from answers like "John Smith, J-O-H-N S-M-I-T-H"
+        const nameOnly = a.split(/[,\-–—]/)[0].trim();
+        return `The witness's name is ${nameOnly}.`;
+    }
+    
+    // "Can you state your name" -> "The witness's name is [answer]"
+    if (qLower.match(/state\s+(your\s+)?(full\s+)?name/)) {
+        const nameOnly = a.split(/[,\-–—]/)[0].trim();
+        return `The witness's name is ${nameOnly}.`;
+    }
+    
+    // Default: create statement from answer with context
+    return `${a}.`;
+}
+
+function conjugateVerb(phrase) {
+    const words = phrase.split(' ');
+    if (words.length > 0) {
+        const verb = words[0].toLowerCase();
+        const irregulars = {
+            'have': 'has',
+            'do': 'does',
+            'go': 'goes',
+            'be': 'is',
+            'know': 'knows',
+            'understand': 'understands',
+            'remember': 'remembers',
+            'recall': 'recalls',
+            'believe': 'believes',
+            'think': 'thinks',
+            'agree': 'agrees'
+        };
+        if (irregulars[verb]) {
+            words[0] = irregulars[verb];
+        } else if (verb.match(/(s|sh|ch|x|z|o)$/)) {
+            words[0] = verb + 'es';
+        } else if (verb.match(/[^aeiou]y$/)) {
+            words[0] = verb.slice(0, -1) + 'ies';
+        } else {
+            words[0] = verb + 's';
+        }
+    }
+    return words.join(' ');
+}
+
+function capitalizeFirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function formatLocation(item) {
