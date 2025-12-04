@@ -57,12 +57,12 @@
             z-index: -1;
         }
 
-        /* Header */
+        /* Header - Compact */
         .header {
-            background: rgba(18, 18, 26, 0.8);
+            background: rgba(18, 18, 26, 0.95);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
-            padding: 16px 32px;
+            padding: 8px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -74,24 +74,24 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 10px;
         }
 
         .logo-icon {
-            width: 44px;
-            height: 44px;
+            width: 32px;
+            height: 32px;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
-            box-shadow: 0 4px 20px var(--accent-glow);
+            font-size: 16px;
+            box-shadow: 0 2px 10px var(--accent-glow);
         }
 
         .logo-text {
             font-family: 'Fraunces', Georgia, serif;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 600;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             -webkit-background-clip: text;
@@ -99,7 +99,7 @@
             letter-spacing: -0.02em;
         }
 
-        /* Step Progress Indicator */
+        /* Step Progress Indicator - Compact */
         .step-progress {
             display: flex;
             align-items: center;
@@ -109,9 +109,9 @@
         .step-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 16px;
-            border-radius: 8px;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
             transition: all 0.3s ease;
         }
 
@@ -120,13 +120,13 @@
         }
 
         .step-number {
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 600;
             transition: all 0.3s ease;
             background: var(--step-inactive);
@@ -136,7 +136,7 @@
         .step-item.active .step-number {
             background: var(--step-active);
             color: white;
-            box-shadow: 0 0 20px var(--accent-glow);
+            box-shadow: 0 0 12px var(--accent-glow);
         }
 
         .step-item.complete .step-number {
@@ -153,7 +153,7 @@
         }
 
         .step-label {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             font-weight: 500;
             transition: color 0.3s;
@@ -165,7 +165,7 @@
         }
 
         .step-connector {
-            width: 40px;
+            width: 24px;
             height: 2px;
             background: var(--step-inactive);
             transition: background 0.3s;
@@ -239,12 +239,12 @@
             display: flex !important;
         }
 
-        /* ========== STEP 1: Upload ========== */
+        /* ========== STEP 1: Upload - Compact ========== */
         .upload-screen {
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 12px;
             overflow: auto;
         }
         
@@ -253,7 +253,7 @@
         }
 
         .upload-container {
-            max-width: 520px;
+            max-width: 480px;
             width: 100%;
             text-align: center;
         }
@@ -261,22 +261,22 @@
         .upload-badge {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             background: var(--accent-subtle);
             border: 1px solid rgba(232, 93, 4, 0.3);
-            padding: 6px 14px;
+            padding: 4px 12px;
             border-radius: 100px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--accent-secondary);
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             font-weight: 500;
         }
 
         .upload-title {
             font-family: 'Fraunces', Georgia, serif;
-            font-size: 2rem;
+            font-size: 1.6rem;
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             line-height: 1.2;
             letter-spacing: -0.03em;
         }
@@ -289,16 +289,16 @@
 
         .upload-subtitle {
             color: var(--text-secondary);
-            font-size: 0.95rem;
-            margin-bottom: 20px;
-            line-height: 1.5;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+            line-height: 1.4;
         }
 
         .upload-area {
             background: var(--bg-raised);
             border: 2px dashed var(--border-bright);
-            border-radius: 16px;
-            padding: 32px 24px;
+            border-radius: 12px;
+            padding: 20px 18px;
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
@@ -331,28 +331,28 @@
         }
 
         .upload-icon {
-            width: 56px;
-            height: 56px;
-            margin: 0 auto 12px;
+            width: 44px;
+            height: 44px;
+            margin: 0 auto 10px;
             background: var(--bg-elevated);
-            border-radius: 14px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.75rem;
+            font-size: 1.4rem;
             border: 1px solid var(--border);
         }
 
         .upload-text {
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: var(--text-primary);
         }
 
         .upload-hint {
             color: var(--text-muted);
-            font-size: 0.85rem;
+            font-size: 0.75rem;
         }
 
         .upload-hint strong {
@@ -361,11 +361,11 @@
 
         input[type="file"] { display: none; }
 
-        /* ========== STEP 2: Page Selection ========== */
+        /* ========== STEP 2: Page Selection - Ultra Compact ========== */
         .page-select-screen {
-            padding: 30px;
+            padding: 8px 12px;
             flex-direction: column;
-            height: calc(100vh - 77px);
+            height: calc(100vh - 50px);
         }
         
         .page-select-screen.active {
@@ -374,32 +374,37 @@
 
         .page-select-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
 
         .page-select-title {
             font-family: 'Fraunces', Georgia, serif;
-            font-size: 1.8rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin: 0;
         }
 
         .page-select-desc {
             color: var(--text-secondary);
-            font-size: 1rem;
+            font-size: 0.75rem;
+            margin: 0;
         }
 
         .page-select-content {
             flex: 1;
             display: flex;
-            gap: 30px;
+            gap: 16px;
             min-height: 0;
         }
 
         .pdf-preview-panel {
             flex: 1;
             background: var(--bg-raised);
-            border-radius: 16px;
+            border-radius: 12px;
             border: 1px solid var(--border);
             overflow: hidden;
             display: flex;
@@ -407,7 +412,7 @@
         }
 
         .pdf-preview-header {
-            padding: 14px 20px;
+            padding: 4px 10px;
             background: var(--bg-elevated);
             border-bottom: 1px solid var(--border);
             display: flex;
@@ -417,8 +422,8 @@
 
         .pdf-preview-title {
             font-weight: 600;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
+            font-size: 0.7rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -426,21 +431,21 @@
         .pdf-preview-nav {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         .nav-btn {
-            width: 36px;
-            height: 36px;
+            width: 26px;
+            height: 26px;
             background: var(--bg-base);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 5px;
             color: var(--text-primary);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
+            font-size: 0.75rem;
             transition: all 0.2s;
         }
 
@@ -456,9 +461,9 @@
 
         .page-indicator {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            min-width: 80px;
+            min-width: 60px;
             text-align: center;
         }
 
@@ -471,7 +476,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 12px;
             background: #000;
             overflow: auto;
         }
@@ -479,68 +484,201 @@
         .pdf-preview-image img {
             max-width: 100%;
             max-height: 100%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         }
 
-        /* Page selector side panel */
-        .page-selector-panel {
-            width: 320px;
-            background: var(--bg-raised);
-            border-radius: 16px;
-            border: 1px solid var(--border);
+        /* Magnifying glass */
+        .magnifier-container {
+            position: relative;
+            flex: 1;
             display: flex;
             flex-direction: column;
         }
 
+        .magnifier-hint {
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            background: rgba(0,0,0,0.7);
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 8px;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+
+        .magnifier-hint.hidden {
+            opacity: 0;
+        }
+
+        .magnifier {
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border: 3px solid var(--accent-primary);
+            border-radius: 50%;
+            pointer-events: auto;
+            z-index: 100;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3);
+            display: none;
+            background: #000;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .magnifier.active {
+            display: block;
+        }
+
+        .magnifier:active {
+            cursor: grabbing;
+        }
+
+        .magnifier-lens {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-size: auto;
+            background-repeat: no-repeat;
+        }
+
+        .magnifier-crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+        }
+
+        .magnifier-crosshair::before,
+        .magnifier-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(236, 119, 34, 0.6);
+        }
+
+        .magnifier-crosshair::before {
+            width: 1px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .magnifier-crosshair::after {
+            height: 1px;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .magnifier-zoom-level {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: var(--accent-secondary);
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .magnifier-toggle {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .magnifier-toggle:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .magnifier-toggle.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Page selector side panel - Compact */
+        .page-selector-panel {
+            width: 240px;
+            background: var(--bg-raised);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
         .selector-header {
-            padding: 20px;
+            padding: 12px;
             border-bottom: 1px solid var(--border);
         }
 
         .selector-title {
             font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
         }
 
         .selector-desc {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
-            line-height: 1.5;
+            line-height: 1.4;
         }
 
         .selector-content {
-            padding: 20px;
+            padding: 12px;
             flex: 1;
             overflow: auto;
         }
 
         .page-input-group {
-            margin-bottom: 24px;
+            margin-bottom: 14px;
         }
 
         .page-input-label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .page-input-wrapper {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         .page-input {
             flex: 1;
             background: var(--bg-base);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 14px 16px;
+            border-radius: 8px;
+            padding: 10px 12px;
             color: var(--text-primary);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-align: center;
         }
 
@@ -552,19 +690,19 @@
 
         .page-quick-select {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .quick-select-btn {
             background: var(--bg-elevated);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 16px;
+            border-radius: 6px;
+            padding: 6px 12px;
             color: var(--text-secondary);
             cursor: pointer;
             font-family: inherit;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             transition: all 0.2s;
         }
 
@@ -581,33 +719,35 @@
 
         .current-preview-info {
             background: var(--bg-elevated);
-            border-radius: 12px;
-            padding: 16px;
-            margin-top: 20px;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 12px;
         }
 
         .preview-info-label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .preview-info-value {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.2rem;
+            font-size: 0.9rem;
             color: var(--accent-secondary);
         }
 
         .selector-footer {
-            padding: 20px;
+            padding: 12px;
             border-top: 1px solid var(--border);
         }
 
         .selector-footer .btn {
             width: 100%;
             justify-content: center;
+            padding: 10px 16px;
+            font-size: 0.85rem;
         }
 
         /* ========== STEP 3: Summarize ========== */
@@ -952,12 +1092,6 @@
             letter-spacing: 0.5px;
         }
 
-        .summary-table-container {
-            flex: 1;
-            overflow: auto;
-            padding: 0;
-        }
-
         .summary-table {
             width: 100%;
             border-collapse: collapse;
@@ -1035,9 +1169,11 @@
             font-size: 0.95rem;
             line-height: 1.4;
             color: var(--text-primary);
-            resize: vertical;
+            resize: none;
             min-height: 60px;
+            overflow: hidden;
             transition: border-color 0.2s, box-shadow 0.2s;
+            field-sizing: content; /* Modern browsers */
         }
 
         .row-summary-input:focus {
@@ -1048,6 +1184,610 @@
 
         .row-summary-input:hover {
             border-color: var(--border-bright);
+        }
+
+        /* Topic badge styles */
+        .topic-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .topic-admonitions { background: #3b82f620; color: #60a5fa; }
+        .topic-background { background: #8b5cf620; color: #a78bfa; }
+        .topic-work-history { background: #06b6d420; color: #22d3ee; }
+        .topic-complaints { background: #f59e0b20; color: #fbbf24; }
+        .topic-harassment { background: #ef444420; color: #f87171; }
+        .topic-discrimination { background: #ec489920; color: #f472b6; }
+        .topic-performance { background: #10b98120; color: #34d399; }
+        .topic-policies { background: #6366f120; color: #818cf8; }
+        .topic-timeline { background: #14b8a620; color: #2dd4bf; }
+        .topic-witnesses { background: #f9731620; color: #fb923c; }
+        .topic-documents { background: #78716c20; color: #a8a29e; }
+        .topic-medical { background: #dc262620; color: #f87171; }
+        .topic-damages { background: #84cc1620; color: #a3e635; }
+        .topic-uncategorized { background: #52525b20; color: #a1a1aa; }
+        .topic-default { background: #52525b20; color: #a1a1aa; }
+
+        .row-topic {
+            min-width: 140px;
+            max-width: 200px;
+            vertical-align: top;
+        }
+
+        /* Consolidated controls in topic cell */
+        .topic-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .topic-controls-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .topic-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-top: 4px;
+            border-top: 1px dashed var(--border);
+            margin-top: 4px;
+        }
+
+        /* Topic dropdown/select */
+        .topic-select {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            min-width: 120px;
+            max-width: 160px;
+        }
+
+        .topic-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .topic-select option {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        /* People dropdown */
+        .people-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .people-btn {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 8px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .people-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .people-btn.has-people {
+            background: #8b5cf620;
+            border-color: #8b5cf640;
+            color: #a78bfa;
+        }
+
+        .people-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            min-width: 180px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .people-list.show {
+            display: block;
+        }
+
+        .people-list-item {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            border-radius: 4px;
+        }
+
+        .people-list-item:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Chron checkbox */
+        .chron-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chron-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .chron-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .chron-checkbox.has-date .chron-label {
+            color: var(--success);
+        }
+
+        /* Resizable columns with sticky headers */
+        .summary-table th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--bg-elevated);
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            user-select: none;
+        }
+
+        .summary-table-container {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+            position: relative;
+        }
+
+        .resize-handle {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            transition: background 0.2s;
+        }
+
+        .resize-handle:hover,
+        .resize-handle.resizing {
+            background: var(--accent-primary);
+        }
+
+        .th-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hide-col-btn {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 2px;
+            transition: opacity 0.2s;
+        }
+
+        .summary-table th:hover .hide-col-btn {
+            opacity: 1;
+        }
+
+        .hide-col-btn:hover {
+            color: var(--accent-primary);
+        }
+
+        /* Column visibility menu */
+        .column-menu {
+            position: relative;
+            display: inline-block;
+        }
+
+        .column-menu-btn {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .column-menu-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .column-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            min-width: 160px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .column-menu-dropdown.show {
+            display: block;
+        }
+
+        .column-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .column-menu-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .column-menu-item input[type="checkbox"] {
+            accent-color: var(--accent-primary);
+        }
+
+        /* Report buttons */
+        .report-btn {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .report-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .report-btn .icon {
+            font-size: 1rem;
+        }
+
+        /* ========== STEP 4: Reports Screen ========== */
+        .reports-screen {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 50px);
+            padding: 30px;
+            background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(236, 119, 34, 0.03) 0%, transparent 100%);
+        }
+        
+        .reports-screen.active {
+            display: flex !important;
+        }
+
+        .reports-container {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .reports-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .reports-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .reports-title {
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .reports-desc {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .report-card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .report-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        .report-card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+
+        .report-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .report-card p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .report-card-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .reports-nav {
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .reports-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Report Modal */
+        .report-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.95);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow: auto;
+            z-index: 300;
+        }
+
+        .report-modal.show {
+            display: flex;
+        }
+
+        .report-content {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            max-width: 900px;
+            width: 100%;
+            max-height: calc(100vh - 80px);
+            overflow: auto;
+        }
+
+        .report-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background: var(--bg-raised);
+            z-index: 10;
+        }
+
+        .report-title {
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .report-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.5rem;
+            padding: 4px;
+        }
+
+        .report-close:hover {
+            color: var(--text-primary);
+        }
+
+        .report-body {
+            padding: 24px;
+        }
+
+        /* Chron report */
+        .chron-entry {
+            display: flex;
+            gap: 20px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chron-entry:last-child {
+            border-bottom: none;
+        }
+
+        .chron-date {
+            flex-shrink: 0;
+            width: 120px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-secondary);
+            font-weight: 600;
+        }
+
+        .chron-date.no-date {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .chron-summary {
+            flex: 1;
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        .chron-location {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Cast of characters report */
+        .cast-entry {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .cast-entry:last-child {
+            border-bottom: none;
+        }
+
+        .cast-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            margin-bottom: 4px;
+        }
+
+        .cast-role {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+
+        .cast-mentions {
+            padding-left: 16px;
+            border-left: 2px solid var(--border);
+        }
+
+        .cast-mention-item {
+            padding: 8px 0;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .cast-mention-loc {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--question-accent);
+        }
+
+        /* Needs AI button for merged entries */
+        .needs-ai-btn {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .needs-ai-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        .needs-ai-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .needs-ai-btn.loading {
+            background: linear-gradient(90deg, #8b5cf6, #6366f1, #8b5cf6);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        .pending-ai-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #a78bfa;
+            font-size: 0.75rem;
+            font-style: italic;
         }
 
         .summary-edit-indicator {
@@ -1074,15 +1814,70 @@
             opacity: 1;
         }
 
-        .row-qa-preview {
-            font-size: 0.8rem;
+        .row-summary-input.loading {
+            background: linear-gradient(90deg, var(--bg-base) 0%, var(--bg-elevated) 50%, var(--bg-base) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
             color: var(--text-muted);
-            max-width: 250px;
+            font-style: italic;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summarizing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-secondary);
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        .summarizing-indicator .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .summarizing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+        .summarizing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        .row-qa-preview {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            vertical-align: top;
+            line-height: 1.5;
         }
 
         .row-qa-preview .q-preview {
             color: var(--question-accent);
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed var(--border);
         }
 
         .row-qa-preview .a-preview {
@@ -1264,9 +2059,11 @@
             line-height: 1.5;
             color: var(--accent-secondary);
             font-weight: 500;
-            resize: vertical;
+            resize: none;
             min-height: 80px;
+            overflow: hidden;
             transition: border-color 0.2s, box-shadow 0.2s;
+            field-sizing: content; /* Modern browsers */
         }
 
         .detail-summary-input:focus {
@@ -1351,14 +2148,14 @@
             font-size: 0.9rem;
         }
 
-        /* Start over button in header */
+        /* Start over button in header - Compact */
         .start-over-btn {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 0.85rem;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -1402,12 +2199,12 @@
             <div class="step-connector"></div>
             <div class="step-item" data-step="3">
                 <div class="step-number"><span>3</span></div>
-                <span class="step-label">Summarize</span>
+                <span class="step-label">Review</span>
             </div>
             <div class="step-connector"></div>
             <div class="step-item" data-step="4">
                 <div class="step-number"><span>4</span></div>
-                <span class="step-label">Review</span>
+                <span class="step-label">Reports</span>
             </div>
         </div>
 
@@ -1437,39 +2234,49 @@
     <!-- STEP 2: Page Selection -->
     <div class="screen page-select-screen" id="pageSelectScreen">
         <div class="page-select-header">
-            <h2 class="page-select-title">Identify Page 1</h2>
-            <p class="page-select-desc">Navigate to find which digital page shows "1" printed in the footer</p>
+            <h2 class="page-select-title">Find Page 1</h2>
+            <p class="page-select-desc">Look for "1" in the page header or footer</p>
         </div>
         
         <div class="page-select-content">
-            <div class="pdf-preview-panel">
+            <!-- Main PDF preview with magnifier -->
+            <div class="pdf-preview-panel magnifier-container">
                 <div class="pdf-preview-header">
                     <span class="pdf-preview-title">PDF Preview</span>
                     <div class="pdf-preview-nav">
                         <button class="nav-btn" id="previewPrevBtn">◀</button>
                         <span class="page-indicator">
-                            <strong id="previewCurrentPage">1</strong> / <span id="previewTotalPages">1</span>
+                            <strong id="previewCurrentPage">1</strong>/<span id="previewTotalPages">1</span>
                         </span>
                         <button class="nav-btn" id="previewNextBtn">▶</button>
                     </div>
                 </div>
-                <div class="pdf-preview-image">
+                <div class="pdf-preview-image" id="pdfPreviewArea">
                     <img id="previewImage" src="" alt="PDF Page Preview">
+                    <div class="magnifier-hint" id="magnifierHint">🔍 Drag magnifier to move</div>
+                    
+                    <!-- Magnifying glass -->
+                    <div class="magnifier" id="magnifier">
+                        <div class="magnifier-lens" id="magnifierLens"></div>
+                        <div class="magnifier-crosshair"></div>
+                        <span class="magnifier-zoom-level">3×</span>
+                    </div>
                 </div>
+                <button class="magnifier-toggle" id="magnifierToggle">
+                    🔍 Magnifier
+                </button>
             </div>
             
+            <!-- Settings panel -->
             <div class="page-selector-panel">
                 <div class="selector-header">
-                    <h3 class="selector-title">Set Page 1 Location</h3>
-                    <p class="selector-desc">
-                        Deposition transcripts often have title pages before the numbered testimony begins.
-                        Tell us which digital page has "1" printed on it.
-                    </p>
+                    <h3 class="selector-title">Page 1 Location</h3>
+                    <p class="selector-desc">Which digital page shows "1" printed?</p>
                 </div>
                 
                 <div class="selector-content">
                     <div class="page-input-group">
-                        <label class="page-input-label">Page "1" is on digital page:</label>
+                        <label class="page-input-label">Page "1" is on:</label>
                         <input type="number" class="page-input" id="pageOneInput" value="3" min="1">
                     </div>
                     
@@ -1484,15 +2291,14 @@
                     </div>
                     
                     <div class="current-preview-info">
-                        <div class="preview-info-label">Currently viewing</div>
-                        <div class="preview-info-value" id="currentViewLabel">Digital page 1 → Title Page</div>
+                        <div class="preview-info-label">Viewing</div>
+                        <div class="preview-info-value" id="currentViewLabel">Page 1 → Title</div>
                     </div>
                 </div>
                 
                 <div class="selector-footer">
                     <button class="btn" id="continueToSummarize">
-                        Continue to Summarize
-                        <span>→</span>
+                        Continue →
                     </button>
                 </div>
             </div>
@@ -1502,14 +2308,15 @@
     <!-- STEP 3: Summarize -->
     <div class="screen summarize-screen" id="summarizeScreen">
         <div class="summarize-container">
-            <div class="summarize-icon">🔍</div>
+            <div class="summarize-icon">🤖</div>
             <h2 class="summarize-title">Ready to Analyze</h2>
             <p class="summarize-desc">
-                We'll scan through the transcript to find the examination section and extract all Q&A pairs with intelligent summaries.
+                We'll scan through the transcript to find the examination section and extract all Q&A pairs. 
+                <strong style="color: var(--accent-secondary);">AI-powered summarization</strong> will generate intelligent summaries for each exchange.
             </p>
             <button class="btn summarize-btn" id="startSummarizeBtn">
                 <span>⚡</span>
-                Start Analysis
+                Start AI Analysis
             </button>
             
             <div class="summarize-progress" id="summarizeProgress">
@@ -1538,8 +2345,8 @@
                 </div>
             </div>
             <div class="summary-actions">
-                <button class="btn btn-secondary" id="exportBtn">
-                    <span>📥</span> Export
+                <button class="btn" id="goToReportsBtn">
+                    Continue to Reports →
                 </button>
             </div>
             <button class="header-collapse-btn" id="headerCollapseBtn" title="Collapse header">
@@ -1580,16 +2387,28 @@
             <div class="summary-table-panel">
                 <div class="summary-table-header">
                     <span class="summary-table-title">Summary Table</span>
+                    <div class="column-menu">
+                        <button class="column-menu-btn" id="columnMenuBtn">
+                            <span>⚙</span> Columns
+                        </button>
+                        <div class="column-menu-dropdown" id="columnMenuDropdown">
+                            <label class="column-menu-item"><input type="checkbox" checked data-col="number"> #</label>
+                            <label class="column-menu-item"><input type="checkbox" checked data-col="location"> Location</label>
+                            <label class="column-menu-item"><input type="checkbox" checked data-col="topic"> Topic / Controls</label>
+                            <label class="column-menu-item"><input type="checkbox" checked data-col="preview"> Q&A</label>
+                            <label class="column-menu-item"><input type="checkbox" checked data-col="summary"> Summary</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="summary-table-container">
-                    <table class="summary-table">
+                    <table class="summary-table" id="summaryTable">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Location</th>
-                                <th>Summary</th>
-                                <th>Q&A Preview</th>
-                                <th></th>
+                                <th data-col="number" style="width: 50px;">#<div class="resize-handle"></div></th>
+                                <th data-col="location" style="width: 90px;">Location<div class="resize-handle"></div></th>
+                                <th data-col="topic" style="width: 180px;">Topic / Controls<div class="resize-handle"></div></th>
+                                <th data-col="preview" style="width: 280px;">Q&A<div class="resize-handle"></div></th>
+                                <th data-col="summary" style="min-width: 300px;">Summary<div class="resize-handle"></div></th>
                             </tr>
                         </thead>
                         <tbody id="summaryTableBody"></tbody>
@@ -1609,6 +2428,10 @@
             </div>
             <div class="detail-content">
                 <div class="detail-section">
+                    <div class="detail-section-label" style="color: var(--accent-secondary);">Topic</div>
+                    <div id="detailTopic" style="margin-bottom: 8px;">—</div>
+                </div>
+                <div class="detail-section">
                     <div class="detail-section-label question">Question</div>
                     <div class="detail-section-text" id="detailQuestion">—</div>
                     <div class="detail-location" id="detailQuestionLoc">—</div>
@@ -1624,11 +2447,80 @@
                         <span class="detail-saved-badge" id="detailSavedBadge">Saved ✓</span>
                     </div>
                     <textarea class="detail-summary-input" id="detailSummary" placeholder="Enter summary..."></textarea>
+                    <div id="detailAIBtn" style="margin-top: 8px;"></div>
                 </div>
             </div>
             <div class="detail-nav">
                 <button class="btn btn-ghost" id="detailPrevBtn">← Previous</button>
                 <button class="btn btn-ghost" id="detailNextBtn">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 4: Reports -->
+    <div class="screen reports-screen" id="reportsScreen">
+        <div class="reports-container">
+            <div class="reports-header">
+                <div class="reports-icon">📊</div>
+                <h2 class="reports-title">Generate Reports</h2>
+                <p class="reports-desc">Create detailed reports from your deposition summary</p>
+            </div>
+            
+            <div class="reports-grid">
+                <div class="report-card" id="chronReportCard">
+                    <div class="report-card-icon">📅</div>
+                    <h3>Chronological Report</h3>
+                    <p>View all summaries organized by date, with timeline context for each entry.</p>
+                    <button class="btn report-card-btn" id="chronReportBtn">Generate Chron Report</button>
+                </div>
+                
+                <div class="report-card" id="castReportCard">
+                    <div class="report-card-icon">👥</div>
+                    <h3>Cast of Characters</h3>
+                    <p>List all people mentioned in the deposition with their roles and references.</p>
+                    <button class="btn report-card-btn" id="castReportBtn">Generate Cast Report</button>
+                </div>
+                
+                <div class="report-card" id="exportReportCard">
+                    <div class="report-card-icon">📥</div>
+                    <h3>Export Summary</h3>
+                    <p>Download the complete deposition summary as a formatted document.</p>
+                    <button class="btn report-card-btn" id="exportBtn">Export to File</button>
+                </div>
+            </div>
+            
+            <div class="reports-nav">
+                <button class="btn btn-secondary" id="backToReviewBtn">← Back to Review</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chron Report Modal -->
+    <div class="report-modal" id="chronReportModal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title">
+                    <span>📅</span> Chronological Summary
+                </div>
+                <button class="report-close" id="chronReportClose">×</button>
+            </div>
+            <div class="report-body" id="chronReportBody">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Cast of Characters Report Modal -->
+    <div class="report-modal" id="castReportModal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title">
+                    <span>👥</span> Cast of Characters
+                </div>
+                <button class="report-close" id="castReportClose">×</button>
+            </div>
+            <div class="report-body" id="castReportBody">
+                <!-- Populated dynamically -->
             </div>
         </div>
     </div>
@@ -1648,12 +2540,27 @@
         let currentPreviewPage = 0;
         let firstPrintedPage = 3;
         let currentDetailIndex = 0;
+        
+        // Topic tracking
+        let allTopics = new Set(['Admonitions', 'Background', 'Work History', 'Complaints', 'Harassment', 
+                                 'Discrimination', 'Performance', 'Policies', 'Timeline', 'Witnesses', 
+                                 'Documents', 'Medical', 'Damages', 'Uncategorized']);
+        
+        // Column visibility state (simplified - controls now in topic column)
+        let columnVisibility = {
+            number: true,
+            location: true,
+            topic: true,
+            preview: true,
+            summary: true
+        };
 
         // ===== Elements =====
         const uploadScreen = document.getElementById('uploadScreen');
         const pageSelectScreen = document.getElementById('pageSelectScreen');
         const summarizeScreen = document.getElementById('summarizeScreen');
         const summaryScreen = document.getElementById('summaryScreen');
+        const reportsScreen = document.getElementById('reportsScreen');
         const stepProgress = document.getElementById('stepProgress');
         const startOverBtn = document.getElementById('startOverBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -1701,17 +2608,26 @@
         const detailNextBtn = document.getElementById('detailNextBtn');
 
         // ===== Step Navigation =====
+        // Step 3 can show either summarizeScreen (before analysis) or summaryScreen (after analysis)
+        let analysisComplete = false;
+        
         function goToStep(step) {
             currentStep = step;
             
             // Update screens
-            [uploadScreen, pageSelectScreen, summarizeScreen, summaryScreen].forEach(s => s.classList.remove('active'));
+            [uploadScreen, pageSelectScreen, summarizeScreen, summaryScreen, reportsScreen].forEach(s => s.classList.remove('active'));
             
             switch(step) {
                 case 1: uploadScreen.classList.add('active'); break;
                 case 2: pageSelectScreen.classList.add('active'); break;
-                case 3: summarizeScreen.classList.add('active'); break;
-                case 4: summaryScreen.classList.add('active'); break;
+                case 3: 
+                    if (analysisComplete) {
+                        summaryScreen.classList.add('active');
+                    } else {
+                        summarizeScreen.classList.add('active');
+                    }
+                    break;
+                case 4: reportsScreen.classList.add('active'); break;
             }
             
             // Update step indicators
@@ -1807,14 +2723,139 @@
             updateCurrentViewLabel();
         }
 
+        // ===== Magnifying Glass =====
+        let magnifierEnabled = false;
+        let isDraggingMagnifier = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        const ZOOM_LEVEL = 3;
+
+        function initMagnifier() {
+            const previewArea = document.getElementById('pdfPreviewArea');
+            const magnifier = document.getElementById('magnifier');
+            const magnifierLens = document.getElementById('magnifierLens');
+            const magnifierToggle = document.getElementById('magnifierToggle');
+            const magnifierHint = document.getElementById('magnifierHint');
+            const previewImg = document.getElementById('previewImage');
+
+            if (!previewArea || !magnifier || !magnifierToggle) return;
+
+            // Toggle magnifier on/off
+            magnifierToggle.addEventListener('click', () => {
+                magnifierEnabled = !magnifierEnabled;
+                magnifierToggle.classList.toggle('active', magnifierEnabled);
+                if (magnifierHint) magnifierHint.classList.toggle('hidden', !magnifierEnabled);
+                
+                if (magnifierEnabled) {
+                    // Position magnifier in lower left corner of the PDF image
+                    const areaRect = previewArea.getBoundingClientRect();
+                    const imgRect = previewImg.getBoundingClientRect();
+                    const magWidth = magnifier.offsetWidth;
+                    const magHeight = magnifier.offsetHeight;
+                    
+                    // Calculate image position relative to the preview area
+                    const imgLeft = imgRect.left - areaRect.left;
+                    const imgBottom = imgRect.bottom - areaRect.top;
+                    
+                    magnifier.style.left = (imgLeft + 10) + 'px';
+                    magnifier.style.top = (imgBottom - magHeight - 10) + 'px';
+                    magnifier.classList.add('active');
+                    magnifier.style.cursor = 'grab';
+                    
+                    // Update magnifier view
+                    updateMagnifierView();
+                } else {
+                    magnifier.classList.remove('active');
+                    isDraggingMagnifier = false;
+                }
+            });
+
+            // Make magnifier draggable
+            magnifier.style.pointerEvents = 'auto';
+            
+            magnifier.addEventListener('mousedown', (e) => {
+                if (!magnifierEnabled) return;
+                e.preventDefault();
+                isDraggingMagnifier = true;
+                magnifier.style.cursor = 'grabbing';
+                
+                const rect = magnifier.getBoundingClientRect();
+                const previewRect = previewArea.getBoundingClientRect();
+                dragOffsetX = e.clientX - rect.left;
+                dragOffsetY = e.clientY - rect.top;
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDraggingMagnifier || !magnifierEnabled) return;
+                
+                const previewRect = previewArea.getBoundingClientRect();
+                const magWidth = magnifier.offsetWidth;
+                const magHeight = magnifier.offsetHeight;
+                
+                // Calculate new position relative to preview area
+                let newX = e.clientX - previewRect.left - dragOffsetX;
+                let newY = e.clientY - previewRect.top - dragOffsetY;
+                
+                // Allow magnifier to go to edges (only half needs to stay visible)
+                newX = Math.max(-magWidth/2, Math.min(newX, previewRect.width - magWidth/2));
+                newY = Math.max(-magHeight/2, Math.min(newY, previewRect.height - magHeight/2));
+                
+                magnifier.style.left = newX + 'px';
+                magnifier.style.top = newY + 'px';
+                
+                updateMagnifierView();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDraggingMagnifier) {
+                    isDraggingMagnifier = false;
+                    magnifier.style.cursor = 'grab';
+                }
+            });
+
+            // Update magnifier when image changes
+            previewImg.addEventListener('load', () => {
+                if (magnifierEnabled) {
+                    updateMagnifierView();
+                }
+            });
+
+            function updateMagnifierView() {
+                if (!magnifierEnabled || !previewImg.src) return;
+                
+                const previewRect = previewArea.getBoundingClientRect();
+                const imgRect = previewImg.getBoundingClientRect();
+                const magRect = magnifier.getBoundingClientRect();
+                
+                const magWidth = magnifier.offsetWidth;
+                const magHeight = magnifier.offsetHeight;
+                
+                // Get center of magnifier relative to the image
+                const magCenterX = magRect.left + magWidth / 2 - imgRect.left;
+                const magCenterY = magRect.top + magHeight / 2 - imgRect.top;
+                
+                // Set the background image and position for zoom effect
+                magnifierLens.style.backgroundImage = `url(${previewImg.src})`;
+                magnifierLens.style.backgroundSize = `${imgRect.width * ZOOM_LEVEL}px ${imgRect.height * ZOOM_LEVEL}px`;
+                
+                // Center the zoomed area on the magnifier center
+                const bgX = -(magCenterX * ZOOM_LEVEL - magWidth / 2);
+                const bgY = -(magCenterY * ZOOM_LEVEL - magHeight / 2);
+                magnifierLens.style.backgroundPosition = `${bgX}px ${bgY}px`;
+            }
+        }
+
+        // Initialize magnifier when page loads
+        document.addEventListener('DOMContentLoaded', initMagnifier);
+
         function updateCurrentViewLabel() {
             const digitalPage = currentPreviewPage + 1;
             const printedPage = digitalPage - firstPrintedPage + 1;
             
             if (printedPage < 1) {
-                currentViewLabel.textContent = `Digital page ${digitalPage} → Title Page`;
+                currentViewLabel.textContent = `#${digitalPage} → Title`;
             } else {
-                currentViewLabel.textContent = `Digital page ${digitalPage} → Printed page ${printedPage}`;
+                currentViewLabel.textContent = `#${digitalPage} → Pg ${printedPage}`;
             }
         }
 
@@ -1868,12 +2909,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         pages: pages,
-                        firstPrintedPage: firstPrintedPage
+                        firstPrintedPage: firstPrintedPage,
+                        useAI: true
                     })
                 });
 
-                progressFill.style.width = '80%';
-                progressText.textContent = 'Generating summaries...';
+                progressFill.style.width = '70%';
+                progressText.textContent = '🤖 Generating AI summaries...';
 
                 const result = await response.json();
 
@@ -1882,6 +2924,7 @@
                 }
 
                 qaItems = result.qaItems;
+                const usedAI = result.aiSummaries;
 
                 if (qaItems.length === 0) {
                     alert('No Q&A pairs found. The examination section may not have been detected.');
@@ -1891,9 +2934,11 @@
                 }
 
                 progressFill.style.width = '100%';
-                progressText.textContent = `Found ${qaItems.length} Q&A pairs!`;
+                progressText.textContent = usedAI 
+                    ? `✨ Found ${qaItems.length} Q&A pairs with AI summaries!`
+                    : `Found ${qaItems.length} Q&A pairs!`;
 
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 800));
 
                 // Populate summary screen
                 totalQACount.textContent = qaItems.length;
@@ -1901,7 +2946,8 @@
                 renderSummaryTable();
                 renderSidePage(0);
                 
-                goToStep(4);
+                analysisComplete = true;
+                goToStep(3); // Stay on step 3 but show summary screen
 
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -1915,71 +2961,151 @@
         function renderSummaryTable() {
             summaryTableBody.innerHTML = '';
             
+            // Update all topics set from current data
+            qaItems.forEach(qa => {
+                if (qa.topic && qa.topic !== 'Uncategorized') {
+                    allTopics.add(qa.topic);
+                }
+            });
+            
             qaItems.forEach((qa, index) => {
                 const tr = document.createElement('tr');
                 tr.dataset.index = index;
                 
-                // Create row with editable summary
+                // Column: Number
                 const tdNumber = document.createElement('td');
                 tdNumber.className = 'row-number';
+                tdNumber.dataset.col = 'number';
+                tdNumber.style.display = columnVisibility.number ? '' : 'none';
                 tdNumber.textContent = index + 1;
                 if (qa.mergedCount && qa.mergedCount > 1) {
-                    tdNumber.innerHTML = `${index + 1}<span class="merged-indicator">${qa.mergedCount} merged</span>`;
+                    tdNumber.innerHTML = `${index + 1}<span class="merged-indicator">${qa.mergedCount}</span>`;
                 }
                 
+                // Column: Location
                 const tdLocation = document.createElement('td');
                 tdLocation.className = 'row-location';
+                tdLocation.dataset.col = 'location';
+                tdLocation.style.display = columnVisibility.location ? '' : 'none';
                 tdLocation.innerHTML = `<a data-page="${extractPageFromLocation(qa.questionLocation)}" data-index="${index}">${qa.questionLocation}</a>`;
                 
-                const tdSummary = document.createElement('td');
-                tdSummary.className = 'row-summary';
+                // Column: Topic + Controls (consolidated)
+                const tdTopic = document.createElement('td');
+                tdTopic.className = 'row-topic';
+                tdTopic.dataset.col = 'topic';
+                tdTopic.style.display = columnVisibility.topic ? '' : 'none';
                 
-                const summaryTextarea = document.createElement('textarea');
-                summaryTextarea.className = 'row-summary-input';
-                summaryTextarea.value = qa.summary || '';
-                summaryTextarea.placeholder = 'Enter summary...';
-                summaryTextarea.dataset.index = index;
+                const topicControls = document.createElement('div');
+                topicControls.className = 'topic-controls';
                 
-                // Save on blur or change
-                summaryTextarea.addEventListener('blur', (e) => saveSummaryFromTable(index, e.target.value));
-                summaryTextarea.addEventListener('input', debounce((e) => saveSummaryFromTable(index, e.target.value), 500));
+                // Topic dropdown row
+                const topicRow = document.createElement('div');
+                topicRow.className = 'topic-controls-row';
                 
-                // Prevent row click when editing
-                summaryTextarea.addEventListener('click', (e) => e.stopPropagation());
+                const topicSelect = document.createElement('select');
+                topicSelect.className = 'topic-select';
+                topicSelect.dataset.index = index;
                 
-                tdSummary.appendChild(summaryTextarea);
+                const sortedTopics = Array.from(allTopics).sort();
+                sortedTopics.forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.textContent = topic;
+                    if (topic === (qa.topic || 'Uncategorized')) {
+                        option.selected = true;
+                    }
+                    topicSelect.appendChild(option);
+                });
                 
-                const tdPreview = document.createElement('td');
-                tdPreview.className = 'row-qa-preview';
+                const addNewOption = document.createElement('option');
+                addNewOption.value = '__new__';
+                addNewOption.textContent = '+ Add new...';
+                topicSelect.appendChild(addNewOption);
                 
-                // Check if this is a merged entry with multiple Q/A pairs
-                if (qa.qaSequence && qa.qaSequence.length > 1) {
-                    // Show sequence of Q/As
-                    let sequenceHtml = '<div class="qa-sequence">';
-                    qa.qaSequence.forEach((item, i) => {
-                        sequenceHtml += `<div class="qa-sequence-item">
-                            <div class="q-preview">Q: ${escapeHtml(truncate(item.question, 30))}</div>
-                            <div class="a-preview">A: ${escapeHtml(truncate(item.answer, 30))}</div>
-                        </div>`;
+                topicSelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    handleTopicChange(index, e.target.value);
+                });
+                topicSelect.addEventListener('click', (e) => e.stopPropagation());
+                
+                topicRow.appendChild(topicSelect);
+                topicControls.appendChild(topicRow);
+                
+                // Meta row: Chron, People, Actions
+                const metaRow = document.createElement('div');
+                metaRow.className = 'topic-meta-row';
+                
+                // Chron checkbox
+                const chronDiv = document.createElement('div');
+                chronDiv.className = 'chron-checkbox' + (qa.hasDates ? ' has-date' : '');
+                chronDiv.title = 'Has dates';
+                
+                const chronCheckbox = document.createElement('input');
+                chronCheckbox.type = 'checkbox';
+                chronCheckbox.checked = qa.hasDates || false;
+                chronCheckbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    qaItems[index].hasDates = e.target.checked;
+                    e.target.parentElement.classList.toggle('has-date', e.target.checked);
+                });
+                chronCheckbox.addEventListener('click', (e) => e.stopPropagation());
+                
+                const chronLabel = document.createElement('span');
+                chronLabel.className = 'chron-label';
+                chronLabel.textContent = '📅';
+                
+                chronDiv.appendChild(chronCheckbox);
+                chronDiv.appendChild(chronLabel);
+                metaRow.appendChild(chronDiv);
+                
+                // People dropdown
+                const peopleDiv = document.createElement('div');
+                peopleDiv.className = 'people-dropdown';
+                
+                const peopleBtn = document.createElement('button');
+                peopleBtn.className = 'people-btn' + ((qa.peopleMentioned && qa.peopleMentioned.length > 0) ? ' has-people' : '');
+                const peopleCount = (qa.peopleMentioned && qa.peopleMentioned.length) || 0;
+                peopleBtn.innerHTML = `👥${peopleCount}`;
+                peopleBtn.title = 'People mentioned';
+                peopleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    togglePeopleList(index, peopleDiv);
+                });
+                
+                const peopleList = document.createElement('div');
+                peopleList.className = 'people-list';
+                peopleList.id = `people-list-${index}`;
+                
+                if (qa.peopleMentioned && qa.peopleMentioned.length > 0) {
+                    qa.peopleMentioned.forEach(person => {
+                        const item = document.createElement('div');
+                        item.className = 'people-list-item';
+                        item.textContent = person.name || person;
+                        peopleList.appendChild(item);
                     });
-                    sequenceHtml += '</div>';
-                    tdPreview.innerHTML = sequenceHtml;
                 } else {
-                    tdPreview.innerHTML = `
-                        <div class="q-preview">Q: ${escapeHtml(truncate(qa.question, 40))}</div>
-                        <div class="a-preview">A: ${escapeHtml(truncate(qa.answer, 40))}</div>
-                    `;
+                    const item = document.createElement('div');
+                    item.className = 'people-list-item';
+                    item.textContent = 'No people';
+                    item.style.fontStyle = 'italic';
+                    item.style.color = 'var(--text-muted)';
+                    peopleList.appendChild(item);
                 }
                 
-                const tdActions = document.createElement('td');
-                tdActions.className = 'row-actions';
+                peopleDiv.appendChild(peopleBtn);
+                peopleDiv.appendChild(peopleList);
+                metaRow.appendChild(peopleDiv);
                 
-                // Add unmerge button for merged entries
+                // Action buttons (merge/unmerge)
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'row-actions';
+                actionsDiv.style.marginLeft = 'auto';
+                
                 if (qa.qaSequence && qa.qaSequence.length > 1) {
                     const unmergeBtn = document.createElement('button');
                     unmergeBtn.className = 'unmerge-btn';
-                    unmergeBtn.title = 'Unmerge Q&A pairs';
-                    unmergeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    unmergeBtn.title = 'Unmerge';
+                    unmergeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <polyline points="5 12 12 19 19 12"></polyline>
                     </svg>`;
@@ -1987,15 +3113,14 @@
                         e.stopPropagation();
                         unmergeQA(index);
                     });
-                    tdActions.appendChild(unmergeBtn);
+                    actionsDiv.appendChild(unmergeBtn);
                 }
                 
-                // Add merge button (not for first row)
                 if (index > 0) {
                     const mergeBtn = document.createElement('button');
                     mergeBtn.className = 'merge-btn';
-                    mergeBtn.title = 'Merge with previous Q&A';
-                    mergeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    mergeBtn.title = 'Merge with previous';
+                    mergeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <polyline points="5 12 12 5 19 12"></polyline>
                     </svg>`;
@@ -2003,24 +3128,258 @@
                         e.stopPropagation();
                         mergeWithPrevious(index);
                     });
-                    tdActions.appendChild(mergeBtn);
+                    actionsDiv.appendChild(mergeBtn);
                 }
                 
+                metaRow.appendChild(actionsDiv);
+                topicControls.appendChild(metaRow);
+                tdTopic.appendChild(topicControls);
+                
+                // Column: Q&A Preview (now on LEFT before summary)
+                const tdPreview = document.createElement('td');
+                tdPreview.className = 'row-qa-preview';
+                tdPreview.dataset.col = 'preview';
+                tdPreview.style.display = columnVisibility.preview ? '' : 'none';
+                
+                if (qa.qaSequence && qa.qaSequence.length > 1) {
+                    let sequenceHtml = '<div class="qa-sequence">';
+                    qa.qaSequence.forEach((item, i) => {
+                        sequenceHtml += `<div class="qa-sequence-item">
+                            <div class="q-preview">Q: ${escapeHtml(truncate(item.question, 50))}</div>
+                            <div class="a-preview">A: ${escapeHtml(truncate(item.answer, 50))}</div>
+                        </div>`;
+                    });
+                    sequenceHtml += '</div>';
+                    tdPreview.innerHTML = sequenceHtml;
+                } else {
+                    tdPreview.innerHTML = `
+                        <div class="q-preview">Q: ${escapeHtml(truncate(qa.question, 60))}</div>
+                        <div class="a-preview">A: ${escapeHtml(truncate(qa.answer, 60))}</div>
+                    `;
+                }
+                
+                // Column: Summary (now on RIGHT)
+                const tdSummary = document.createElement('td');
+                tdSummary.className = 'row-summary';
+                tdSummary.dataset.col = 'summary';
+                tdSummary.style.display = columnVisibility.summary ? '' : 'none';
+                
+                const summaryTextarea = document.createElement('textarea');
+                summaryTextarea.className = 'row-summary-input';
+                summaryTextarea.value = qa.summary || '';
+                summaryTextarea.placeholder = 'Enter summary...';
+                summaryTextarea.dataset.index = index;
+                
+                if (qa.isSummarizing) {
+                    summaryTextarea.classList.add('loading');
+                    summaryTextarea.disabled = true;
+                }
+                
+                autoExpandTextarea(summaryTextarea);
+                
+                summaryTextarea.addEventListener('blur', (e) => saveSummaryFromTable(index, e.target.value));
+                summaryTextarea.addEventListener('input', (e) => {
+                    autoExpandTextarea(e.target);
+                    debounce(() => saveSummaryFromTable(index, e.target.value), 500)();
+                });
+                summaryTextarea.addEventListener('click', (e) => e.stopPropagation());
+                
+                tdSummary.appendChild(summaryTextarea);
+                
+                if (qa.isSummarizing) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'summarizing-indicator';
+                    indicator.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span> AI...';
+                    tdSummary.appendChild(indicator);
+                }
+                
+                if (qa.needsAISummary && qa.qaSequence && qa.qaSequence.length > 1) {
+                    const aiBtn = document.createElement('button');
+                    aiBtn.className = 'needs-ai-btn';
+                    aiBtn.innerHTML = '✨ AI Summary';
+                    aiBtn.dataset.index = index;
+                    aiBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        submitMergedToAI(index);
+                    });
+                    tdSummary.appendChild(aiBtn);
+                }
+                
+                // Append columns in new order: #, Location, Topic/Controls, Q&A, Summary
                 tr.appendChild(tdNumber);
                 tr.appendChild(tdLocation);
-                tr.appendChild(tdSummary);
+                tr.appendChild(tdTopic);
                 tr.appendChild(tdPreview);
-                tr.appendChild(tdActions);
+                tr.appendChild(tdSummary);
                 
-                // Click on non-summary areas opens detail
                 tdNumber.addEventListener('click', () => openDetail(index));
                 tdPreview.addEventListener('click', () => openDetail(index));
                 
                 summaryTableBody.appendChild(tr);
             });
             
-            // Update total count
+            // Update header visibility
+            updateColumnVisibility();
+            
             totalQACount.textContent = qaItems.length;
+            
+            setTimeout(() => {
+                document.querySelectorAll('.row-summary-input').forEach(autoExpandTextarea);
+            }, 50);
+        }
+
+        // Handle topic change
+        async function handleTopicChange(index, newTopic) {
+            if (newTopic === '__new__') {
+                const customTopic = prompt('Enter new topic name:');
+                if (customTopic && customTopic.trim()) {
+                    const trimmedTopic = customTopic.trim();
+                    allTopics.add(trimmedTopic);
+                    qaItems[index].topic = trimmedTopic;
+                    
+                    // Offer to reevaluate other Q/As with AI
+                    if (confirm(`Topic "${trimmedTopic}" added. Would you like AI to check if this topic applies to other Q&A items?`)) {
+                        await reevaluateTopicsWithAI(trimmedTopic);
+                    }
+                    
+                    renderSummaryTable();
+                } else {
+                    // Reset to previous value
+                    renderSummaryTable();
+                }
+            } else {
+                qaItems[index].topic = newTopic;
+            }
+        }
+
+        // AI reevaluate topics with new custom topic
+        async function reevaluateTopicsWithAI(newTopic) {
+            try {
+                const response = await fetch('/api/reevaluate-topics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        qaItems: qaItems.map(qa => ({ 
+                            question: qa.question, 
+                            answer: qa.answer, 
+                            currentTopic: qa.topic 
+                        })),
+                        newTopic: newTopic,
+                        existingTopics: Array.from(allTopics)
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.updates) {
+                    let updateCount = 0;
+                    result.updates.forEach((update, idx) => {
+                        if (update.newTopic && update.newTopic !== qaItems[idx].topic) {
+                            qaItems[idx].topic = update.newTopic;
+                            updateCount++;
+                        }
+                    });
+                    
+                    if (updateCount > 0) {
+                        alert(`AI updated ${updateCount} items to use topic "${newTopic}"`);
+                        renderSummaryTable();
+                    } else {
+                        alert(`AI didn't find any other items that fit the topic "${newTopic}"`);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to reevaluate topics:', error);
+            }
+        }
+
+        // Toggle people list visibility
+        function togglePeopleList(index, container) {
+            const list = container.querySelector('.people-list');
+            const wasOpen = list.classList.contains('show');
+            
+            // Close all other lists
+            document.querySelectorAll('.people-list.show').forEach(l => l.classList.remove('show'));
+            
+            if (!wasOpen) {
+                list.classList.add('show');
+            }
+        }
+
+        // Update column visibility in header and body
+        function updateColumnVisibility() {
+            // Update header
+            document.querySelectorAll('.summary-table th[data-col]').forEach(th => {
+                const col = th.dataset.col;
+                th.style.display = columnVisibility[col] ? '' : 'none';
+            });
+            
+            // Update body rows
+            document.querySelectorAll('.summary-table td[data-col]').forEach(td => {
+                const col = td.dataset.col;
+                td.style.display = columnVisibility[col] ? '' : 'none';
+            });
+        }
+
+        // Get topic CSS class based on topic name
+        function getTopicClass(topic) {
+            if (!topic) return 'topic-uncategorized';
+            const normalized = topic.toLowerCase().replace(/\s+/g, '-');
+            const knownTopics = ['admonitions', 'background', 'work-history', 'complaints', 
+                                'harassment', 'discrimination', 'performance', 'policies',
+                                'timeline', 'witnesses', 'documents', 'medical', 'damages', 'uncategorized'];
+            return knownTopics.includes(normalized) ? `topic-${normalized}` : 'topic-default';
+        }
+
+        // Auto-expand textarea to fit content
+        function autoExpandTextarea(textarea) {
+            if (!textarea) return;
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+        }
+
+        // Submit merged entry to AI for summarization
+        async function submitMergedToAI(index) {
+            if (index < 0 || index >= qaItems.length) return;
+            
+            const qa = qaItems[index];
+            if (!qa.qaSequence || qa.qaSequence.length <= 1) return;
+            
+            // Update UI to show loading
+            qa.isSummarizing = true;
+            qa.needsAISummary = false;
+            renderSummaryTable();
+            
+            try {
+                const response = await fetch('/api/summarize-merged', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        qaSequence: qa.qaSequence
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.summary) {
+                    qa.summary = result.summary;
+                    qa.topic = result.topic || qa.topic;
+                } else {
+                    // Fall back to combined summaries if AI fails
+                    qa.summary = qa.qaSequence.map(item => item.summary || '').filter(Boolean).join(' ');
+                    console.warn('AI summarization failed, using combined summaries');
+                }
+            } catch (error) {
+                console.error('Failed to get AI summary:', error);
+                qa.summary = qa.qaSequence.map(item => item.summary || '').filter(Boolean).join(' ');
+            }
+            
+            qa.isSummarizing = false;
+            renderSummaryTable();
+            
+            // Update detail panel if open
+            if (detailPanel.classList.contains('open') && currentDetailIndex === index) {
+                openDetail(currentDetailIndex);
+            }
         }
 
         // Save summary from table textarea
@@ -2088,6 +3447,7 @@
         }
 
         // ===== Merge Q&A Pairs =====
+        // Merge does NOT auto-submit to AI - user must click "Submit to AI" button
         function mergeWithPrevious(index) {
             if (index <= 0 || index >= qaItems.length) return;
             
@@ -2103,7 +3463,8 @@
                     answerLocation: previous.answerLocation,
                     colloquy: previous.colloquy,
                     colloquyLocation: previous.colloquyLocation,
-                    summary: previous.summary
+                    summary: previous.summary,
+                    topic: previous.topic
                 }];
             }
             
@@ -2119,7 +3480,8 @@
                     answerLocation: current.answerLocation,
                     colloquy: current.colloquy,
                     colloquyLocation: current.colloquyLocation,
-                    summary: current.summary
+                    summary: current.summary,
+                    topic: current.topic
                 });
             }
             
@@ -2134,11 +3496,17 @@
             previous.questionLocation = allQuestionLocs.reduce((merged, loc) => mergeLocations(merged, loc), allQuestionLocs[0]);
             previous.answerLocation = allAnswerLocs.reduce((merged, loc) => mergeLocations(merged, loc), allAnswerLocs[0]);
             
-            // Combine summaries into single statement (user can edit)
-            previous.summary = previous.qaSequence.map(item => item.summary || '').filter(Boolean).join(' ');
-            
             // Track merge count
             previous.mergedCount = previous.qaSequence.length;
+            
+            // Combine summaries for now (user can submit to AI for better summary)
+            previous.summary = previous.qaSequence.map(item => item.summary || '').filter(Boolean).join(' ');
+            
+            // Keep first topic or mark as needing classification
+            previous.topic = previous.qaSequence[0]?.topic || 'Uncategorized';
+            
+            // Flag that this merged entry needs AI summary (user can submit when ready)
+            previous.needsAISummary = true;
             
             // Remove current item
             qaItems.splice(index, 1);
@@ -2350,6 +3718,11 @@
             const qa = qaItems[index];
             detailNumber.textContent = index + 1;
             
+            // Show topic
+            const detailTopic = document.getElementById('detailTopic');
+            const topicClass = getTopicClass(qa.topic);
+            detailTopic.innerHTML = `<span class="topic-badge ${topicClass}">${escapeHtml(qa.topic || 'Uncategorized')}</span>`;
+            
             // Check if this is a merged entry
             if (qa.qaSequence && qa.qaSequence.length > 1) {
                 // Show Q/A sequence
@@ -2373,6 +3746,20 @@
             detailSummary.value = qa.summary || '';
             detailQuestionLoc.textContent = `Location: ${qa.questionLocation}`;
             detailAnswerLoc.textContent = `Location: ${qa.answerLocation}`;
+            
+            // Show AI submit button for merged entries that need AI
+            const detailAIBtn = document.getElementById('detailAIBtn');
+            if (qa.needsAISummary && qa.qaSequence && qa.qaSequence.length > 1) {
+                detailAIBtn.innerHTML = `<button class="needs-ai-btn" onclick="submitMergedToAI(${index})">✨ Generate AI Summary</button>
+                    <span style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                        This merged entry has ${qa.qaSequence.length} Q&A pairs. Click to generate an AI summary.
+                    </span>`;
+            } else {
+                detailAIBtn.innerHTML = '';
+            }
+            
+            // Auto-expand the detail summary textarea
+            setTimeout(() => autoExpandTextarea(detailSummary), 50);
             
             detailPrevBtn.disabled = index === 0;
             detailNextBtn.disabled = index === qaItems.length - 1;
@@ -2433,6 +3820,7 @@
             currentPreviewPage = 0;
             firstPrintedPage = 3;
             currentDetailIndex = 0;
+            analysisComplete = false;
             fileInput.value = '';
             pageOneInput.value = 3;
             startSummarizeBtn.disabled = false;
@@ -2440,6 +3828,18 @@
             detailPanel.classList.remove('open');
             updateQuickSelectButtons();
             goToStep(1);
+        });
+
+        // ===== Reports Navigation =====
+        const goToReportsBtn = document.getElementById('goToReportsBtn');
+        const backToReviewBtn = document.getElementById('backToReviewBtn');
+        
+        goToReportsBtn.addEventListener('click', () => {
+            goToStep(4);
+        });
+        
+        backToReviewBtn.addEventListener('click', () => {
+            goToStep(3);
         });
 
         // ===== Utilities =====
@@ -2467,12 +3867,262 @@
             }
         });
 
+        // ===== Column Menu =====
+        const columnMenuBtn = document.getElementById('columnMenuBtn');
+        const columnMenuDropdown = document.getElementById('columnMenuDropdown');
+
+        columnMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            columnMenuDropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.column-menu')) {
+                columnMenuDropdown.classList.remove('show');
+            }
+            // Also close people lists
+            if (!e.target.closest('.people-dropdown')) {
+                document.querySelectorAll('.people-list.show').forEach(l => l.classList.remove('show'));
+            }
+        });
+
+        // Handle column visibility toggles
+        columnMenuDropdown.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const col = e.target.dataset.col;
+                columnVisibility[col] = e.target.checked;
+                updateColumnVisibility();
+            });
+        });
+
+        // ===== Column Resizing =====
+        let isResizing = false;
+        let currentResizeHandle = null;
+        let startX = 0;
+        let startWidth = 0;
+
+        document.querySelectorAll('.resize-handle').forEach(handle => {
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                currentResizeHandle = handle;
+                startX = e.pageX;
+                const th = handle.parentElement;
+                startWidth = th.offsetWidth;
+                handle.classList.add('resizing');
+                e.preventDefault();
+            });
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const th = currentResizeHandle.parentElement;
+            const diff = e.pageX - startX;
+            const newWidth = Math.max(50, startWidth + diff);
+            th.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                if (currentResizeHandle) {
+                    currentResizeHandle.classList.remove('resizing');
+                }
+                currentResizeHandle = null;
+            }
+        });
+
+        // ===== Chron Report =====
+        const chronReportBtn = document.getElementById('chronReportBtn');
+        const chronReportModal = document.getElementById('chronReportModal');
+        const chronReportClose = document.getElementById('chronReportClose');
+        const chronReportBody = document.getElementById('chronReportBody');
+
+        chronReportBtn.addEventListener('click', () => {
+            generateChronReport();
+            chronReportModal.classList.add('show');
+        });
+
+        chronReportClose.addEventListener('click', () => {
+            chronReportModal.classList.remove('show');
+        });
+
+        chronReportModal.addEventListener('click', (e) => {
+            if (e.target === chronReportModal) {
+                chronReportModal.classList.remove('show');
+            }
+        });
+
+        function generateChronReport() {
+            chronReportBody.innerHTML = '';
+            
+            // Filter items with dates and sort chronologically
+            const chronItems = qaItems
+                .filter(qa => qa.hasDates)
+                .map((qa, idx) => ({
+                    ...qa,
+                    originalIndex: qaItems.indexOf(qa),
+                    dateExtracted: extractDateFromText(qa.question + ' ' + qa.answer)
+                }))
+                .sort((a, b) => {
+                    // Sort by extracted date if possible, otherwise by location
+                    if (a.dateExtracted && b.dateExtracted) {
+                        return new Date(a.dateExtracted) - new Date(b.dateExtracted);
+                    }
+                    return 0;
+                });
+
+            if (chronItems.length === 0) {
+                chronReportBody.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px;">No items marked with dates. Check the "Chron" checkbox on items that contain date references.</p>';
+                return;
+            }
+
+            chronItems.forEach(item => {
+                const entry = document.createElement('div');
+                entry.className = 'chron-entry';
+                
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'chron-date' + (item.dateExtracted ? '' : ' no-date');
+                dateDiv.textContent = item.dateExtracted || 'Date TBD';
+                
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'chron-summary';
+                summaryDiv.innerHTML = `
+                    ${escapeHtml(item.summary || '')}
+                    <div class="chron-location">📍 ${item.questionLocation}</div>
+                `;
+                
+                entry.appendChild(dateDiv);
+                entry.appendChild(summaryDiv);
+                chronReportBody.appendChild(entry);
+            });
+        }
+
+        // Simple date extraction from text
+        function extractDateFromText(text) {
+            // Try to find dates in various formats
+            const patterns = [
+                /\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/,
+                /\b(\d{4}-\d{2}-\d{2})\b/,
+                /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
+                /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[.\s]+\d{1,2},?\s+\d{4}\b/i,
+                /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i
+            ];
+            
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    return match[0];
+                }
+            }
+            return null;
+        }
+
+        // ===== Cast of Characters Report =====
+        const castReportBtn = document.getElementById('castReportBtn');
+        const castReportModal = document.getElementById('castReportModal');
+        const castReportClose = document.getElementById('castReportClose');
+        const castReportBody = document.getElementById('castReportBody');
+
+        castReportBtn.addEventListener('click', () => {
+            generateCastReport();
+            castReportModal.classList.add('show');
+        });
+
+        castReportClose.addEventListener('click', () => {
+            castReportModal.classList.remove('show');
+        });
+
+        castReportModal.addEventListener('click', (e) => {
+            if (e.target === castReportModal) {
+                castReportModal.classList.remove('show');
+            }
+        });
+
+        function generateCastReport() {
+            castReportBody.innerHTML = '';
+            
+            // Collect all people and their mentions
+            const peopleMap = new Map();
+            
+            qaItems.forEach((qa, idx) => {
+                if (qa.peopleMentioned && qa.peopleMentioned.length > 0) {
+                    qa.peopleMentioned.forEach(person => {
+                        const name = typeof person === 'string' ? person : person.name;
+                        const role = typeof person === 'object' ? person.role : null;
+                        
+                        if (!peopleMap.has(name)) {
+                            peopleMap.set(name, { name, role, mentions: [] });
+                        }
+                        
+                        const entry = peopleMap.get(name);
+                        if (role && !entry.role) entry.role = role;
+                        entry.mentions.push({
+                            index: idx,
+                            location: qa.questionLocation,
+                            summary: qa.summary
+                        });
+                    });
+                }
+            });
+
+            if (peopleMap.size === 0) {
+                castReportBody.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px;">No people detected in the testimony. People are identified during AI analysis.</p>';
+                return;
+            }
+
+            // Sort by last name (assuming "First Last" format)
+            const sortedPeople = Array.from(peopleMap.values()).sort((a, b) => {
+                const aLast = a.name.split(' ').pop() || a.name;
+                const bLast = b.name.split(' ').pop() || b.name;
+                return aLast.localeCompare(bLast);
+            });
+
+            sortedPeople.forEach(person => {
+                const entry = document.createElement('div');
+                entry.className = 'cast-entry';
+                
+                // Format name as "Last, First"
+                const nameParts = person.name.split(' ');
+                const displayName = nameParts.length > 1 
+                    ? `${nameParts.pop()}, ${nameParts.join(' ')}`
+                    : person.name;
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'cast-name';
+                nameDiv.textContent = displayName;
+                
+                const roleDiv = document.createElement('div');
+                roleDiv.className = 'cast-role';
+                roleDiv.textContent = person.role || 'Role unknown';
+                
+                const mentionsDiv = document.createElement('div');
+                mentionsDiv.className = 'cast-mentions';
+                
+                person.mentions.forEach(mention => {
+                    const item = document.createElement('div');
+                    item.className = 'cast-mention-item';
+                    item.innerHTML = `
+                        <span class="cast-mention-loc">${mention.location}</span>
+                        ${escapeHtml(truncate(mention.summary || 'No summary', 100))}
+                    `;
+                    mentionsDiv.appendChild(item);
+                });
+                
+                entry.appendChild(nameDiv);
+                entry.appendChild(roleDiv);
+                entry.appendChild(mentionsDiv);
+                castReportBody.appendChild(entry);
+            });
+        }
+
         // ===== Export =====
         document.getElementById('exportBtn').addEventListener('click', () => {
-            // Generate CSV export
-            let csv = 'Number,Location,Summary,Question,Answer\n';
+            // Generate CSV export with all fields
+            let csv = 'Number,Location,Topic,HasDates,People,Summary,Question,Answer\n';
             qaItems.forEach((qa, idx) => {
-                csv += `${idx + 1},"${qa.questionLocation}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
+                const people = (qa.peopleMentioned || []).map(p => typeof p === 'string' ? p : p.name).join('; ');
+                csv += `${idx + 1},"${qa.questionLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -2482,6 +4132,14 @@
             a.download = 'deposition-summary.csv';
             a.click();
             URL.revokeObjectURL(url);
+        });
+
+        // ===== Close report modals with Escape =====
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                chronReportModal.classList.remove('show');
+                castReportModal.classList.remove('show');
+            }
         });
     </script>
 </body>

@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -10,6 +11,441 @@ if (fs.existsSync(gsPath)) {
 }
 
 const { TextReconstructor } = require('./dist/text-reconstructor.js');
+
+// OpenAI API configuration
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+if (!OPENAI_API_KEY) {
+    console.warn('Warning: OPENAI_API_KEY not found. AI summarization will fall back to rule-based summaries.');
+}
+
+/**
+ * Call OpenAI API for summarization
+ */
+async function callOpenAI(messages, options = {}) {
+    if (!OPENAI_API_KEY) {
+        throw new Error('OpenAI API key not configured');
+    }
+
+    const payload = JSON.stringify({
+        model: options.model || 'gpt-4o-mini',
+        messages: messages,
+        temperature: options.temperature || 0.3,
+        max_tokens: options.max_tokens || 500
+    });
+
+    return new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: 'api.openai.com',
+            path: '/v1/chat/completions',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.error) {
+                        reject(new Error(parsed.error.message || 'OpenAI API error'));
+                    } else {
+                        resolve(parsed.choices[0].message.content);
+                    }
+                } catch (e) {
+                    reject(new Error('Failed to parse OpenAI response'));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+    });
+}
+
+/**
+ * Generate AI-powered summary for a Q&A pair
+ */
+async function generateAISummary(question, answer, colloquy = '') {
+    const systemPrompt = `You are a legal assistant summarizing deposition testimony. 
+Your task is to convert a question-answer exchange into a single, clear, factual statement about what the witness testified.
+
+Rules:
+- Write in third person ("The witness..." or "Witness testified that...")
+- Be concise but capture the key information
+- Use past tense for events, present tense for ongoing facts
+- Include specific names, dates, numbers when mentioned
+- If the answer is unclear or the witness doesn't know, reflect that
+- Keep summaries to 1-2 sentences maximum
+- Do not include objections or colloquy in the summary unless it affected the answer`;
+
+    const userPrompt = colloquy 
+        ? `Q: ${question}\n\n${colloquy ? `[Colloquy: ${colloquy}]\n\n` : ''}A: ${answer}`
+        : `Q: ${question}\n\nA: ${answer}`;
+
+    try {
+        const summary = await callOpenAI([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ]);
+        return summary.trim();
+    } catch (error) {
+        console.error('AI summarization failed:', error.message);
+        // Fall back to rule-based summary
+        return generateSummary(question, answer);
+    }
+}
+
+/**
+ * Generate AI summary for merged Q&A pairs (with topic classification)
+ */
+async function generateMergedAISummary(qaSequence) {
+    if (!qaSequence || qaSequence.length === 0) {
+        return { summary: '', topic: 'Uncategorized' };
+    }
+
+    const systemPrompt = `You are a legal assistant summarizing deposition testimony.
+You are given multiple related question-answer exchanges that have been grouped together because they form a coherent topic or line of questioning.
+
+Your task is to:
+1. Synthesize these exchanges into a unified summary
+2. Classify the overall topic
+
+Common topics: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages
+
+Summary requirements:
+- Captures the key testimony from all Q&A pairs
+- Presents the information in a logical, flowing narrative
+- Uses third person ("The witness testified..." or "According to the witness...")
+- Remains factual and objective
+- Is 2-4 sentences maximum, depending on complexity
+
+Respond in JSON format: {"summary": "...", "topic": "..."}`;
+
+    let userPrompt = 'Summarize the following related Q&A exchanges:\n\n';
+    qaSequence.forEach((qa, idx) => {
+        userPrompt += `--- Exchange ${idx + 1} ---\n`;
+        userPrompt += `Q: ${qa.question}\n`;
+        if (qa.colloquy) {
+            userPrompt += `[Colloquy: ${qa.colloquy}]\n`;
+        }
+        userPrompt += `A: ${qa.answer}\n\n`;
+    });
+
+    try {
+        const response = await callOpenAI([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ], { max_tokens: 300 });
+        
+        // Parse JSON response
+        const parsed = JSON.parse(response.trim());
+        return {
+            summary: parsed.summary || '',
+            topic: parsed.topic || 'Uncategorized'
+        };
+    } catch (error) {
+        console.error('AI merged summarization failed:', error.message);
+        // Fall back to combining individual summaries
+        return {
+            summary: qaSequence.map(qa => qa.summary || '').filter(Boolean).join(' '),
+            topic: qaSequence[0]?.topic || 'Uncategorized'
+        };
+    }
+}
+
+/**
+ * Batch summarize multiple Q&A pairs using AI
+ * Limited to AI_SUMMARY_LIMIT items to save costs - remainder use rule-based summaries
+ */
+const AI_SUMMARY_LIMIT = 20; // Limit AI summarization to 15-25 Q/As to save money
+
+async function batchSummarizeQA(qaItems, batchSize = 5) {
+    if (!OPENAI_API_KEY) {
+        console.log('No API key - using rule-based summaries');
+        return qaItems.map(qa => ({
+            ...qa,
+            summary: generateSummary(qa.question, qa.answer),
+            topic: 'Uncategorized'
+        }));
+    }
+
+    // Split items: AI summarize first AI_SUMMARY_LIMIT, rule-based for the rest
+    const aiItems = qaItems.slice(0, AI_SUMMARY_LIMIT);
+    const ruleBasedItems = qaItems.slice(AI_SUMMARY_LIMIT);
+
+    console.log(`Generating AI summaries for ${aiItems.length} Q&A pairs (limit: ${AI_SUMMARY_LIMIT})...`);
+    if (ruleBasedItems.length > 0) {
+        console.log(`Using rule-based summaries for remaining ${ruleBasedItems.length} pairs to save costs`);
+    }
+
+    const results = [];
+    
+    // Process AI items in batches
+    for (let i = 0; i < aiItems.length; i += batchSize) {
+        const batch = aiItems.slice(i, i + batchSize);
+        const promises = batch.map(async (qa) => {
+            try {
+                const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
+                return { ...qa, summary, aiSummarized: true };
+            } catch (error) {
+                console.error(`Failed to summarize Q&A ${i}: ${error.message}`);
+                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false };
+            }
+        });
+        
+        const batchResults = await Promise.all(promises);
+        results.push(...batchResults);
+        
+        // Progress update
+        console.log(`  Summarized ${Math.min(i + batchSize, aiItems.length)}/${aiItems.length} pairs`);
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < aiItems.length) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+    }
+    
+    // Add rule-based items
+    for (const qa of ruleBasedItems) {
+        results.push({
+            ...qa,
+            summary: generateSummary(qa.question, qa.answer),
+            aiSummarized: false
+        });
+    }
+    
+    return results;
+}
+
+/**
+ * Classify topic, extract people, and detect dates for Q&A pairs using AI
+ * Common deposition topics: admonitions, background, work history, complaints, 
+ * harassment, discrimination, performance, policies
+ */
+async function classifyTopicsAndExtractMetadata(qaItems) {
+    if (!OPENAI_API_KEY || qaItems.length === 0) {
+        return qaItems.map(qa => ({ 
+            ...qa, 
+            topic: 'Uncategorized',
+            peopleMentioned: [],
+            hasDates: false
+        }));
+    }
+
+    const systemPrompt = `You are a legal assistant analyzing deposition testimony.
+Your task is to analyze each Q&A exchange and provide:
+1. Topic classification (broad category)
+2. People mentioned (names of individuals referenced)
+3. Whether EXPLICIT dates are mentioned (true/false)
+
+Common deposition topics include:
+- Admonitions: Instructions given at the start of a deposition
+- Background: Personal background, education, biographical information
+- Work History: Employment history, job duties, positions held
+- Complaints: Filed complaints, grievances, issues raised
+- Harassment: Harassment allegations, incidents, complaints
+- Discrimination: Discrimination claims, protected class issues
+- Performance: Job performance, evaluations, reviews
+- Policies: Company policies, procedures, handbooks
+- Timeline: Dates, chronology of events
+- Witnesses: Other people involved, who witnessed events
+- Documents: Document identification, exhibits
+- Medical: Health issues, injuries, medical treatment
+- Damages: Financial harm, emotional distress, losses
+
+For people mentioned:
+- Extract full names when available (e.g., "John Smith")
+- Include role/title if mentioned (e.g., {"name": "John Smith", "role": "Supervisor"})
+- Do NOT include the witness themselves unless they refer to themselves by name
+- Do NOT include attorneys or court reporter
+
+For hasDates - ONLY set to true if an EXPLICIT, SPECIFIC date is mentioned:
+- TRUE examples: "January 15, 2020", "on 3/15/2019", "March 2020"
+- FALSE examples: "last year", "a few months ago", "in 2019" (year alone is not enough)
+- FALSE by default - only true if a clear date can be extracted for chronological ordering
+
+Respond in JSON format:
+{"topic": "...", "peopleMentioned": [{"name": "...", "role": "..."}], "hasDates": true/false}`;
+
+    console.log(`Analyzing ${Math.min(qaItems.length, AI_SUMMARY_LIMIT)} Q&A pairs for topics, people, and dates...`);
+    
+    // Only analyze the first AI_SUMMARY_LIMIT items to save costs
+    const itemsToAnalyze = qaItems.slice(0, AI_SUMMARY_LIMIT);
+    const remainingItems = qaItems.slice(AI_SUMMARY_LIMIT);
+    
+    const results = [];
+    
+    for (let i = 0; i < itemsToAnalyze.length; i++) {
+        const qa = itemsToAnalyze[i];
+        try {
+            const userPrompt = `Q: ${qa.question}\nA: ${qa.answer}`;
+            const response = await callOpenAI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ], { max_tokens: 200 });
+            
+            const parsed = JSON.parse(response.trim());
+            results.push({ 
+                ...qa, 
+                topic: parsed.topic || 'Uncategorized',
+                peopleMentioned: parsed.peopleMentioned || [],
+                hasDates: parsed.hasDates || false
+            });
+        } catch (error) {
+            console.error(`Failed to analyze Q&A ${i}: ${error.message}`);
+            results.push({ 
+                ...qa, 
+                topic: 'Uncategorized',
+                peopleMentioned: [],
+                hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
+            });
+        }
+        
+        // Progress update every 10 items
+        if ((i + 1) % 10 === 0) {
+            console.log(`  Analyzed ${i + 1}/${itemsToAnalyze.length} items`);
+        }
+        
+        // Small delay to avoid rate limiting
+        if (i < itemsToAnalyze.length - 1) {
+            await new Promise(r => setTimeout(r, 100));
+        }
+    }
+    
+    // Add remaining items with basic metadata
+    for (const qa of remainingItems) {
+        results.push({ 
+            ...qa, 
+            topic: 'Uncategorized',
+            peopleMentioned: [],
+            hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
+        });
+    }
+    
+    return results;
+}
+
+// Simple date detection for non-AI processed items
+function detectDatesInText(text) {
+    // Only detect EXPLICIT dates (month + day, or full dates)
+    // Do NOT match standalone years - those are too vague for chronological ordering
+    const datePatterns = [
+        /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/,                    // 1/15/2020 or 01/15/20
+        /\b\d{4}-\d{2}-\d{2}\b/,                            // 2020-01-15
+        /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,  // January 15, 2020
+        /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[.\s]+\d{1,2},?\s+\d{4}\b/i,  // Jan. 15, 2020
+        /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i,  // 15 January 2020
+        /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(st|nd|rd|th)?,?\s+\d{4}\b/i,  // January 15th, 2020
+    ];
+    
+    return datePatterns.some(pattern => pattern.test(text));
+}
+
+/**
+ * Reevaluate topics when user adds a new custom topic
+ */
+async function reevaluateTopicsWithNewTopic(qaItems, newTopic, existingTopics) {
+    if (!OPENAI_API_KEY || qaItems.length === 0) {
+        return { updates: qaItems.map(() => ({ newTopic: null })) };
+    }
+
+    const systemPrompt = `You are a legal assistant analyzing deposition testimony.
+A user has added a new topic category: "${newTopic}"
+
+Your task is to review each Q&A exchange and determine if this new topic is a better fit than the current topic.
+
+Existing topics: ${existingTopics.join(', ')}
+
+For each Q&A, respond with:
+- The new topic if "${newTopic}" is a better fit
+- null if the current topic is better
+
+Be conservative - only change topics if the new topic is clearly more appropriate.
+
+Respond in JSON format: {"shouldChange": true/false, "newTopic": "..." or null}`;
+
+    console.log(`Reevaluating ${Math.min(qaItems.length, AI_SUMMARY_LIMIT)} Q&A items with new topic "${newTopic}"...`);
+    
+    const itemsToEvaluate = qaItems.slice(0, AI_SUMMARY_LIMIT);
+    const updates = [];
+    
+    for (let i = 0; i < itemsToEvaluate.length; i++) {
+        const qa = itemsToEvaluate[i];
+        try {
+            const userPrompt = `Current topic: ${qa.currentTopic}\n\nQ: ${qa.question}\nA: ${qa.answer}`;
+            const response = await callOpenAI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ], { max_tokens: 100 });
+            
+            const parsed = JSON.parse(response.trim());
+            updates.push({ 
+                newTopic: parsed.shouldChange ? newTopic : null 
+            });
+        } catch (error) {
+            updates.push({ newTopic: null });
+        }
+        
+        // Small delay to avoid rate limiting
+        if (i < itemsToEvaluate.length - 1) {
+            await new Promise(r => setTimeout(r, 50));
+        }
+    }
+    
+    // Add null updates for remaining items
+    for (let i = itemsToEvaluate.length; i < qaItems.length; i++) {
+        updates.push({ newTopic: null });
+    }
+    
+    return { updates };
+}
+
+/**
+ * Generate AI summary AND topic for a single Q&A (used for merged entries)
+ */
+async function generateAISummaryWithTopic(question, answer, colloquy = '') {
+    const systemPrompt = `You are a legal assistant summarizing deposition testimony. 
+Your task is to:
+1. Convert a question-answer exchange into a single, clear, factual statement
+2. Classify the topic into a broad category
+
+Common topics: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages
+
+Rules for summary:
+- Write in third person ("The witness..." or "Witness testified that...")
+- Be concise but capture the key information
+- Keep summaries to 1-2 sentences maximum
+
+Respond in JSON format: {"summary": "...", "topic": "..."}`;
+
+    const userPrompt = colloquy 
+        ? `Q: ${question}\n\n${colloquy ? `[Colloquy: ${colloquy}]\n\n` : ''}A: ${answer}`
+        : `Q: ${question}\n\nA: ${answer}`;
+
+    try {
+        const response = await callOpenAI([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ], { max_tokens: 200 });
+        
+        // Parse JSON response
+        const parsed = JSON.parse(response.trim());
+        return {
+            summary: parsed.summary || '',
+            topic: parsed.topic || 'Uncategorized'
+        };
+    } catch (error) {
+        console.error('AI summarization with topic failed:', error.message);
+        return {
+            summary: generateSummary(question, answer),
+            topic: 'Uncategorized'
+        };
+    }
+}
 
 const PORT = 3000;
 const UPLOAD_DIR = path.join(__dirname, 'temp', 'uploads');
@@ -707,28 +1143,144 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // Parse Q/A endpoint
+    // Parse Q/A endpoint - with AI summarization, topic classification, people extraction, and date detection
     if (req.method === 'POST' && url.pathname === '/api/parse-qa') {
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
         req.on('end', async () => {
             try {
                 const body = JSON.parse(Buffer.concat(chunks).toString());
-                const { pages, firstPrintedPage } = body;
+                const { pages, firstPrintedPage, useAI = true } = body;
                 
                 console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
-                const qaItems = parseExamination(pages, firstPrintedPage);
+                let qaItems = parseExamination(pages, firstPrintedPage);
+                
+                // Use AI summarization if enabled and API key is available
+                if (useAI && OPENAI_API_KEY && qaItems.length > 0) {
+                    console.log(`Using AI for summarization (limited to first ${AI_SUMMARY_LIMIT} items)...`);
+                    qaItems = await batchSummarizeQA(qaItems);
+                    
+                    // Classify topics, extract people, detect dates
+                    console.log('Analyzing topics, people, and dates...');
+                    qaItems = await classifyTopicsAndExtractMetadata(qaItems);
+                } else if (!OPENAI_API_KEY) {
+                    console.log('No OpenAI API key - using rule-based summaries');
+                    qaItems = qaItems.map(qa => ({ 
+                        ...qa, 
+                        topic: 'Uncategorized',
+                        peopleMentioned: [],
+                        hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
+                    }));
+                }
                 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: true,
                     qaItems: qaItems,
-                    totalQA: qaItems.length
+                    totalQA: qaItems.length,
+                    aiSummaries: !!(useAI && OPENAI_API_KEY),
+                    aiSummaryLimit: AI_SUMMARY_LIMIT
                 }));
             } catch (error) {
                 console.error('Parse error:', error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to parse: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // Summarize merged Q&A pairs endpoint (returns summary and topic)
+    if (req.method === 'POST' && url.pathname === '/api/summarize-merged') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const body = JSON.parse(Buffer.concat(chunks).toString());
+                const { qaSequence } = body;
+                
+                if (!qaSequence || !Array.isArray(qaSequence) || qaSequence.length === 0) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid qaSequence provided' }));
+                    return;
+                }
+                
+                console.log(`Generating merged summary for ${qaSequence.length} Q&A pairs...`);
+                const result = await generateMergedAISummary(qaSequence);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    summary: result.summary,
+                    topic: result.topic
+                }));
+            } catch (error) {
+                console.error('Summarize error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to summarize: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // Reevaluate topics with new custom topic
+    if (req.method === 'POST' && url.pathname === '/api/reevaluate-topics') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const body = JSON.parse(Buffer.concat(chunks).toString());
+                const { qaItems, newTopic, existingTopics } = body;
+                
+                if (!qaItems || !newTopic) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'qaItems and newTopic are required' }));
+                    return;
+                }
+                
+                console.log(`Reevaluating topics with new topic "${newTopic}"...`);
+                const result = await reevaluateTopicsWithNewTopic(qaItems, newTopic, existingTopics || []);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    updates: result.updates
+                }));
+            } catch (error) {
+                console.error('Topic reevaluation error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to reevaluate: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // Single Q&A summarization endpoint
+    if (req.method === 'POST' && url.pathname === '/api/summarize') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const body = JSON.parse(Buffer.concat(chunks).toString());
+                const { question, answer, colloquy } = body;
+                
+                if (!question || !answer) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Question and answer are required' }));
+                    return;
+                }
+                
+                const summary = await generateAISummary(question, answer, colloquy);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    summary: summary
+                }));
+            } catch (error) {
+                console.error('Summarize error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to summarize: ' + error.message }));
             }
         });
         return;
