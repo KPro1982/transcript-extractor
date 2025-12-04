@@ -3,36 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Reader - Legal Transcript Viewer</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>DepoDigest - Deposition Summarization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0a0a0f;
-            --bg-panel: #12121a;
-            --bg-card: #1a1a24;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.3);
-            --text: #e4e4e7;
-            --text-dim: #71717a;
-            --border: #27272a;
+            --bg-deep: #0d1117;
+            --bg-surface: #161b22;
+            --bg-elevated: #21262d;
+            --bg-hover: #30363d;
+            --accent-gold: #c9a227;
+            --accent-gold-dim: rgba(201, 162, 39, 0.15);
+            --accent-copper: #b87333;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border: #30363d;
+            --border-subtle: #21262d;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
             --line-num: #fbbf24;
-            --success: #22c55e;
+            --question-bg: rgba(56, 139, 253, 0.1);
+            --answer-bg: rgba(63, 185, 80, 0.1);
+            --colloquy-bg: rgba(210, 153, 34, 0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg-dark);
-            color: var(--text);
+            font-family: 'DM Sans', system-ui, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
             min-height: 100vh;
         }
 
         /* Header */
         .header {
-            background: var(--bg-panel);
+            background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
-            padding: 16px 24px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -45,19 +54,26 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.25rem;
-            font-weight: 700;
         }
 
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
+        }
+
+        .logo-text {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .header-controls {
@@ -66,89 +82,279 @@
             gap: 16px;
         }
 
-        /* Page number offset control */
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
+            color: var(--bg-deep);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            box-shadow: none;
+            transform: none;
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        /* Nav controls */
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: var(--accent-gold);
+            border-color: var(--accent-gold);
+            color: var(--bg-deep);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .page-info strong {
+            color: var(--line-num);
+        }
+
+        /* Offset control */
         .offset-control {
             display: flex;
             align-items: center;
             gap: 8px;
             padding: 6px 12px;
-            background: var(--bg-card);
+            background: var(--bg-elevated);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.85rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
         }
 
         .offset-control label {
-            color: var(--text-dim);
+            color: var(--text-muted);
             white-space: nowrap;
         }
 
         .offset-input {
-            width: 50px;
-            background: var(--bg-dark);
+            width: 45px;
+            background: var(--bg-deep);
             border: 1px solid var(--border);
-            color: var(--text);
-            padding: 4px 8px;
+            color: var(--text-primary);
+            padding: 4px 6px;
             border-radius: 4px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-align: center;
         }
 
         .offset-input:focus {
             outline: none;
-            border-color: var(--accent);
+            border-color: var(--accent-gold);
         }
 
-        .printed-page {
-            color: var(--line-num);
-            font-weight: 600;
+        /* Upload Screen */
+        .screen {
+            display: none;
         }
 
-        .digital-page {
-            color: var(--text-dim);
-            font-size: 0.8rem;
+        .screen.active {
+            display: block;
         }
 
-        /* Upload Area */
         .upload-container {
-            max-width: 600px;
-            margin: 80px auto;
+            max-width: 550px;
+            margin: 40px auto;
             padding: 20px;
         }
 
+        .upload-title {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 2.2rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
         .upload-area {
-            background: var(--bg-card);
+            background: var(--bg-surface);
             border: 2px dashed var(--border);
             border-radius: 16px;
-            padding: 60px 40px;
+            padding: 40px 30px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .upload-area:hover, .upload-area.dragover {
-            border-color: var(--accent);
-            background: rgba(59, 130, 246, 0.05);
+            border-color: var(--accent-gold);
+            background: var(--bg-elevated);
         }
 
-        .upload-icon { font-size: 3rem; margin-bottom: 16px; }
-        .upload-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; }
-        .upload-subtitle { color: var(--text-dim); }
+        .upload-icon { font-size: 3rem; margin-bottom: 16px; display: block; }
+        .upload-text { font-size: 1.1rem; font-weight: 500; margin-bottom: 8px; color: var(--text-primary); }
+        .upload-hint { color: var(--text-muted); font-size: 0.9rem; }
         input[type="file"] { display: none; }
+        
+        .header-controls.hidden { display: none !important; }
 
-        /* Main Viewer */
-        .viewer {
+        /* Viewer Screen - Side by Side */
+        .viewer-screen {
+            height: calc(100vh - 57px);
             display: none;
-            height: calc(100vh - 73px);
+            position: relative;
         }
 
-        .viewer.active { display: flex; }
+        .viewer-screen.active {
+            display: flex;
+        }
+
+        /* Large navigation arrows on sides */
+        .viewer-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 60px;
+            height: 100px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .viewer-nav-btn:hover:not(:disabled) {
+            background: var(--accent-gold);
+            color: var(--bg-deep);
+            border-color: var(--accent-gold);
+        }
+
+        .viewer-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .viewer-nav-left {
+            left: 0;
+            border-radius: 0 12px 12px 0;
+        }
+
+        .viewer-nav-right {
+            right: 0;
+            border-radius: 12px 0 0 12px;
+        }
+
+        /* Bottom control bar */
+        .viewer-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 24px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 50;
+        }
+
+        .viewer-page-info {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .viewer-page-info strong {
+            color: var(--line-num);
+            font-size: 1.1rem;
+        }
+
+        .viewer-offset-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .btn-parse {
+            background: linear-gradient(135deg, var(--success), #22a94d);
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-parse:hover {
+            box-shadow: 0 4px 15px rgba(63, 185, 80, 0.4);
+        }
 
         /* PDF Panel */
         .pdf-panel {
             flex: 1;
-            background: var(--bg-panel);
+            background: var(--bg-surface);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -156,18 +362,18 @@
         }
 
         .panel-header {
-            padding: 12px 20px;
+            padding: 10px 16px;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: var(--bg-card);
+            background: var(--bg-elevated);
         }
 
         .panel-title {
             font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--text-dim);
+            font-size: 0.8rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -178,7 +384,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 16px;
             background: #000;
         }
 
@@ -199,28 +405,28 @@
         .text-container {
             flex: 1;
             overflow: auto;
-            padding: 20px;
+            padding: 16px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            line-height: 1.8;
-            background: var(--bg-dark);
+            font-size: 12px;
+            line-height: 1.7;
+            background: var(--bg-deep);
         }
 
         .text-line {
             display: flex;
-            padding: 2px 0;
+            padding: 1px 0;
         }
 
         .text-line:hover {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(201, 162, 39, 0.1);
         }
 
         .line-number {
-            width: 40px;
+            width: 36px;
             flex-shrink: 0;
             color: var(--line-num);
             text-align: right;
-            padding-right: 16px;
+            padding-right: 12px;
             user-select: none;
             font-weight: 500;
         }
@@ -232,23 +438,106 @@
         }
 
         .line-empty {
-            color: var(--text-dim);
+            color: var(--text-muted);
             font-style: italic;
         }
 
-        /* Navigation */
-        .nav-controls {
+        /* Status bar */
+        .status-bar {
+            padding: 6px 16px;
+            background: var(--bg-elevated);
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
             display: flex;
-            align-items: center;
-            gap: 8px;
+            justify-content: space-between;
         }
 
-        .nav-btn {
-            background: var(--bg-card);
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        /* Q/A Results Screen */
+        .results-screen {
+            display: none;
+            padding: 16px 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+            height: calc(100vh - 57px);
+            overflow: hidden;
+        }
+
+        .results-screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .results-title {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .results-stats {
+            display: flex;
+            gap: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent-gold);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Q/A Navigation */
+        .qa-navigator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: var(--bg-surface);
+            border-radius: 8px;
             border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
+            flex-shrink: 0;
+        }
+
+        .qa-nav-btn {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
             border-radius: 8px;
             cursor: pointer;
             display: flex;
@@ -258,58 +547,351 @@
             transition: all 0.2s;
         }
 
-        .nav-btn:hover:not(:disabled) {
-            background: var(--accent);
-            border-color: var(--accent);
+        .qa-nav-btn:hover:not(:disabled) {
+            background: var(--accent-gold);
+            border-color: var(--accent-gold);
+            color: var(--bg-deep);
         }
 
-        .nav-btn:disabled {
+        .qa-nav-btn:disabled {
             opacity: 0.3;
             cursor: not-allowed;
         }
 
-        .page-info {
-            font-size: 0.9rem;
-            color: var(--text-dim);
+        .qa-counter {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
             min-width: 80px;
             text-align: center;
         }
 
-        .page-info strong {
-            color: var(--text);
-        }
-
-        /* Buttons */
-        .btn {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
+        .qa-counter-current {
+            color: var(--accent-gold);
             font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
         }
 
-        .btn:hover { filter: brightness(1.1); }
-
-        .btn-outline {
-            background: transparent;
+        /* Q/A Card */
+        .qa-card {
+            background: var(--bg-surface);
+            border-radius: 10px;
             border: 1px solid var(--border);
-            color: var(--text);
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
-        .btn-outline:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+        .qa-section {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
         }
 
-        /* Loading */
+        .qa-section.answer {
+            flex: 1;
+            overflow: auto;
+            min-height: 60px;
+        }
+
+        .qa-section:last-child {
+            border-bottom: none;
+        }
+
+        .qa-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .qa-section-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .qa-section-label.question { color: #58a6ff; }
+        .qa-section-label.answer { color: #3fb950; }
+        .qa-section-label.colloquy { color: #d29922; }
+
+        .qa-section-label-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+
+        .qa-section-label.question .qa-section-label-icon { background: var(--question-bg); }
+        .qa-section-label.answer .qa-section-label-icon { background: var(--answer-bg); }
+        .qa-section-label.colloquy .qa-section-label-icon { background: var(--colloquy-bg); }
+
+        .qa-location {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: var(--bg-elevated);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .qa-text {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        .qa-section.question { background: var(--question-bg); }
+        .qa-section.answer { background: var(--answer-bg); }
+        .qa-section.colloquy { background: var(--colloquy-bg); }
+        .qa-section.colloquy.empty { padding: 8px 16px; background: transparent; }
+
+        .qa-empty-note {
+            color: var(--text-muted);
+            font-style: italic;
+            font-size: 0.8rem;
+        }
+
+        .qa-card-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* View toggle */
+        .view-toggle {
+            display: flex;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .view-toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn.active {
+            background: var(--accent-gold);
+            color: var(--bg-deep);
+        }
+
+        /* Table View */
+        .qa-table-container {
+            display: none;
+            background: var(--bg-surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .qa-table-container.active { display: block; }
+        .qa-card-container.hidden { display: none !important; }
+
+        /* Text View - Full transcript with highlighting */
+        .qa-text-view-container {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+            background: var(--bg-surface);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .qa-text-view-container.active {
+            display: flex;
+        }
+
+        .text-view-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 10px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .text-view-legend {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 8px;
+            background: var(--bg-deep);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-item::before {
+            content: '';
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .legend-question { color: #58a6ff; }
+        .legend-question::before { background: rgba(56, 139, 253, 0.3); border: 1px solid #58a6ff; }
+        
+        .legend-answer { color: #3fb950; }
+        .legend-answer::before { background: rgba(63, 185, 80, 0.3); border: 1px solid #3fb950; }
+        
+        .legend-colloquy { color: #d29922; }
+        .legend-colloquy::before { background: rgba(210, 153, 34, 0.3); border: 1px solid #d29922; }
+
+        .text-view-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .text-view-line {
+            display: flex;
+            padding: 1px 0;
+            border-radius: 3px;
+            margin: 1px 0;
+        }
+
+        .text-view-line.highlight-question {
+            background: rgba(56, 139, 253, 0.2);
+            border-left: 3px solid #58a6ff;
+            padding-left: 8px;
+        }
+
+        .text-view-line.highlight-answer {
+            background: rgba(63, 185, 80, 0.2);
+            border-left: 3px solid #3fb950;
+            padding-left: 8px;
+        }
+
+        .text-view-line.highlight-colloquy {
+            background: rgba(210, 153, 34, 0.2);
+            border-left: 3px solid #d29922;
+            padding-left: 8px;
+        }
+
+        .text-view-line.current-qa {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 2px;
+        }
+
+        .text-view-line-num {
+            width: 50px;
+            flex-shrink: 0;
+            color: var(--text-muted);
+            text-align: right;
+            padding-right: 12px;
+            user-select: none;
+            font-size: 0.7rem;
+        }
+
+        .text-view-line-text {
+            flex: 1;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .text-view-page-header {
+            padding: 8px 12px;
+            margin: 16px 0 8px 0;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--accent-gold);
+            font-size: 0.8rem;
+        }
+
+        .text-view-page-header:first-child {
+            margin-top: 0;
+        }
+
+        .qa-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .qa-table th {
+            background: var(--bg-elevated);
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .qa-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            vertical-align: top;
+            font-size: 0.85rem;
+        }
+
+        .qa-table tr:last-child td { border-bottom: none; }
+        .qa-table tr:hover { background: var(--bg-elevated); cursor: pointer; }
+
+        .qa-table-num {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-gold);
+            font-weight: 600;
+            text-align: center;
+            width: 50px;
+        }
+
+        .qa-table-text {
+            font-family: 'Crimson Pro', Georgia, serif;
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .qa-table-location {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(13, 17, 23, 0.9);
             display: none;
             align-items: center;
             justify-content: center;
@@ -324,88 +906,66 @@
             width: 48px;
             height: 48px;
             border: 3px solid var(--border);
-            border-top-color: var(--accent);
+            border-top-color: var(--accent-gold);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .loading-text {
-            font-size: 1.1rem;
-            color: var(--text);
-        }
-
-        .loading-progress {
-            color: var(--text-dim);
-            font-size: 0.9rem;
-        }
-
-        /* Status bar */
-        .status-bar {
-            padding: 8px 20px;
-            background: var(--bg-card);
-            border-top: 1px solid var(--border);
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-        }
+        .loading-text { font-size: 1.1rem; color: var(--text-primary); }
+        .loading-progress { color: var(--text-muted); font-size: 0.9rem; }
     </style>
 </head>
 <body>
     <header class="header">
         <div class="logo">
-            <div class="logo-icon">📄</div>
-            <span>PDF Reader</span>
+            <div class="logo-icon">📜</div>
+            <span class="logo-text">DepoDigest</span>
         </div>
         <div class="header-controls" id="headerControls" style="display: none;">
             <div class="nav-controls">
                 <button class="nav-btn" id="prevBtn" title="Previous page">◀</button>
                 <span class="page-info">
-                    Page <strong class="printed-page" id="printedPage">—</strong>
-                    <span class="digital-page">(digital <span id="currentPage">1</span>/<span id="totalPages">1</span>)</span>
+                    Page <strong id="printedPage">—</strong>
+                    <span style="color: var(--text-muted); font-size: 0.75rem;">(digital <span id="currentPage">1</span>/<span id="totalPages">1</span>)</span>
                 </span>
                 <button class="nav-btn" id="nextBtn" title="Next page">▶</button>
             </div>
-            <div class="offset-control" title="Which digital page has '1' printed on it? Look at the PDF footer.">
+            <div class="offset-control" title="Which digital page has '1' printed on it?">
                 <label>Pg 1 is digital:</label>
                 <input type="number" id="pageOffset" class="offset-input" value="3" min="1" max="100">
             </div>
-            <button class="btn btn-outline" id="downloadBtn">Download TXT</button>
+            <button class="btn btn-success" id="parseQABtn">Parse Q&A</button>
+            <button class="btn btn-outline" id="backToViewerBtn" style="display: none;">Back to Viewer</button>
             <button class="btn btn-outline" id="newFileBtn">New File</button>
         </div>
     </header>
 
-    <!-- Upload Screen -->
-    <div class="upload-container" id="uploadContainer">
-        <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
-            <div class="upload-title">Drop PDF here or click to browse</div>
-            <div class="upload-subtitle">Legal transcript viewer with line numbers</div>
-            <input type="file" id="fileInput" accept=".pdf">
+    <!-- Screen 1: Upload -->
+    <div class="screen active" id="uploadScreen">
+        <div class="upload-container">
+            <h1 class="upload-title">Analyze Your Deposition</h1>
+            <p class="upload-subtitle">Upload a deposition PDF to extract and navigate Q&A pairs</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop your deposition PDF here</div>
+                <div class="upload-hint">or click to browse files</div>
+                <input type="file" id="fileInput" accept=".pdf">
+            </div>
         </div>
     </div>
 
-    <!-- Main Viewer -->
-    <div class="viewer" id="viewer">
+    <!-- Screen 2: Side-by-Side Viewer -->
+    <div class="viewer-screen" id="viewerScreen">
+        <!-- Left Navigation Arrow -->
+        <button class="viewer-nav-btn viewer-nav-left" id="viewerPrevBtn" title="Previous page">◀</button>
+        
         <div class="pdf-panel">
             <div class="panel-header">
                 <span class="panel-title">PDF Document</span>
-                <span id="pdfFileName"></span>
+                <span id="pdfFileName" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
             </div>
             <div class="pdf-container">
                 <img class="pdf-image" id="pdfImage" alt="PDF Page">
@@ -413,17 +973,139 @@
         </div>
         <div class="text-panel">
             <div class="panel-header">
-                <span class="panel-title">Page <strong class="printed-page" id="textPanelPage">—</strong></span>
-                <span id="lineCount"></span>
+                <span class="panel-title">Extracted Text - Page <strong style="color: var(--line-num);" id="textPanelPage">—</strong></span>
+                <span id="lineCount" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
             </div>
             <div class="text-container" id="textContainer"></div>
             <div class="status-bar">
                 <div class="status-item">
                     <span class="status-dot"></span>
-                    <span>Lines 1-25 • Set page offset to match printed numbers</span>
+                    <span>Lines 1-25 per page</span>
                 </div>
                 <div class="status-item" id="extractionInfo"></div>
             </div>
+        </div>
+        
+        <!-- Right Navigation Arrow -->
+        <button class="viewer-nav-btn viewer-nav-right" id="viewerNextBtn" title="Next page">▶</button>
+        
+        <!-- Bottom Control Bar -->
+        <div class="viewer-controls">
+            <div class="viewer-page-info">
+                Page <strong id="viewerPrintedPage">—</strong>
+                <span style="color: var(--text-muted);">(digital <span id="viewerCurrentPage">1</span>/<span id="viewerTotalPages">1</span>)</span>
+            </div>
+            <div class="viewer-offset-control">
+                <label>Page 1 is digital:</label>
+                <input type="number" id="viewerPageOffset" class="offset-input" value="3" min="1" max="100">
+            </div>
+            <button class="btn btn-parse" id="viewerParseBtn">
+                <span>🔍</span> Parse Q&A Pairs
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 3: Q/A Results -->
+    <div class="results-screen" id="resultsScreen">
+        <div class="results-header">
+            <h1 class="results-title">Examination Q&A</h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="results-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalQACount">0</div>
+                        <div class="stat-label">Q&A Pairs</div>
+                    </div>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" id="cardViewBtn">Card</button>
+                    <button class="view-toggle-btn" id="tableViewBtn">Table</button>
+                    <button class="view-toggle-btn" id="textViewBtn">Text</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card View -->
+        <div class="qa-card-container" id="qaCardContainer">
+            <div class="qa-navigator">
+                <button class="qa-nav-btn" id="qaPrevBtn" title="Previous Q&A">◀</button>
+                <div class="qa-counter">
+                    <span class="qa-counter-current" id="qaCurrentNum">1</span>
+                    <span> / </span>
+                    <span id="qaTotalNum">0</span>
+                </div>
+                <button class="qa-nav-btn" id="qaNextBtn" title="Next Q&A">▶</button>
+            </div>
+
+            <div class="qa-card" id="qaCard">
+                <div class="qa-section question">
+                    <div class="qa-section-header">
+                        <div class="qa-section-label question">
+                            <span class="qa-section-label-icon">Q</span>
+                            Question
+                        </div>
+                        <span class="qa-location" id="qaQuestionLoc">—</span>
+                    </div>
+                    <div class="qa-text" id="qaQuestionText">—</div>
+                </div>
+                
+                <div class="qa-section colloquy" id="qaColloquySection">
+                    <div class="qa-section-header">
+                        <div class="qa-section-label colloquy">
+                            <span class="qa-section-label-icon">⚖</span>
+                            Colloquy / Objection
+                        </div>
+                        <span class="qa-location" id="qaColloquyLoc">—</span>
+                    </div>
+                    <div class="qa-text" id="qaColloquyText">—</div>
+                </div>
+                
+                <div class="qa-section answer">
+                    <div class="qa-section-header">
+                        <div class="qa-section-label answer">
+                            <span class="qa-section-label-icon">A</span>
+                            Answer
+                        </div>
+                        <span class="qa-location" id="qaAnswerLoc">—</span>
+                    </div>
+                    <div class="qa-text" id="qaAnswerText">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table View -->
+        <div class="qa-table-container" id="qaTableContainer">
+            <table class="qa-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Loc</th>
+                        <th>Answer</th>
+                        <th>Loc</th>
+                        <th>Objection</th>
+                    </tr>
+                </thead>
+                <tbody id="qaTableBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Text View - Full transcript with highlighting -->
+        <div class="qa-text-view-container" id="qaTextViewContainer">
+            <div class="text-view-nav">
+                <button class="qa-nav-btn" id="textPrevBtn" title="Previous Q&A">▲</button>
+                <div class="qa-counter">
+                    <span class="qa-counter-current" id="textCurrentNum">1</span>
+                    <span> / </span>
+                    <span id="textTotalNum">0</span>
+                </div>
+                <button class="qa-nav-btn" id="textNextBtn" title="Next Q&A">▼</button>
+            </div>
+            <div class="text-view-legend">
+                <span class="legend-item legend-question">Question</span>
+                <span class="legend-item legend-answer">Answer</span>
+                <span class="legend-item legend-colloquy">Colloquy</span>
+            </div>
+            <div class="text-view-content" id="textViewContent"></div>
         </div>
     </div>
 
@@ -436,60 +1118,104 @@
 
     <script>
         // Elements
-        const uploadContainer = document.getElementById('uploadContainer');
+        const uploadScreen = document.getElementById('uploadScreen');
+        const viewerScreen = document.getElementById('viewerScreen');
+        const resultsScreen = document.getElementById('resultsScreen');
+        const headerControls = document.getElementById('headerControls');
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const viewer = document.getElementById('viewer');
-        const headerControls = document.getElementById('headerControls');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const loadingProgress = document.getElementById('loadingProgress');
+        
+        // Viewer elements
         const pdfImage = document.getElementById('pdfImage');
         const textContainer = document.getElementById('textContainer');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         const currentPageEl = document.getElementById('currentPage');
         const totalPagesEl = document.getElementById('totalPages');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const newFileBtn = document.getElementById('newFileBtn');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        const loadingProgress = document.getElementById('loadingProgress');
+        const printedPageEl = document.getElementById('printedPage');
+        const textPanelPageEl = document.getElementById('textPanelPage');
+        const pageOffsetInput = document.getElementById('pageOffset');
         const pdfFileName = document.getElementById('pdfFileName');
         const lineCount = document.getElementById('lineCount');
         const extractionInfo = document.getElementById('extractionInfo');
-        const pageOffsetInput = document.getElementById('pageOffset');
-        const printedPageEl = document.getElementById('printedPage');
-        const textPanelPageEl = document.getElementById('textPanelPage');
+        const parseQABtn = document.getElementById('parseQABtn');
+        const backToViewerBtn = document.getElementById('backToViewerBtn');
+        const newFileBtn = document.getElementById('newFileBtn');
+        
+        // New viewer controls
+        const viewerPrevBtn = document.getElementById('viewerPrevBtn');
+        const viewerNextBtn = document.getElementById('viewerNextBtn');
+        const viewerParseBtn = document.getElementById('viewerParseBtn');
+        const viewerPageOffset = document.getElementById('viewerPageOffset');
+        const viewerPrintedPage = document.getElementById('viewerPrintedPage');
+        const viewerCurrentPage = document.getElementById('viewerCurrentPage');
+        const viewerTotalPages = document.getElementById('viewerTotalPages');
+
+        // Results elements
+        const qaCardContainer = document.getElementById('qaCardContainer');
+        const qaTableContainer = document.getElementById('qaTableContainer');
+        const qaTextViewContainer = document.getElementById('qaTextViewContainer');
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        const textViewBtn = document.getElementById('textViewBtn');
+        const qaPrevBtn = document.getElementById('qaPrevBtn');
+        const qaNextBtn = document.getElementById('qaNextBtn');
+        const qaCurrentNum = document.getElementById('qaCurrentNum');
+        const qaTotalNum = document.getElementById('qaTotalNum');
+        const totalQACount = document.getElementById('totalQACount');
+        
+        // Text view elements
+        const textViewContent = document.getElementById('textViewContent');
+        const textPrevBtn = document.getElementById('textPrevBtn');
+        const textNextBtn = document.getElementById('textNextBtn');
+        const textCurrentNum = document.getElementById('textCurrentNum');
+        const textTotalNum = document.getElementById('textTotalNum');
 
         // State
         let pages = [];
+        let qaItems = [];
         let currentPage = 0;
+        let currentQAIndex = 0;
+        let firstNumberedPage = 3;
         let selectedFile = null;
-        let pageOffset = 0; // Offset to calculate printed page number
 
-        // firstNumberedPage: which digital page (1-based) is printed page 1
-        let firstNumberedPage = 1;
-
-        // Calculate printed page number from digital index
+        // Calculate printed page number
         function getPrintedPageNumber(digitalIndex) {
-            // digitalIndex is 0-based
-            // firstNumberedPage is 1-based (which digital page = printed page 1)
-            // So digital page 3 (index 2) being printed page 1 means:
-            //   index 0 → printed -1 (title), index 1 → printed 0 (title), index 2 → printed 1
             const printedPage = (digitalIndex + 1) - firstNumberedPage + 1;
             return printedPage;
         }
 
         function formatPrintedPage(digitalIndex) {
             const printed = getPrintedPageNumber(digitalIndex);
-            if (printed < 1) {
-                return '—'; // Title/unnumbered page
-            }
+            if (printed < 1) return '—';
             return printed.toString();
         }
-        
-        // Update firstNumberedPage from input
+
         function updateFirstNumberedPage() {
             firstNumberedPage = parseInt(pageOffsetInput.value) || 1;
         }
+
+        // Show screen
+        function showScreen(screen) {
+            uploadScreen.classList.remove('active');
+            viewerScreen.classList.remove('active');
+            resultsScreen.classList.remove('active');
+            screen.classList.add('active');
+            
+            if (screen === uploadScreen) {
+                headerControls.classList.add('hidden');
+            } else {
+                headerControls.classList.remove('hidden');
+            }
+            parseQABtn.style.display = screen === viewerScreen ? 'inline-block' : 'none';
+            backToViewerBtn.style.display = screen === resultsScreen ? 'inline-block' : 'none';
+        }
+        
+        // Initialize - ensure header is hidden on load
+        headerControls.classList.add('hidden');
 
         // Upload handlers
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -517,7 +1243,6 @@
             selectedFile = file;
             pdfFileName.textContent = file.name;
 
-            // Show loading
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'Processing PDF...';
             loadingProgress.textContent = 'Converting pages to images and extracting text';
@@ -539,21 +1264,15 @@
 
                 pages = result.pages;
                 currentPage = 0;
-
-                // Default to 3 for legal transcripts (typically 2 title pages)
                 firstNumberedPage = 3;
-                pageOffsetInput.value = firstNumberedPage;
+                pageOffsetInput.value = 3;
+                viewerPageOffset.value = 3;
 
-                // Update UI
                 totalPagesEl.textContent = pages.length;
                 extractionInfo.textContent = `${pages.length} pages`;
 
-                // Show viewer
-                uploadContainer.style.display = 'none';
-                viewer.classList.add('active');
-                headerControls.style.display = 'flex';
-
                 renderPage(0);
+                showScreen(viewerScreen);
 
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -568,19 +1287,25 @@
             currentPage = index;
             const page = pages[index];
 
-            // Update page info (digital page)
             currentPageEl.textContent = index + 1;
             
-            // Update printed page number
             const printedPage = formatPrintedPage(index);
             printedPageEl.textContent = printedPage;
             textPanelPageEl.textContent = printedPage;
 
-            // Update navigation buttons
+            // Update header nav buttons
             prevBtn.disabled = index === 0;
             nextBtn.disabled = index === pages.length - 1;
+            
+            // Update viewer nav buttons
+            viewerPrevBtn.disabled = index === 0;
+            viewerNextBtn.disabled = index === pages.length - 1;
+            
+            // Update viewer controls
+            viewerPrintedPage.textContent = printedPage;
+            viewerCurrentPage.textContent = index + 1;
+            viewerTotalPages.textContent = pages.length;
 
-            // Render PDF image
             pdfImage.src = page.imageUrl;
 
             // Render text with line numbers
@@ -606,11 +1331,11 @@
                 textContainer.appendChild(lineEl);
             });
 
-            // Add unmatched content if any
+            // Unmatched content
             if (page.unmatched && page.unmatched.length > 0) {
                 const divider = document.createElement('div');
-                divider.style.cssText = 'padding: 10px 0; color: var(--text-dim); border-top: 1px solid var(--border); margin-top: 10px;';
-                divider.textContent = '— Additional content (not matched to line numbers) —';
+                divider.style.cssText = 'padding: 8px 0; color: var(--text-muted); border-top: 1px solid var(--border); margin-top: 8px; font-size: 0.8rem;';
+                divider.textContent = '— Unmatched content —';
                 textContainer.appendChild(divider);
 
                 page.unmatched.forEach(text => {
@@ -632,65 +1357,367 @@
             }
         }
 
-        // Navigation
+        // Navigation - Header buttons
         prevBtn.addEventListener('click', () => renderPage(currentPage - 1));
         nextBtn.addEventListener('click', () => renderPage(currentPage + 1));
 
-        // Page offset change - update displayed page numbers
+        // Navigation - Viewer side buttons
+        viewerPrevBtn.addEventListener('click', () => renderPage(currentPage - 1));
+        viewerNextBtn.addEventListener('click', () => renderPage(currentPage + 1));
+
+        // Page offset - sync both inputs
         pageOffsetInput.addEventListener('input', () => {
+            viewerPageOffset.value = pageOffsetInput.value;
             updateFirstNumberedPage();
-            renderPage(currentPage); // Re-render to update page number display
+            renderPage(currentPage);
         });
+        
+        viewerPageOffset.addEventListener('input', () => {
+            pageOffsetInput.value = viewerPageOffset.value;
+            updateFirstNumberedPage();
+            renderPage(currentPage);
+        });
+        
+        // Parse Q/A from viewer button
+        viewerParseBtn.addEventListener('click', () => parseQABtn.click());
 
-        // Keyboard navigation
         document.addEventListener('keydown', (e) => {
-            if (!viewer.classList.contains('active')) return;
-            if (e.key === 'ArrowLeft') renderPage(currentPage - 1);
-            if (e.key === 'ArrowRight') renderPage(currentPage + 1);
+            if (viewerScreen.classList.contains('active')) {
+                if (e.key === 'ArrowLeft') renderPage(currentPage - 1);
+                if (e.key === 'ArrowRight') renderPage(currentPage + 1);
+            }
+            if (resultsScreen.classList.contains('active')) {
+                if (e.key === 'ArrowLeft') renderQACard(currentQAIndex - 1);
+                if (e.key === 'ArrowRight') renderQACard(currentQAIndex + 1);
+            }
         });
 
-        // Download
-        downloadBtn.addEventListener('click', () => {
-            let text = '';
-            pages.forEach((page, idx) => {
-                const printedPage = formatPrintedPage(idx);
-                const pageLabel = printedPage === '—' ? 'TITLE PAGE' : `PAGE ${printedPage}`;
-                
-                text += `\n${'='.repeat(60)}\n`;
-                text += `${pageLabel}\n`;
-                text += `${'='.repeat(60)}\n\n`;
-                
-                (page.lines || []).forEach(line => {
-                    const num = (line.lineNumber || '').toString().padStart(4);
-                    text += `${num} | ${line.text}\n`;
+        // Parse Q/A
+        parseQABtn.addEventListener('click', async () => {
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'Parsing Q&A...';
+            loadingProgress.textContent = 'Analyzing examination section';
+
+            try {
+                const response = await fetch('/api/parse-qa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pages: pages,
+                        firstPrintedPage: firstNumberedPage
+                    })
                 });
 
-                if (page.unmatched && page.unmatched.length > 0) {
-                    text += '\n--- Unmatched content ---\n';
-                    page.unmatched.forEach(t => text += `     | ${t}\n`);
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || 'Parsing failed');
+                }
+
+                qaItems = result.qaItems;
+                currentQAIndex = 0;
+
+                if (qaItems.length === 0) {
+                    alert('No Q&A pairs found. The examination section may not have been detected.\n\nCheck the extracted text to verify Q. and A. markers are present.');
+                    return;
+                }
+
+                totalQACount.textContent = qaItems.length;
+                qaTotalNum.textContent = qaItems.length;
+                textTotalNum.textContent = qaItems.length;
+                
+                renderQACard(0);
+                renderQATable();
+                showScreen(resultsScreen);
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        });
+
+        // Back to viewer
+        backToViewerBtn.addEventListener('click', () => {
+            showScreen(viewerScreen);
+        });
+
+        // Q/A Card
+        function renderQACard(index) {
+            if (index < 0 || index >= qaItems.length) return;
+            currentQAIndex = index;
+            
+            const qa = qaItems[index];
+            qaCurrentNum.textContent = index + 1;
+            
+            document.getElementById('qaQuestionText').textContent = qa.question;
+            document.getElementById('qaQuestionLoc').textContent = qa.questionLocation;
+            
+            document.getElementById('qaAnswerText').textContent = qa.answer;
+            document.getElementById('qaAnswerLoc').textContent = qa.answerLocation;
+            
+            const colloquySection = document.getElementById('qaColloquySection');
+            if (qa.colloquy) {
+                colloquySection.classList.remove('empty');
+                document.getElementById('qaColloquyText').textContent = qa.colloquy;
+                document.getElementById('qaColloquyLoc').textContent = qa.colloquyLocation;
+            } else {
+                colloquySection.classList.add('empty');
+                document.getElementById('qaColloquyText').innerHTML = '<span class="qa-empty-note">No objection or colloquy</span>';
+                document.getElementById('qaColloquyLoc').textContent = '';
+            }
+            
+            qaPrevBtn.disabled = index === 0;
+            qaNextBtn.disabled = index === qaItems.length - 1;
+        }
+
+        qaPrevBtn.addEventListener('click', () => renderQACard(currentQAIndex - 1));
+        qaNextBtn.addEventListener('click', () => renderQACard(currentQAIndex + 1));
+
+        // Q/A Table
+        function renderQATable() {
+            const tbody = document.getElementById('qaTableBody');
+            tbody.innerHTML = '';
+            
+            qaItems.forEach((qa, index) => {
+                const tr = document.createElement('tr');
+                tr.addEventListener('click', () => {
+                    cardViewBtn.click();
+                    renderQACard(index);
+                });
+                
+                tr.innerHTML = `
+                    <td class="qa-table-num">${index + 1}</td>
+                    <td class="qa-table-text" title="${escapeHtml(qa.question)}">${escapeHtml(truncate(qa.question, 60))}</td>
+                    <td class="qa-table-location">${qa.questionLocation}</td>
+                    <td class="qa-table-text" title="${escapeHtml(qa.answer)}">${escapeHtml(truncate(qa.answer, 60))}</td>
+                    <td class="qa-table-location">${qa.answerLocation}</td>
+                    <td class="qa-table-text" style="color: ${qa.colloquy ? 'var(--warning)' : 'var(--text-muted)'}">
+                        ${qa.colloquy ? escapeHtml(truncate(qa.colloquy, 30)) : '—'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function truncate(str, len) {
+            if (!str || str.length <= len) return str || '';
+            return str.substring(0, len) + '...';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // View toggle
+        cardViewBtn.addEventListener('click', () => {
+            cardViewBtn.classList.add('active');
+            tableViewBtn.classList.remove('active');
+            textViewBtn.classList.remove('active');
+            qaCardContainer.classList.remove('hidden');
+            qaTableContainer.classList.remove('active');
+            qaTextViewContainer.classList.remove('active');
+        });
+
+        tableViewBtn.addEventListener('click', () => {
+            tableViewBtn.classList.add('active');
+            cardViewBtn.classList.remove('active');
+            textViewBtn.classList.remove('active');
+            qaTableContainer.classList.add('active');
+            qaCardContainer.classList.add('hidden');
+            qaTextViewContainer.classList.remove('active');
+        });
+
+        textViewBtn.addEventListener('click', () => {
+            textViewBtn.classList.add('active');
+            cardViewBtn.classList.remove('active');
+            tableViewBtn.classList.remove('active');
+            qaTextViewContainer.classList.add('active');
+            qaCardContainer.classList.add('hidden');
+            qaTableContainer.classList.remove('active');
+            renderTextView();
+            scrollToCurrentQA();
+        });
+
+        // Text view navigation
+        textPrevBtn.addEventListener('click', () => {
+            if (currentQAIndex > 0) {
+                currentQAIndex--;
+                updateTextViewNav();
+                scrollToCurrentQA();
+                renderQACard(currentQAIndex);
+            }
+        });
+
+        textNextBtn.addEventListener('click', () => {
+            if (currentQAIndex < qaItems.length - 1) {
+                currentQAIndex++;
+                updateTextViewNav();
+                scrollToCurrentQA();
+                renderQACard(currentQAIndex);
+            }
+        });
+
+        function updateTextViewNav() {
+            textCurrentNum.textContent = currentQAIndex + 1;
+            textTotalNum.textContent = qaItems.length;
+            textPrevBtn.disabled = currentQAIndex === 0;
+            textNextBtn.disabled = currentQAIndex === qaItems.length - 1;
+            qaCurrentNum.textContent = currentQAIndex + 1;
+        }
+
+        // Render full text view with highlighting
+        function renderTextView() {
+            if (!pages || pages.length === 0) return;
+            
+            textViewContent.innerHTML = '';
+            textTotalNum.textContent = qaItems.length;
+            
+            // Build a map of line locations to highlight types
+            const highlights = buildHighlightMap();
+            
+            // Render all pages
+            pages.forEach((page, pageIdx) => {
+                const printedPage = (pageIdx + 1) - firstNumberedPage + 1;
+                const pageLabel = printedPage < 1 ? 'Title Page' : `Page ${printedPage}`;
+                
+                // Page header
+                const pageHeader = document.createElement('div');
+                pageHeader.className = 'text-view-page-header';
+                pageHeader.textContent = pageLabel;
+                pageHeader.dataset.page = printedPage;
+                textViewContent.appendChild(pageHeader);
+                
+                // Page lines
+                const lines = page.lines || [];
+                lines.forEach(line => {
+                    const lineKey = `${printedPage}:${line.lineNumber}`;
+                    const lineEl = document.createElement('div');
+                    lineEl.className = 'text-view-line';
+                    lineEl.dataset.page = printedPage;
+                    lineEl.dataset.line = line.lineNumber;
+                    
+                    // Check for highlights
+                    const highlight = highlights[lineKey];
+                    if (highlight) {
+                        lineEl.classList.add(`highlight-${highlight.type}`);
+                        lineEl.dataset.qaIndex = highlight.qaIndex;
+                    }
+                    
+                    const numEl = document.createElement('span');
+                    numEl.className = 'text-view-line-num';
+                    numEl.textContent = `${printedPage}:${line.lineNumber}`;
+                    
+                    const textEl = document.createElement('span');
+                    textEl.className = 'text-view-line-text';
+                    textEl.textContent = line.text || '';
+                    
+                    lineEl.appendChild(numEl);
+                    lineEl.appendChild(textEl);
+                    textViewContent.appendChild(lineEl);
+                });
+            });
+        }
+
+        // Build a map of page:line -> highlight type
+        function buildHighlightMap() {
+            const map = {};
+            
+            qaItems.forEach((qa, qaIndex) => {
+                // Parse question location
+                addHighlightRange(map, qa.questionLocation, 'question', qaIndex);
+                // Parse answer location
+                addHighlightRange(map, qa.answerLocation, 'answer', qaIndex);
+                // Parse colloquy location
+                if (qa.colloquyLocation) {
+                    addHighlightRange(map, qa.colloquyLocation, 'colloquy', qaIndex);
                 }
             });
+            
+            return map;
+        }
 
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = (selectedFile?.name || 'document').replace('.pdf', '_extracted.txt');
-            a.click();
-            URL.revokeObjectURL(url);
-        });
+        function addHighlightRange(map, location, type, qaIndex) {
+            if (!location) return;
+            
+            // Parse location format: "page:startLine-endLine" or "page:line" or "startPage:startLine-endPage:endLine"
+            const match = location.match(/^(\d+):(\d+)(?:-(\d+))?$/);
+            if (match) {
+                const page = parseInt(match[1]);
+                const startLine = parseInt(match[2]);
+                const endLine = match[3] ? parseInt(match[3]) : startLine;
+                
+                for (let line = startLine; line <= endLine; line++) {
+                    const key = `${page}:${line}`;
+                    if (!map[key]) {
+                        map[key] = { type, qaIndex };
+                    }
+                }
+            } else {
+                // Try cross-page format: "startPage:startLine-endPage:endLine"
+                const crossMatch = location.match(/^(\d+):(\d+)-(\d+):(\d+)$/);
+                if (crossMatch) {
+                    const startPage = parseInt(crossMatch[1]);
+                    const startLine = parseInt(crossMatch[2]);
+                    const endPage = parseInt(crossMatch[3]);
+                    const endLine = parseInt(crossMatch[4]);
+                    
+                    for (let page = startPage; page <= endPage; page++) {
+                        const lineStart = (page === startPage) ? startLine : 1;
+                        const lineEnd = (page === endPage) ? endLine : 25;
+                        for (let line = lineStart; line <= lineEnd; line++) {
+                            const key = `${page}:${line}`;
+                            if (!map[key]) {
+                                map[key] = { type, qaIndex };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function scrollToCurrentQA() {
+            if (qaItems.length === 0) return;
+            
+            const qa = qaItems[currentQAIndex];
+            const qLoc = qa.questionLocation;
+            
+            // Remove previous current highlight
+            document.querySelectorAll('.text-view-line.current-qa').forEach(el => {
+                el.classList.remove('current-qa');
+            });
+            
+            // Parse the location to find the first line
+            const match = qLoc.match(/^(\d+):(\d+)/);
+            if (match) {
+                const page = match[1];
+                const line = match[2];
+                
+                // Find the line element and scroll to it
+                const lineEl = textViewContent.querySelector(
+                    `.text-view-line[data-page="${page}"][data-line="${line}"]`
+                );
+                
+                if (lineEl) {
+                    lineEl.classList.add('current-qa');
+                    lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
 
         // New file
         newFileBtn.addEventListener('click', () => {
             pages = [];
+            qaItems = [];
             currentPage = 0;
+            currentQAIndex = 0;
             selectedFile = null;
             fileInput.value = '';
-            firstNumberedPage = 1;
-            pageOffsetInput.value = '1';
-            viewer.classList.remove('active');
-            headerControls.style.display = 'none';
-            uploadContainer.style.display = 'block';
+            firstNumberedPage = 3;
+            pageOffsetInput.value = '3';
+            showScreen(uploadScreen);
         });
     </script>
 </body>

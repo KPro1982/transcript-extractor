@@ -28,6 +28,274 @@ fs.readdirSync(IMAGES_DIR).forEach(file => {
 });
 
 /**
+ * Parse Q/A pairs from examination content
+ * Each Q/A object contains:
+ * - question: text snippet
+ * - questionLocation: page:startLine-endLine
+ * - answer: text snippet
+ * - answerLocation: page:startLine-endLine
+ * - colloquy: text snippet (objections, etc.)
+ * - colloquyLocation: page:startLine-endLine
+ */
+function parseExamination(pages, firstPrintedPage) {
+    const qaItems = [];
+    
+    // Flatten all lines with page/line info
+    const allLines = [];
+    for (let i = 0; i < pages.length; i++) {
+        const printedPage = (i + 1) - firstPrintedPage + 1;
+        const page = pages[i];
+        const lines = page.lines || [];
+        
+        for (const line of lines) {
+            allLines.push({
+                text: line.text || '',
+                lineNumber: line.lineNumber,
+                pageIndex: i,
+                printedPage: printedPage
+            });
+        }
+    }
+    
+    // Find examination start
+    let examStart = -1;
+    for (let i = 0; i < allLines.length; i++) {
+        const text = allLines[i].text.trim();
+        // Look for "EXAMINATION" header or "BY MR./MS. X:"
+        if (text.match(/^EXAMINATION$/i) || 
+            text.match(/^BY\s+M[RS]\.\s+\w+:$/i) ||
+            text.match(/EXAMINATION\s*$/i)) {
+            examStart = i;
+            break;
+        }
+    }
+    
+    if (examStart === -1) {
+        // Try to find first Q. or QUESTION if no EXAMINATION header
+        // Handle patterns with middle dots like "· · ·Q.·"
+        for (let i = 0; i < allLines.length; i++) {
+            const lineText = allLines[i].text;
+            if (lineText.match(/[·\s]*Q\.[·\s]/i) || 
+                lineText.match(/^\s*Q\.\s+/i) || 
+                lineText.match(/^\s*QUESTION[:\s]/i)) {
+                examStart = i;
+                break;
+            }
+        }
+    }
+    
+    if (examStart === -1) {
+        console.log('Could not find examination section');
+        return qaItems;
+    }
+    
+    console.log(`Found examination starting at line ${examStart}`);
+    
+    // Parse Q/A pairs
+    let currentQ = null;
+    let currentA = null;
+    let currentColloquy = null;
+    let state = 'searching'; // searching, in_question, in_colloquy, in_answer
+    
+    for (let i = examStart; i < allLines.length; i++) {
+        const line = allLines[i];
+        const text = line.text;
+        const trimmed = text.trim();
+        
+        // Skip empty lines
+        if (!trimmed) continue;
+        
+        // Check if this is a Question line (Q. or QUESTION or Question:)
+        // Handle patterns like "· · ·Q.·" with middle dots
+        const isQuestion = trimmed.match(/^Q\.\s*/i) || 
+                          text.match(/^\s+Q\.\s*/i) ||
+                          trimmed.match(/^[·\s]*Q\.[·\s]/i) ||
+                          trimmed.match(/^QUESTION[:\s]/i) ||
+                          trimmed.match(/^Question[:\s]/i);
+        // Check if this is an Answer line (A. or ANSWER or Answer:)
+        // Handle patterns like "· · ·A.·" with middle dots
+        const isAnswer = trimmed.match(/^A\.\s*/i) || 
+                        text.match(/^\s+A\.\s*/i) ||
+                        trimmed.match(/^[·\s]*A\.[·\s]/i) ||
+                        trimmed.match(/^ANSWER[:\s]/i) ||
+                        trimmed.match(/^Answer[:\s]/i);
+        // Check if this is THE WITNESS: (answer after objection)
+        const isWitnessAnswer = trimmed.match(/^[·\s]*THE\s+WITNESS:[·\s]*/i) ||
+                               trimmed.match(/^THE\s+WITNESS:/i);
+        // Check if this is colloquy (attorney speaking, objection, etc.)
+        // But NOT "THE WITNESS:" which is an answer
+        const isColloquy = (trimmed.match(/^M[RS]\.\s+\w+:/i) || 
+                          trimmed.match(/^THE\s+(REPORTER|COURT):/i) ||
+                          trimmed.match(/^\(.*\)$/) || // Parenthetical notes
+                          trimmed.match(/^[·\s]*M[RS]\.\s+\w+:/i) ||
+                          trimmed.match(/^BY\s+M[RS]\.\s+\w+:$/i)) && // Return to questioning
+                          !isWitnessAnswer;
+        
+        // Check for end of examination (certificate, signature pages)
+        if (trimmed.match(/^CERTIFICATE OF REPORTER/i) ||
+            trimmed.match(/^PENALTY OF PERJURY/i) ||
+            trimmed.match(/^CHANGES AND SIGNATURE/i)) {
+            // Save current Q/A if complete
+            if (currentQ && currentA) {
+                qaItems.push({
+                    question: currentQ.text,
+                    questionLocation: formatLocation(currentQ),
+                    answer: currentA.text,
+                    answerLocation: formatLocation(currentA),
+                    colloquy: currentColloquy ? currentColloquy.text : '',
+                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+                });
+            }
+            break;
+        }
+        
+        if (isQuestion) {
+            // Save previous Q/A if complete
+            if (currentQ && currentA) {
+                qaItems.push({
+                    question: currentQ.text,
+                    questionLocation: formatLocation(currentQ),
+                    answer: currentA.text,
+                    answerLocation: formatLocation(currentA),
+                    colloquy: currentColloquy ? currentColloquy.text : '',
+                    colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+                });
+            }
+            
+            // Start new question
+            currentQ = {
+                text: cleanQAText(text),
+                startPage: line.printedPage,
+                startLine: line.lineNumber,
+                endPage: line.printedPage,
+                endLine: line.lineNumber
+            };
+            currentA = null;
+            currentColloquy = null;
+            state = 'in_question';
+            
+        } else if (isAnswer || isWitnessAnswer) {
+            if (currentQ) {
+                // Start answer - handle both A. and THE WITNESS:
+                const answerText = isWitnessAnswer 
+                    ? cleanWitnessText(text)
+                    : cleanQAText(text);
+                    
+                if (!currentA) {
+                    // Start new answer
+                    currentA = {
+                        text: answerText,
+                        startPage: line.printedPage,
+                        startLine: line.lineNumber,
+                        endPage: line.printedPage,
+                        endLine: line.lineNumber
+                    };
+                } else {
+                    // Continue existing answer (another THE WITNESS: line)
+                    currentA.text += ' ' + answerText;
+                    currentA.endPage = line.printedPage;
+                    currentA.endLine = line.lineNumber;
+                }
+                state = 'in_answer';
+            }
+            
+        } else if (isColloquy) {
+            if (state === 'in_question' || state === 'in_colloquy') {
+                // Colloquy between question and answer (objection, etc.)
+                if (!currentColloquy) {
+                    currentColloquy = {
+                        text: cleanColloquyText(trimmed),
+                        startPage: line.printedPage,
+                        startLine: line.lineNumber,
+                        endPage: line.printedPage,
+                        endLine: line.lineNumber
+                    };
+                } else {
+                    currentColloquy.text += ' ' + cleanColloquyText(trimmed);
+                    currentColloquy.endPage = line.printedPage;
+                    currentColloquy.endLine = line.lineNumber;
+                }
+                state = 'in_colloquy';
+            } else if (state === 'in_answer') {
+                // In answer state, colloquy might indicate end of this Q/A
+                // or continuation - we'll treat it as end and let next Q pick it up
+            }
+            
+        } else {
+            // Continuation of current element
+            if (state === 'in_question' && currentQ) {
+                currentQ.text += ' ' + trimmed;
+                currentQ.endPage = line.printedPage;
+                currentQ.endLine = line.lineNumber;
+            } else if (state === 'in_answer' && currentA) {
+                currentA.text += ' ' + trimmed;
+                currentA.endPage = line.printedPage;
+                currentA.endLine = line.lineNumber;
+            } else if (state === 'in_colloquy' && currentColloquy) {
+                currentColloquy.text += ' ' + trimmed;
+                currentColloquy.endPage = line.printedPage;
+                currentColloquy.endLine = line.lineNumber;
+            }
+        }
+    }
+    
+    // Don't forget the last Q/A pair
+    if (currentQ && currentA) {
+        qaItems.push({
+            question: currentQ.text,
+            questionLocation: formatLocation(currentQ),
+            answer: currentA.text,
+            answerLocation: formatLocation(currentA),
+            colloquy: currentColloquy ? currentColloquy.text : '',
+            colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : ''
+        });
+    }
+    
+    console.log(`Parsed ${qaItems.length} Q/A pairs`);
+    return qaItems;
+}
+
+function cleanQAText(text) {
+    // Remove Q./A./QUESTION/ANSWER prefix and clean up middle dots/spacing
+    // Handle patterns like "· · ·Q.· text" or "· · ·A.· text"
+    return text
+        .replace(/^[·\s]*Q\.[·\s]*/i, '')
+        .replace(/^[·\s]*A\.[·\s]*/i, '')
+        .replace(/^\s*QUESTION[:\s]*/i, '')
+        .replace(/^\s*ANSWER[:\s]*/i, '')
+        .replace(/·/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function cleanWitnessText(text) {
+    // Remove "THE WITNESS:" prefix and clean up
+    return text
+        .replace(/^[·\s]*THE\s+WITNESS:[·\s]*/i, '')
+        .replace(/·/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function cleanColloquyText(text) {
+    // Clean up colloquy text (keep the speaker label for context)
+    return text
+        .replace(/·/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function formatLocation(item) {
+    if (item.startPage === item.endPage) {
+        if (item.startLine === item.endLine) {
+            return `${item.startPage}:${item.startLine}`;
+        }
+        return `${item.startPage}:${item.startLine}-${item.endLine}`;
+    }
+    return `${item.startPage}:${item.startLine}-${item.endPage}:${item.endLine}`;
+}
+
+/**
  * Extract text and images from PDF for side-by-side viewing
  */
 async function extractPDFWithImages(pdfPath) {
@@ -185,7 +453,34 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // Single extraction endpoint
+    // Parse Q/A endpoint
+    if (req.method === 'POST' && url.pathname === '/api/parse-qa') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const body = JSON.parse(Buffer.concat(chunks).toString());
+                const { pages, firstPrintedPage } = body;
+                
+                console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
+                const qaItems = parseExamination(pages, firstPrintedPage);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    qaItems: qaItems,
+                    totalQA: qaItems.length
+                }));
+            } catch (error) {
+                console.error('Parse error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to parse: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // PDF extraction endpoint
     if (req.method === 'POST' && url.pathname === '/api/extract') {
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
@@ -283,13 +578,14 @@ function parseMultipart(buffer, boundary) {
 
 server.listen(PORT, () => {
     console.log(`\n${'='.repeat(50)}`);
-    console.log('  PDF Reader Server Running');
+    console.log('  DepoDigest - Deposition Summarization Tool');
     console.log(`${'='.repeat(50)}`);
     console.log(`\n  Server: http://localhost:${PORT}/`);
     console.log(`\n  Features:`);
-    console.log('    - Side-by-side PDF + text view');
-    console.log('    - Line numbers 1-25 per page');
-    console.log('    - Page navigation');
+    console.log('    - Upload deposition PDFs');
+    console.log('    - Confirm first printed page number');
+    console.log('    - Parse Q/A examination section');
+    console.log('    - Navigate through Q/A pairs');
     console.log(`\n${'='.repeat(50)}\n`);
 
     // Open in default browser

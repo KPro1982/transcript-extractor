@@ -1,7 +1,7 @@
 {
-  "name": "pdf-reader",
+  "name": "depo-digest",
   "version": "1.0.0",
-  "description": "Extract text from PDFs with line numbers, headers, and footers",
+  "description": "DepoDigest - Deposition summarization and Q/A extraction tool",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -16,8 +16,11 @@
     "test-ocr": "ts-node src/test-ocr-direct.ts"
   },
   "keywords": [
+    "deposition",
+    "legal",
     "pdf",
-    "text-extraction"
+    "text-extraction",
+    "qa-parsing"
   ],
   "author": "",
   "license": "ISC",
