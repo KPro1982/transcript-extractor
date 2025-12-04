@@ -10,3 +10,4 @@ console.log('"25":', pattern.test('25'));
 console.log('"5":', pattern.test('5'));
 
 
+
