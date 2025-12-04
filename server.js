@@ -578,6 +578,7 @@ function parseExamination(pages, firstPrintedPage) {
                     questionLocation: formatLocation(currentQ),
                     answer: currentA.text,
                     answerLocation: formatLocation(currentA),
+                    location: formatFullLocation(currentQ, currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
                     colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
                     summary: generateSummary(currentQ.text, currentA.text)
@@ -594,6 +595,7 @@ function parseExamination(pages, firstPrintedPage) {
                     questionLocation: formatLocation(currentQ),
                     answer: currentA.text,
                     answerLocation: formatLocation(currentA),
+                    location: formatFullLocation(currentQ, currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
                     colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
                     summary: generateSummary(currentQ.text, currentA.text)
@@ -684,6 +686,7 @@ function parseExamination(pages, firstPrintedPage) {
             questionLocation: formatLocation(currentQ),
             answer: currentA.text,
             answerLocation: formatLocation(currentA),
+            location: formatFullLocation(currentQ, currentA),
             colloquy: currentColloquy ? currentColloquy.text : '',
             colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
             summary: generateSummary(currentQ.text, currentA.text)
@@ -986,15 +989,43 @@ function formatLocation(item) {
 }
 
 /**
+ * Format the full location spanning from question start to answer end
+ */
+function formatFullLocation(question, answer) {
+    if (!question || !answer) {
+        return question ? formatLocation(question) : (answer ? formatLocation(answer) : '');
+    }
+    
+    const startPage = question.startPage;
+    const startLine = question.startLine;
+    const endPage = answer.endPage;
+    const endLine = answer.endLine;
+    
+    if (startPage === endPage) {
+        if (startLine === endLine) {
+            return `${startPage}:${startLine}`;
+        }
+        return `${startPage}:${startLine}-${endLine}`;
+    }
+    return `${startPage}:${startLine}-${endPage}:${endLine}`;
+}
+
+/**
  * Extract text and images from PDF for side-by-side viewing
+ * Uses DIGITAL extraction first, with OCR fallback only for pages without text
  */
 async function extractPDFWithImages(pdfPath) {
     const { ExternalPDFToImageConverter } = require('./dist/pdf-to-image-external.js');
+    const { OCREngine } = require('./dist/ocr-engine.js');
     const pdfjsLib = require('pdfjs-dist');
     
     if (pdfjsLib.GlobalWorkerOptions) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     }
+
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('SMART PDF Extraction (Digital First, OCR Fallback)');
+    console.log(`${'='.repeat(60)}`);
 
     // Get PDF info
     const pdfBuffer = fs.readFileSync(pdfPath);
@@ -1003,22 +1034,19 @@ async function extractPDFWithImages(pdfPath) {
     const pdfDoc = await loadingTask.promise;
     const totalPages = pdfDoc.numPages;
 
-    // Convert PDF to images (use lower DPI for display)
-    const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
-    const images = await imageConverter.convert(pdfPath);
-    
-    console.log(`  Converting ${totalPages} pages...`);
-
     // Legal transcript settings
     const LINES_PER_PAGE = 25;
     const topMarginPercent = 0.10;
     const bottomMarginPercent = 0.10;
+    const MIN_TEXT_ITEMS_THRESHOLD = 10; // Minimum items to consider digital extraction successful
 
-    const pages = [];
-
+    // Step 1: Try digital extraction for all pages first
+    console.log(`\n[1/3] Attempting digital text extraction for ${totalPages} pages...`);
+    
+    const digitalPages = [];
+    const pagesNeedingOCR = [];
+    
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-
-        // Get digital text
         const page = await pdfDoc.getPage(pageNum);
         const viewport = page.getViewport({ scale: 1.0 });
         const textContent = await page.getTextContent();
@@ -1037,6 +1065,96 @@ async function extractPDFWithImages(pdfPath) {
                 width: item.width || 0,
                 height: item.height || 12,
             });
+        }
+
+        // Check if this page has meaningful text
+        const meaningfulItems = textItems.filter(item => /[a-zA-Z0-9]/.test(item.text.trim()));
+        const hasEnoughText = meaningfulItems.length >= MIN_TEXT_ITEMS_THRESHOLD;
+        
+        digitalPages.push({
+            pageNum,
+            width,
+            height,
+            textItems,
+            hasEnoughText
+        });
+
+        if (!hasEnoughText) {
+            pagesNeedingOCR.push(pageNum);
+            console.log(`  ⚠ Page ${pageNum}: ${textItems.length} items (needs OCR)`);
+        } else {
+            console.log(`  ✓ Page ${pageNum}: ${textItems.length} items (digital OK)`);
+        }
+    }
+
+    // Step 2: Only convert to images and OCR if needed
+    let images = null;
+    let ocrEngine = null;
+    let ocrResults = new Map();
+
+    if (pagesNeedingOCR.length > 0) {
+        console.log(`\n[2/3] OCR fallback for ${pagesNeedingOCR.length} pages: ${pagesNeedingOCR.join(', ')}`);
+        
+        // Convert PDF to images
+        console.log('  Converting PDF to images...');
+        const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+        images = await imageConverter.convert(pdfPath);
+        
+        // Initialize OCR engine
+        console.log('  Initializing OCR engine...');
+        ocrEngine = new OCREngine('eng');
+        await ocrEngine.initialize();
+        
+        // OCR only the pages that need it
+        for (const pageNum of pagesNeedingOCR) {
+            const pageImage = images.find(img => img.pageNumber === pageNum);
+            if (pageImage) {
+                console.log(`  Processing page ${pageNum} with OCR...`);
+                const ocrResult = await ocrEngine.processImage(pageImage.imagePath, pageNum);
+                ocrResults.set(pageNum, ocrResult);
+            }
+        }
+        
+        // Cleanup OCR engine
+        await ocrEngine.terminate();
+    } else {
+        console.log(`\n[2/3] Skipping OCR - all pages have digital text!`);
+        
+        // Still need images for display
+        console.log('  Converting PDF to images for display...');
+        const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+        images = await imageConverter.convert(pdfPath);
+    }
+
+    // Step 3: Build final results
+    console.log(`\n[3/3] Building final results...`);
+    const pages = [];
+
+    for (let i = 0; i < digitalPages.length; i++) {
+        const digitalPage = digitalPages[i];
+        const pageNum = digitalPage.pageNum;
+        const { width, height } = digitalPage;
+        
+        let textItems;
+        let extractionMethod;
+        
+        if (ocrResults.has(pageNum)) {
+            // Use OCR results for this page
+            const ocrResult = ocrResults.get(pageNum);
+            textItems = ocrResult.words.map(word => ({
+                text: word.text,
+                x: word.bbox.x,
+                y: word.bbox.y,
+                width: word.bbox.width,
+                height: word.bbox.height,
+            }));
+            extractionMethod = 'ocr';
+            console.log(`  Page ${pageNum}: Using OCR (${textItems.length} words)`);
+        } else {
+            // Use digital extraction
+            textItems = digitalPage.textItems;
+            extractionMethod = 'digital';
+            console.log(`  Page ${pageNum}: Using digital (${textItems.length} items)`);
         }
 
         // Find content bounds
@@ -1082,7 +1200,7 @@ async function extractPDFWithImages(pdfPath) {
                 mainContent.push({
                     text: item.text,
                     position: { x: item.x, y: item.y, width: item.width, height: item.height },
-                    confidence: 100,
+                    confidence: extractionMethod === 'digital' ? 100 : 90,
                     type: 'content',
                 });
             }
@@ -1103,12 +1221,19 @@ async function extractPDFWithImages(pdfPath) {
                 lineNumber: m.lineNumber,
                 text: m.text || ''
             })),
-            unmatched: merged.filter(m => !m.lineNumber && m.text).map(m => m.text)
+            unmatched: merged.filter(m => !m.lineNumber && m.text).map(m => m.text),
+            extractionMethod
         });
-
     }
 
-    console.log(`  ✓ Text extracted from ${totalPages} pages`);
+    const digitalCount = pages.filter(p => p.extractionMethod === 'digital').length;
+    const ocrCount = pages.filter(p => p.extractionMethod === 'ocr').length;
+    
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`✓ Smart Extraction Complete - ${totalPages} pages processed`);
+    console.log(`  Digital: ${digitalCount} pages | OCR fallback: ${ocrCount} pages`);
+    console.log(`${'='.repeat(60)}\n`);
+
     return { pages, totalPages };
 }
 
@@ -1116,6 +1241,9 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(200);

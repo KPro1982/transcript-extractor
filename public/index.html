@@ -2982,12 +2982,13 @@
                     tdNumber.innerHTML = `${index + 1}<span class="merged-indicator">${qa.mergedCount}</span>`;
                 }
                 
-                // Column: Location
+                // Column: Location (full Q&A range)
                 const tdLocation = document.createElement('td');
                 tdLocation.className = 'row-location';
                 tdLocation.dataset.col = 'location';
                 tdLocation.style.display = columnVisibility.location ? '' : 'none';
-                tdLocation.innerHTML = `<a data-page="${extractPageFromLocation(qa.questionLocation)}" data-index="${index}">${qa.questionLocation}</a>`;
+                const fullLocation = qa.location || qa.questionLocation;
+                tdLocation.innerHTML = `<a data-page="${extractPageFromLocation(fullLocation)}" data-index="${index}">${fullLocation}</a>`;
                 
                 // Column: Topic + Controls (consolidated)
                 const tdTopic = document.createElement('td');
@@ -3461,6 +3462,7 @@
                     answer: previous.answer,
                     questionLocation: previous.questionLocation,
                     answerLocation: previous.answerLocation,
+                    location: previous.location || previous.questionLocation,
                     colloquy: previous.colloquy,
                     colloquyLocation: previous.colloquyLocation,
                     summary: previous.summary,
@@ -3478,6 +3480,7 @@
                     answer: current.answer,
                     questionLocation: current.questionLocation,
                     answerLocation: current.answerLocation,
+                    location: current.location || current.questionLocation,
                     colloquy: current.colloquy,
                     colloquyLocation: current.colloquyLocation,
                     summary: current.summary,
@@ -3489,12 +3492,15 @@
             previous.question = previous.qaSequence.map(item => item.question).join('\n\n');
             previous.answer = previous.qaSequence.map(item => item.answer).join('\n\n');
             
-            // Update location to span the full range
+            // Update location to span the full range (from first Q start to last A end)
             const allQuestionLocs = previous.qaSequence.map(item => item.questionLocation).filter(Boolean);
             const allAnswerLocs = previous.qaSequence.map(item => item.answerLocation).filter(Boolean);
+            const allFullLocs = previous.qaSequence.map(item => item.location).filter(Boolean);
             
             previous.questionLocation = allQuestionLocs.reduce((merged, loc) => mergeLocations(merged, loc), allQuestionLocs[0]);
             previous.answerLocation = allAnswerLocs.reduce((merged, loc) => mergeLocations(merged, loc), allAnswerLocs[0]);
+            // Full location spans from first question to last answer
+            previous.location = allFullLocs.reduce((merged, loc) => mergeLocations(merged, loc), allFullLocs[0]);
             
             // Track merge count
             previous.mergedCount = previous.qaSequence.length;
@@ -3538,6 +3544,7 @@
                 answer: item.answer,
                 questionLocation: item.questionLocation,
                 answerLocation: item.answerLocation,
+                location: item.location || item.questionLocation,
                 colloquy: item.colloquy,
                 colloquyLocation: item.colloquyLocation,
                 summary: item.summary || ''
@@ -3777,8 +3784,9 @@
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             
-            // Navigate to page
-            const printedPage = extractPageFromLocation(qa.questionLocation);
+            // Navigate to page (use full location)
+            const fullLocation = qa.location || qa.questionLocation;
+            const printedPage = extractPageFromLocation(fullLocation);
             const digitalIndex = printedPage + firstPrintedPage - 2;
             if (digitalIndex >= 0 && digitalIndex < pages.length) {
                 renderSidePage(digitalIndex);
@@ -3987,9 +3995,10 @@
                 
                 const summaryDiv = document.createElement('div');
                 summaryDiv.className = 'chron-summary';
+                const chronFullLocation = item.location || item.questionLocation;
                 summaryDiv.innerHTML = `
                     ${escapeHtml(item.summary || '')}
-                    <div class="chron-location">📍 ${item.questionLocation}</div>
+                    <div class="chron-location">📍 ${chronFullLocation}</div>
                 `;
                 
                 entry.appendChild(dateDiv);
@@ -4059,7 +4068,7 @@
                         if (role && !entry.role) entry.role = role;
                         entry.mentions.push({
                             index: idx,
-                            location: qa.questionLocation,
+                            location: qa.location || qa.questionLocation,
                             summary: qa.summary
                         });
                     });
@@ -4122,7 +4131,8 @@
             let csv = 'Number,Location,Topic,HasDates,People,Summary,Question,Answer\n';
             qaItems.forEach((qa, idx) => {
                 const people = (qa.peopleMentioned || []).map(p => typeof p === 'string' ? p : p.name).join('; ');
-                csv += `${idx + 1},"${qa.questionLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
+                const fullLocation = qa.location || qa.questionLocation;
+                csv += `${idx + 1},"${fullLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv' });
