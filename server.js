@@ -464,7 +464,192 @@ fs.readdirSync(IMAGES_DIR).forEach(file => {
 });
 
 /**
+ * Use AI to find where the examination/Q&A section begins
+ * Returns the page index (0-based) where examination starts
+ */
+async function findExaminationStartWithAI(pages) {
+    if (!OPENAI_API_KEY) {
+        console.log('No API key - cannot use AI for examination detection');
+        return null;
+    }
+
+    // Sample text from first 10 pages to find examination start
+    const samplesToCheck = Math.min(15, pages.length);
+    let sampleText = '';
+    
+    for (let i = 0; i < samplesToCheck; i++) {
+        const page = pages[i];
+        const lines = page.lines || [];
+        const pageText = lines.map(l => `${l.lineNumber || ''} ${l.text || ''}`).join('\n');
+        sampleText += `\n--- PAGE ${i + 1} ---\n${pageText}\n`;
+    }
+
+    const systemPrompt = `You are a legal document analyzer. Your task is to find where the examination/questioning section begins in a deposition transcript.
+
+The examination section is where attorneys begin asking questions to the witness. It typically:
+- Starts after preliminary matters (appearances, stipulations, swearing in)
+- Contains Q&A exchanges between attorneys and witnesses
+- May be marked with "EXAMINATION", "DIRECT EXAMINATION", or simply begin with questions
+
+Questions in depositions can be formatted as:
+- "Q." or "Q:" followed by the question
+- Just "Q" followed by a space and the question
+- "QUESTION:" followed by the question
+- An attorney name followed by their question
+
+Answers are similarly formatted with "A.", "A:", "A", "ANSWER:", or "THE WITNESS:"
+
+Analyze the provided text and return ONLY a JSON object with:
+- "pageNumber": the page number (1-based) where examination begins
+- "lineNumber": the approximate line number on that page
+- "confidence": "high", "medium", or "low"
+- "reason": brief explanation of why you identified this location`;
+
+    try {
+        console.log('Using AI to detect examination start...');
+        const response = await callOpenAI([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Find where the examination begins in this deposition:\n\n${sampleText}` }
+        ], { max_tokens: 300, temperature: 0.1 });
+
+        // Parse the JSON response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const result = JSON.parse(jsonMatch[0]);
+            console.log(`AI detected examination start: Page ${result.pageNumber}, Line ~${result.lineNumber} (${result.confidence} confidence)`);
+            console.log(`Reason: ${result.reason}`);
+            return {
+                pageIndex: result.pageNumber - 1,
+                lineNumber: result.lineNumber,
+                confidence: result.confidence
+            };
+        }
+    } catch (error) {
+        console.error('AI examination detection failed:', error.message);
+    }
+    
+    return null;
+}
+
+/**
+ * Use AI to parse Q&A pairs from a batch of pages
+ * This is more flexible than pattern matching and works with various transcript formats
+ */
+async function parseQABatchWithAI(pages, startPageIndex, firstPrintedPage) {
+    if (!OPENAI_API_KEY) {
+        return [];
+    }
+
+    const qaItems = [];
+    const BATCH_SIZE = 5; // Process 5 pages at a time
+    const MAX_PAGES = Math.min(pages.length, startPageIndex + 100); // Limit to avoid huge API calls
+
+    console.log(`Using AI to parse Q&A pairs from pages ${startPageIndex + 1} to ${MAX_PAGES}...`);
+
+    for (let batchStart = startPageIndex; batchStart < MAX_PAGES; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, MAX_PAGES);
+        let batchText = '';
+
+        for (let i = batchStart; i < batchEnd; i++) {
+            const page = pages[i];
+            const printedPage = (i + 1) - firstPrintedPage + 1;
+            const lines = page.lines || [];
+            const pageText = lines.map(l => `${l.lineNumber || ''}: ${l.text || ''}`).join('\n');
+            batchText += `\n=== PAGE ${printedPage} (index ${i}) ===\n${pageText}\n`;
+        }
+
+        const systemPrompt = `You are a legal document parser. Extract all question-answer pairs from the deposition transcript text.
+
+The input data has the format "LINE_NUMBER: TEXT" on each line. Use these EXACT line numbers in your response.
+
+For each Q&A pair, identify:
+1. The question text (remove Q./Q:/Q prefix)
+2. The answer text (remove A./A:/A/THE WITNESS: prefix)
+3. The EXACT page number and line numbers from the data (line numbers are shown at the start of each line before the colon)
+
+Questions may be formatted as: Q., Q:, Q (space), QUESTION:, or attorney name followed by question
+Answers may be formatted as: A., A:, A (space), ANSWER:, THE WITNESS:
+
+Return a JSON array of objects:
+[
+  {
+    "question": "the question text without prefix",
+    "questionPage": page_number_from_header,
+    "questionStartLine": exact_line_number_where_Q_appears,
+    "questionEndLine": exact_line_number_where_question_ends,
+    "answer": "the answer text without prefix",
+    "answerPage": page_number_from_header,
+    "answerStartLine": exact_line_number_where_A_appears,
+    "answerEndLine": exact_line_number_where_answer_ends,
+    "colloquy": "any objections or side discussions between Q and A, or empty string"
+  }
+]
+
+IMPORTANT: Use the EXACT line numbers shown in the data (e.g., if "11: Q So are you..." then questionStartLine is 11, NOT 10 or 12).
+Only include complete Q&A pairs. If a question spans pages, use the starting page. Be thorough - capture ALL Q&A pairs in the text.`;
+
+        try {
+            const response = await callOpenAI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Extract all Q&A pairs from this deposition text:\n\n${batchText}` }
+            ], { max_tokens: 4000, temperature: 0.1 });
+
+            // Parse the JSON response
+            const jsonMatch = response.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const batchQA = JSON.parse(jsonMatch[0]);
+                
+                for (const qa of batchQA) {
+                    qaItems.push({
+                        question: qa.question || '',
+                        questionLocation: formatLocationFromAI(qa.questionPage, qa.questionStartLine, qa.questionEndLine),
+                        answer: qa.answer || '',
+                        answerLocation: formatLocationFromAI(qa.answerPage, qa.answerStartLine, qa.answerEndLine),
+                        location: formatFullLocationFromAI(qa),
+                        colloquy: qa.colloquy || '',
+                        colloquyLocation: ''
+                    });
+                }
+                
+                console.log(`  Batch ${Math.floor((batchStart - startPageIndex) / BATCH_SIZE) + 1}: Found ${batchQA.length} Q&A pairs`);
+            }
+        } catch (error) {
+            console.error(`AI Q&A parsing failed for batch starting at page ${batchStart + 1}:`, error.message);
+        }
+
+        // Small delay between batches
+        if (batchEnd < MAX_PAGES) {
+            await new Promise(r => setTimeout(r, 300));
+        }
+    }
+
+    console.log(`AI parsing complete: ${qaItems.length} total Q&A pairs found`);
+    return qaItems;
+}
+
+function formatLocationFromAI(page, startLine, endLine) {
+    if (!page) return '';
+    if (startLine === endLine || !endLine) {
+        return `${page}:${startLine || 1}`;
+    }
+    return `${page}:${startLine}-${endLine}`;
+}
+
+function formatFullLocationFromAI(qa) {
+    const startPage = qa.questionPage || qa.answerPage;
+    const endPage = qa.answerPage || qa.questionPage;
+    const startLine = qa.questionStartLine || 1;
+    const endLine = qa.answerEndLine || qa.answerStartLine || 25;
+    
+    if (startPage === endPage) {
+        return `${startPage}:${startLine}-${endLine}`;
+    }
+    return `${startPage}:${startLine}-${endPage}:${endLine}`;
+}
+
+/**
  * Parse Q/A pairs from examination content
+ * Uses AI when available for robust parsing, falls back to pattern matching
  * Each Q/A object contains:
  * - question: text snippet
  * - questionLocation: page:startLine-endLine
@@ -473,7 +658,31 @@ fs.readdirSync(IMAGES_DIR).forEach(file => {
  * - colloquy: text snippet (objections, etc.)
  * - colloquyLocation: page:startLine-endLine
  */
-function parseExamination(pages, firstPrintedPage) {
+async function parseExamination(pages, firstPrintedPage) {
+    // Try AI-based parsing first (more robust)
+    if (OPENAI_API_KEY) {
+        try {
+            // First, use AI to find where examination starts
+            const examStart = await findExaminationStartWithAI(pages);
+            
+            if (examStart && examStart.confidence !== 'low') {
+                // Use AI to parse Q&A pairs
+                const aiQAItems = await parseQABatchWithAI(pages, examStart.pageIndex, firstPrintedPage);
+                
+                if (aiQAItems.length > 0) {
+                    console.log(`AI parsing successful: ${aiQAItems.length} Q&A pairs`);
+                    return aiQAItems;
+                }
+            }
+            
+            console.log('AI parsing did not find Q&A pairs, falling back to pattern matching...');
+        } catch (error) {
+            console.error('AI parsing failed, falling back to pattern matching:', error.message);
+        }
+    }
+
+    // Fallback: Pattern-based parsing
+    console.log('Using pattern-based Q&A parsing...');
     const qaItems = [];
     
     // Flatten all lines with page/line info
@@ -507,12 +716,14 @@ function parseExamination(pages, firstPrintedPage) {
     }
     
     if (examStart === -1) {
-        // Try to find first Q. or QUESTION if no EXAMINATION header
+        // Try to find first Q. or Q or QUESTION if no EXAMINATION header
         // Handle patterns with middle dots like "· · ·Q.·"
+        // Also handle standalone Q without period
         for (let i = 0; i < allLines.length; i++) {
             const lineText = allLines[i].text;
             if (lineText.match(/[·\s]*Q\.[·\s]/i) || 
                 lineText.match(/^\s*Q\.\s+/i) || 
+                lineText.match(/^\s*Q\s+[A-Z]/i) ||  // Standalone Q followed by content
                 lineText.match(/^\s*QUESTION[:\s]/i)) {
                 examStart = i;
                 break;
@@ -541,18 +752,22 @@ function parseExamination(pages, firstPrintedPage) {
         // Skip empty lines
         if (!trimmed) continue;
         
-        // Check if this is a Question line (Q. or QUESTION or Question:)
+        // Check if this is a Question line (Q. or Q or QUESTION or Question:)
         // Handle patterns like "· · ·Q.·" with middle dots
+        // Also handle standalone Q without period (like "Q The question...")
         const isQuestion = trimmed.match(/^Q\.\s*/i) || 
                           text.match(/^\s+Q\.\s*/i) ||
                           trimmed.match(/^[·\s]*Q\.[·\s]/i) ||
+                          trimmed.match(/^Q\s+[A-Z]/i) ||  // Standalone Q followed by content
                           trimmed.match(/^QUESTION[:\s]/i) ||
                           trimmed.match(/^Question[:\s]/i);
-        // Check if this is an Answer line (A. or ANSWER or Answer:)
+        // Check if this is an Answer line (A. or A or ANSWER or Answer:)
         // Handle patterns like "· · ·A.·" with middle dots
+        // Also handle standalone A without period (like "A The answer...")
         const isAnswer = trimmed.match(/^A\.\s*/i) || 
                         text.match(/^\s+A\.\s*/i) ||
                         trimmed.match(/^[·\s]*A\.[·\s]/i) ||
+                        trimmed.match(/^A\s+[A-Z]/i) ||  // Standalone A followed by content
                         trimmed.match(/^ANSWER[:\s]/i) ||
                         trimmed.match(/^Answer[:\s]/i);
         // Check if this is THE WITNESS: (answer after objection)
@@ -700,9 +915,12 @@ function parseExamination(pages, firstPrintedPage) {
 function cleanQAText(text) {
     // Remove Q./A./QUESTION/ANSWER prefix and clean up middle dots/spacing
     // Handle patterns like "· · ·Q.· text" or "· · ·A.· text"
+    // Also handle standalone Q/A without periods (like "Q The question...")
     return text
         .replace(/^[·\s]*Q\.[·\s]*/i, '')
         .replace(/^[·\s]*A\.[·\s]*/i, '')
+        .replace(/^Q\s+/i, '')  // Standalone Q
+        .replace(/^A\s+/i, '')  // Standalone A
         .replace(/^\s*QUESTION[:\s]*/i, '')
         .replace(/^\s*ANSWER[:\s]*/i, '')
         .replace(/·/g, ' ')
@@ -1157,45 +1375,116 @@ async function extractPDFWithImages(pdfPath) {
             console.log(`  Page ${pageNum}: Using digital (${textItems.length} items)`);
         }
 
-        // Find content bounds
-        const contentItems = textItems.filter(item => item.x > width * 0.1);
-        let minY = height, maxY = 0;
-        for (const item of contentItems) {
-            if (item.y < minY) minY = item.y;
-            if (item.y > maxY) maxY = item.y;
+        // First, try to find ACTUAL line numbers in the left margin of the PDF
+        const actualLineNumbers = [];
+        const leftMarginThreshold = width * 0.15;
+        
+        for (const item of textItems) {
+            const text = item.text.trim();
+            // Look for numbers 1-25 in the left margin
+            if (item.x < leftMarginThreshold && /^[1-9]$|^1[0-9]$|^2[0-5]$/.test(text)) {
+                actualLineNumbers.push({
+                    number: parseInt(text),
+                    text: text,
+                    x: item.x,
+                    y: item.y,
+                    height: item.height || 12
+                });
+            }
         }
 
-        if (contentItems.length === 0) {
-            minY = height * topMarginPercent;
-            maxY = height * (1 - bottomMarginPercent);
+        // Sort by Y position (top to bottom in display coordinates)
+        actualLineNumbers.sort((a, b) => a.y - b.y);
+        
+        // Check if we found a good sequence of actual line numbers
+        const hasActualLineNumbers = actualLineNumbers.length >= 10;
+        
+        let lineNumbers = [];
+        let lineHeight;
+        
+        if (hasActualLineNumbers) {
+            // Use ACTUAL line numbers from the PDF
+            // Calculate average line height from actual numbers
+            if (actualLineNumbers.length >= 2) {
+                const yDiffs = [];
+                for (let i = 1; i < Math.min(actualLineNumbers.length, 10); i++) {
+                    yDiffs.push(Math.abs(actualLineNumbers[i].y - actualLineNumbers[i-1].y));
+                }
+                lineHeight = yDiffs.reduce((a, b) => a + b, 0) / yDiffs.length;
+            } else {
+                lineHeight = 25;
+            }
+            
+            // Create line number objects from actual detected numbers
+            for (const ln of actualLineNumbers) {
+                lineNumbers.push({
+                    text: String(ln.number),
+                    position: { x: ln.x, y: ln.y, width: 20, height: lineHeight },
+                    confidence: 100,
+                    type: 'line_number',
+                    isActual: true
+                });
+            }
+            
+            if (pageNum === 1) {
+                console.log(`  Using ACTUAL line numbers from PDF (found ${actualLineNumbers.length})`);
+            }
+        } else {
+            // Fall back to SYNTHETIC line numbers
+            const contentItems = textItems.filter(item => item.x > width * 0.1);
+            let minY = height, maxY = 0;
+            for (const item of contentItems) {
+                if (item.y < minY) minY = item.y;
+                if (item.y > maxY) maxY = item.y;
+            }
+
+            if (contentItems.length === 0) {
+                minY = height * topMarginPercent;
+                maxY = height * (1 - bottomMarginPercent);
+            }
+
+            const contentSpan = maxY - minY;
+            lineHeight = contentSpan / (LINES_PER_PAGE - 1) || (height * 0.8 / LINES_PER_PAGE);
+
+            for (let num = 1; num <= LINES_PER_PAGE; num++) {
+                const yPosition = minY + (num - 1) * lineHeight;
+                lineNumbers.push({
+                    text: String(num),
+                    position: { x: 0, y: yPosition, width: 20, height: lineHeight },
+                    confidence: 100,
+                    type: 'line_number',
+                    isActual: false
+                });
+            }
+            
+            if (pageNum === 1) {
+                console.log(`  Using SYNTHETIC line numbers (no actual numbers found)`);
+            }
         }
 
-        // Calculate line positions
-        const contentSpan = maxY - minY;
-        const lineHeight = contentSpan / (LINES_PER_PAGE - 1) || (height * 0.8 / LINES_PER_PAGE);
-
-        // Generate line numbers with Y positions
-        const lineNumbers = [];
-        for (let num = 1; num <= LINES_PER_PAGE; num++) {
-            const yPosition = minY + (num - 1) * lineHeight;
-            lineNumbers.push({
-                text: String(num),
-                position: { x: 0, y: yPosition, width: 20, height: lineHeight },
-                confidence: 100,
-                type: 'line_number',
-            });
+        // Categorize content - exclude left margin (line numbers area)
+        const digitalLeftMargin = width * 0.12;
+        
+        // Find content Y bounds from line numbers or content
+        let minY, maxY;
+        if (lineNumbers.length >= 2) {
+            minY = Math.min(...lineNumbers.map(ln => ln.position.y));
+            maxY = Math.max(...lineNumbers.map(ln => ln.position.y));
+        } else {
+            const contentItems = textItems.filter(item => item.x > digitalLeftMargin);
+            minY = Math.min(...contentItems.map(i => i.y), height * 0.1);
+            maxY = Math.max(...contentItems.map(i => i.y), height * 0.9);
         }
-
-        // Categorize content
-        const digitalLeftMargin = width * 0.10;
-        const headerBound = minY - lineHeight;
-        const footerBound = maxY + lineHeight;
+        
+        const headerBound = minY - (lineHeight || 25);
+        const footerBound = maxY + (lineHeight || 25);
 
         const mainContent = [];
         for (const item of textItems) {
             const centerY = item.y + (item.height || 0) / 2;
             const centerX = item.x + (item.width || 0) / 2;
 
+            // Exclude items in the left margin (line numbers) from content
             if (centerY >= headerBound && centerY <= footerBound && centerX >= digitalLeftMargin) {
                 mainContent.push({
                     text: item.text,
@@ -1235,6 +1524,306 @@ async function extractPDFWithImages(pdfPath) {
     console.log(`${'='.repeat(60)}\n`);
 
     return { pages, totalPages };
+}
+
+/**
+ * Analyze PDF to determine document structure and extraction capabilities
+ * Returns diagnostic information about:
+ * - Digital text layer presence
+ * - Line numbers in digital layer
+ * - Page numbers in digital layer
+ * - OCR readability if no digital layer
+ */
+async function analyzePDF(pdfPath) {
+    const pdfjsLib = require('pdfjs-dist');
+    const { ExternalPDFToImageConverter } = require('./dist/pdf-to-image-external.js');
+    const { OCREngine } = require('./dist/ocr-engine.js');
+    
+    if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfBytes = new Uint8Array(pdfBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes, useWorkerFetch: false, isEvalSupported: false });
+    const pdfDoc = await loadingTask.promise;
+    const totalPages = pdfDoc.numPages;
+
+    const analysis = {
+        totalPages,
+        pageHeight: 0, // Will be set from first page
+        pageWidth: 0,
+        hasDigitalLayer: false,
+        digitalLayerQuality: 'none', // none, poor, good
+        digitalTextItemCount: 0,
+        lineNumbersInDigital: {
+            found: false,
+            count: 0,
+            samplePages: [],
+            position: null // 'left-margin' or null
+        },
+        pageNumbersInDigital: {
+            found: false,
+            samplePages: [],
+            position: null, // 'header', 'footer', or null
+            detailFindings: [] // Detailed Y positions for preview
+        },
+        ocrFallback: {
+            needed: false,
+            tested: false,
+            readable: false,
+            lineNumbersFound: false,
+            confidence: 0
+        },
+        recommendations: [],
+        sampleText: ''
+    };
+
+    console.log(`\nAnalyzing ${totalPages} pages...`);
+
+    // Sample pages to analyze (first 5, middle, and a few more)
+    const pagesToAnalyze = [1, 2, 3, 4, 5];
+    if (totalPages > 10) pagesToAnalyze.push(Math.floor(totalPages / 2));
+    if (totalPages > 7) pagesToAnalyze.push(7, 8);
+
+    let totalTextItems = 0;
+    let pagesWithText = 0;
+    const lineNumberFindings = [];
+    const pageNumberFindings = [];
+
+    for (const pageNum of pagesToAnalyze) {
+        if (pageNum > totalPages) continue;
+        
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.0 });
+        const textContent = await page.getTextContent();
+        const { width, height } = viewport;
+        
+        // Store page dimensions from first page
+        if (pageNum === pagesToAnalyze[0]) {
+            analysis.pageHeight = height;
+            analysis.pageWidth = width;
+        }
+        
+        const items = textContent.items || [];
+        const meaningfulItems = items.filter(item => item.str && item.str.trim().length > 0);
+        totalTextItems += meaningfulItems.length;
+        
+        if (meaningfulItems.length >= 10) {
+            pagesWithText++;
+        }
+
+        // Check for line numbers in left margin
+        const leftMarginNumbers = [];
+        for (const item of items) {
+            const text = item.str.trim();
+            const x = item.transform[4];
+            
+            // Look for numbers 1-25 in left 15% of page
+            if (x < width * 0.15 && /^[1-9]$|^1[0-9]$|^2[0-5]$/.test(text)) {
+                leftMarginNumbers.push({
+                    number: parseInt(text),
+                    x: x,
+                    y: height - item.transform[5]
+                });
+            }
+        }
+
+        // If we found multiple sequential line numbers, it's likely a transcript
+        if (leftMarginNumbers.length >= 5) {
+            leftMarginNumbers.sort((a, b) => a.y - b.y);
+            const numbers = leftMarginNumbers.map(n => n.number);
+            
+            // Check if roughly sequential
+            let sequential = 0;
+            for (let i = 1; i < numbers.length; i++) {
+                if (numbers[i] === numbers[i-1] + 1) sequential++;
+            }
+            
+            if (sequential >= 3) {
+                lineNumberFindings.push({
+                    page: pageNum,
+                    count: leftMarginNumbers.length,
+                    numbers: numbers.slice(0, 10),
+                    avgX: leftMarginNumbers.reduce((s, n) => s + n.x, 0) / leftMarginNumbers.length
+                });
+            }
+        }
+
+        // Check for page numbers (header/footer area)
+        // PDF Y coordinate: transform[5] is distance from BOTTOM of page
+        // So HIGH transform[5] = near top, LOW transform[5] = near bottom
+        // IMPORTANT: Exclude left margin (x < 15% of width) where line numbers are
+        for (const item of items) {
+            const text = item.str.trim();
+            const pdfX = item.transform[4]; // X position
+            const pdfY = item.transform[5]; // Y position (from bottom)
+            
+            // Skip items in the left margin - those are likely line numbers, not page numbers
+            const inLeftMargin = pdfX < width * 0.15;
+            
+            // Check if in header (top 12% = high Y values) or footer (bottom 12% = low Y values)
+            const inHeader = pdfY > height * 0.88;
+            const inFooter = pdfY < height * 0.12;
+            
+            // Only check standalone numbers if NOT in left margin
+            if (!inLeftMargin && (inHeader || inFooter) && /^\d+$/.test(text)) {
+                const num = parseInt(text);
+                if (num >= 1 && num <= totalPages + 10) {
+                    pageNumberFindings.push({
+                        page: pageNum,
+                        foundNumber: num,
+                        position: inHeader ? 'header' : 'footer',
+                        pdfX: pdfX,
+                        pdfY: pdfY,
+                        text: text
+                    });
+                }
+            }
+            
+            // Check for "Page X" pattern (can be anywhere in header/footer, including left margin)
+            const pageMatch = text.match(/^Page\s*(\d+)$/i);
+            if ((inHeader || inFooter) && pageMatch) {
+                const num = parseInt(pageMatch[1]);
+                pageNumberFindings.push({
+                    page: pageNum,
+                    foundNumber: num,
+                    position: inHeader ? 'header' : 'footer',
+                    pdfX: pdfX,
+                    pdfY: pdfY,
+                    text: text,
+                    format: 'Page X'
+                });
+            }
+        }
+
+        // Capture sample text from page 7 or 8 if available (usually has Q&A content)
+        if ((pageNum === 7 || pageNum === 8) && !analysis.sampleText) {
+            const sampleItems = items.slice(0, 100).map(i => i.str).join('');
+            analysis.sampleText = sampleItems.substring(0, 500);
+        }
+    }
+
+    // Analyze digital layer quality
+    const avgItemsPerPage = totalTextItems / pagesToAnalyze.length;
+    analysis.digitalTextItemCount = totalTextItems;
+    
+    if (avgItemsPerPage >= 50) {
+        analysis.hasDigitalLayer = true;
+        analysis.digitalLayerQuality = avgItemsPerPage >= 150 ? 'good' : 'fair';
+    } else if (avgItemsPerPage >= 10) {
+        analysis.hasDigitalLayer = true;
+        analysis.digitalLayerQuality = 'poor';
+    } else {
+        analysis.hasDigitalLayer = false;
+        analysis.digitalLayerQuality = 'none';
+        analysis.ocrFallback.needed = true;
+    }
+
+    // Summarize line number findings
+    if (lineNumberFindings.length >= 2) {
+        analysis.lineNumbersInDigital.found = true;
+        analysis.lineNumbersInDigital.count = lineNumberFindings.length;
+        analysis.lineNumbersInDigital.samplePages = lineNumberFindings.map(f => ({
+            page: f.page,
+            numbersFound: f.count,
+            sample: f.numbers
+        }));
+        analysis.lineNumbersInDigital.position = 'left-margin';
+    }
+
+    // Summarize page number findings
+    if (pageNumberFindings.length >= 1) {
+        analysis.pageNumbersInDigital.found = true;
+        const positions = [...new Set(pageNumberFindings.map(f => f.position))];
+        analysis.pageNumbersInDigital.position = positions[0];
+        analysis.pageNumbersInDigital.samplePages = pageNumberFindings.slice(0, 5);
+        
+        // Store detailed findings with position percentages for visual preview
+        analysis.pageNumbersInDigital.detailFindings = pageNumberFindings.slice(0, 5).map(f => ({
+            page: f.page,
+            number: f.foundNumber,
+            text: f.text || String(f.foundNumber),
+            pdfX: f.pdfX,
+            pdfY: f.pdfY,
+            yPercent: analysis.pageHeight > 0 ? ((f.pdfY / analysis.pageHeight) * 100).toFixed(1) : 0,
+            position: f.position,
+            format: f.format || 'number'
+        }));
+        
+        // Log detailed findings for debugging
+        console.log('  Page number findings:');
+        pageNumberFindings.slice(0, 3).forEach(f => {
+            const yPct = analysis.pageHeight > 0 ? ((f.pdfY / analysis.pageHeight) * 100).toFixed(1) : '?';
+            console.log(`    Page ${f.page}: "${f.foundNumber}" at pdfY=${f.pdfY?.toFixed(1)} (${yPct}% from bottom) → ${f.position}${f.format ? ' [' + f.format + ']' : ''}`);
+        });
+    }
+
+    // If no digital layer or poor quality, test OCR on one page
+    if (analysis.digitalLayerQuality === 'none' || analysis.digitalLayerQuality === 'poor') {
+        console.log('  Testing OCR capability...');
+        analysis.ocrFallback.tested = true;
+        
+        try {
+            // Convert just page 7 or 8 to image for OCR test
+            const testPage = Math.min(7, totalPages);
+            const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+            const images = await imageConverter.convert(pdfPath, testPage, testPage);
+            
+            if (images.length > 0) {
+                const ocrEngine = new OCREngine('eng');
+                await ocrEngine.initialize();
+                const ocrResult = await ocrEngine.processImage(images[0].imagePath, testPage);
+                await ocrEngine.terminate();
+                
+                // Check OCR quality
+                if (ocrResult.words && ocrResult.words.length > 20) {
+                    analysis.ocrFallback.readable = true;
+                    analysis.ocrFallback.confidence = ocrResult.confidence || 80;
+                    
+                    // Check for line numbers in OCR results
+                    const ocrLineNums = ocrResult.words.filter(w => 
+                        /^[1-9]$|^1[0-9]$|^2[0-5]$/.test(w.text) && 
+                        w.bbox.x < 100
+                    );
+                    analysis.ocrFallback.lineNumbersFound = ocrLineNums.length >= 5;
+                }
+                
+                // Clean up test image
+                fs.unlinkSync(images[0].imagePath);
+            }
+        } catch (ocrError) {
+            console.log('  OCR test failed:', ocrError.message);
+            analysis.ocrFallback.readable = false;
+        }
+    }
+
+    // Generate recommendations
+    if (analysis.hasDigitalLayer && analysis.lineNumbersInDigital.found) {
+        analysis.recommendations.push('✓ Digital text layer detected with line numbers - optimal extraction possible');
+        analysis.recommendations.push('→ Line numbers can be read directly from PDF data');
+    } else if (analysis.hasDigitalLayer && !analysis.lineNumbersInDigital.found) {
+        analysis.recommendations.push('✓ Digital text layer detected but no line numbers found in margin');
+        analysis.recommendations.push('→ Will use estimated line positions based on content layout');
+    } else if (analysis.ocrFallback.readable && analysis.ocrFallback.lineNumbersFound) {
+        analysis.recommendations.push('⚠ No digital text layer - using OCR');
+        analysis.recommendations.push('✓ Line numbers detected in page images via OCR');
+    } else if (analysis.ocrFallback.readable) {
+        analysis.recommendations.push('⚠ No digital text layer - using OCR');
+        analysis.recommendations.push('→ Line numbers may need to be estimated from layout');
+    } else {
+        analysis.recommendations.push('⚠ Limited text extraction capability detected');
+        analysis.recommendations.push('→ Results may be incomplete');
+    }
+
+    console.log(`  Digital layer: ${analysis.hasDigitalLayer ? 'Yes' : 'No'} (${analysis.digitalLayerQuality})`);
+    console.log(`  Line numbers in digital: ${analysis.lineNumbersInDigital.found ? 'Yes' : 'No'}`);
+    console.log(`  Page numbers in digital: ${analysis.pageNumbersInDigital.found ? 'Yes' : 'No'}`);
+    if (analysis.ocrFallback.tested) {
+        console.log(`  OCR readable: ${analysis.ocrFallback.readable ? 'Yes' : 'No'}`);
+    }
+
+    return analysis;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -1281,7 +1870,7 @@ const server = http.createServer(async (req, res) => {
                 const { pages, firstPrintedPage, useAI = true } = body;
                 
                 console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
-                let qaItems = parseExamination(pages, firstPrintedPage);
+                let qaItems = await parseExamination(pages, firstPrintedPage);
                 
                 // Use AI summarization if enabled and API key is available
                 if (useAI && OPENAI_API_KEY && qaItems.length > 0) {
@@ -1409,6 +1998,115 @@ const server = http.createServer(async (req, res) => {
                 console.error('Summarize error:', error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to summarize: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // Capture page region as image for preview
+    if (req.method === 'GET' && url.pathname.startsWith('/api/capture-region')) {
+        try {
+            const pageNum = parseInt(url.searchParams.get('page')) || 1;
+            const region = url.searchParams.get('region') || 'footer'; // 'header' or 'footer'
+            const tempPath = url.searchParams.get('path');
+            
+            if (!tempPath || !fs.existsSync(tempPath)) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'PDF path not found' }));
+                return;
+            }
+            
+            const { ExternalPDFToImageConverter } = require('./dist/pdf-to-image-external.js');
+            const sharp = require('sharp');
+            
+            // Convert the specific page to image
+            const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+            const images = await imageConverter.convert(tempPath, pageNum, pageNum);
+            
+            if (images.length === 0) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to convert page' }));
+                return;
+            }
+            
+            const imagePath = images[0].imagePath;
+            const metadata = await sharp(imagePath).metadata();
+            const imgHeight = metadata.height;
+            const imgWidth = metadata.width;
+            
+            // Crop to the header or footer region (15% of page)
+            let cropTop, cropHeight;
+            if (region === 'header') {
+                cropTop = 0;
+                cropHeight = Math.floor(imgHeight * 0.15);
+            } else {
+                cropTop = Math.floor(imgHeight * 0.85);
+                cropHeight = Math.floor(imgHeight * 0.15);
+            }
+            
+            // Create cropped image
+            const croppedBuffer = await sharp(imagePath)
+                .extract({ left: 0, top: cropTop, width: imgWidth, height: cropHeight })
+                .png()
+                .toBuffer();
+            
+            // Clean up full page image
+            fs.unlinkSync(imagePath);
+            
+            res.writeHead(200, { 'Content-Type': 'image/png' });
+            res.end(croppedBuffer);
+            
+        } catch (error) {
+            console.error('Region capture error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to capture region: ' + error.message }));
+        }
+        return;
+    }
+
+    // PDF Analysis endpoint - diagnoses document structure before extraction
+    if (req.method === 'POST' && url.pathname === '/api/analyze') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const buffer = Buffer.concat(chunks);
+                const boundary = req.headers['content-type'].split('boundary=')[1];
+                const parts = parseMultipart(buffer, boundary);
+                
+                const filePart = parts.find(p => p.filename);
+                if (!filePart) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'No PDF file uploaded' }));
+                    return;
+                }
+
+                const tempPath = path.join(UPLOAD_DIR, `analyze_${Date.now()}.pdf`);
+                fs.writeFileSync(tempPath, filePart.data);
+
+                console.log(`\n${'='.repeat(50)}`);
+                console.log(`Analyzing: ${filePart.filename}`);
+                console.log(`${'='.repeat(50)}`);
+
+                const analysis = await analyzePDF(tempPath);
+                
+                // Keep the file for subsequent extraction
+                // Store path in analysis result
+                analysis.tempPath = tempPath;
+                analysis.filename = filePart.filename;
+
+                console.log(`\n✓ Analysis complete\n`);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    analysis
+                }));
+
+            } catch (error) {
+                console.error('Analysis error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to analyze: ' + error.message }));
             }
         });
         return;

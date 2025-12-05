@@ -361,7 +361,407 @@
 
         input[type="file"] { display: none; }
 
-        /* ========== STEP 2: Page Selection - Ultra Compact ========== */
+        /* ========== STEP 2: Analysis Screen ========== */
+        .analysis-screen {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .analysis-container {
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .analysis-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .analysis-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .analysis-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .analysis-stats {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .stat-badge {
+            background: var(--bg-elevated);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 1rem;
+        }
+
+        .stat-badge strong {
+            font-size: 1.2rem;
+        }
+
+        .analysis-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 40px;
+        }
+
+        .analysis-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--bg-elevated);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .analysis-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .analysis-card.success {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .analysis-card.warning {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .analysis-card.error {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .analysis-card.neutral {
+            border-color: var(--border);
+        }
+
+        .analysis-card-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        .analysis-card-content h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .analysis-card-status {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .analysis-card.success .analysis-card-status { color: #22c55e; }
+        .analysis-card.warning .analysis-card-status { color: #f59e0b; }
+        .analysis-card.error .analysis-card-status { color: #ef4444; }
+        .analysis-card.neutral .analysis-card-status { color: var(--text-secondary); }
+
+        .analysis-card-detail {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .analysis-recommendations {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .analysis-recommendations h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .analysis-recommendations ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .analysis-recommendations li {
+            padding: 8px 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .analysis-recommendations li:last-child {
+            border-bottom: none;
+        }
+
+        .analysis-actions {
+            display: flex;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+        }
+
+        .analysis-card.clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .analysis-card.clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .click-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: normal;
+            margin-left: 8px;
+        }
+
+        /* Position Preview Modal */
+        .position-preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .position-preview-modal.active {
+            display: flex;
+        }
+
+        .position-preview-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .position-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .position-preview-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .position-preview-body {
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .preview-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 0 0 200px;
+        }
+
+        .page-diagram {
+            flex: 0 0 auto;
+        }
+
+        .capture-preview {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .capture-preview img {
+            max-width: 100%;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .capture-loading {
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .capture-label {
+            margin: 8px 0 0 0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .page-diagram-inner {
+            width: 120px;
+            height: 160px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            background: #fff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-zone {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: #666;
+            text-align: center;
+            padding: 2px;
+        }
+
+        .header-zone {
+            height: 15%;
+            background: rgba(239, 68, 68, 0.2);
+            border-bottom: 1px dashed #ef4444;
+        }
+
+        .content-zone {
+            flex: 1;
+            background: rgba(200, 200, 200, 0.1);
+        }
+
+        .footer-zone {
+            height: 15%;
+            background: rgba(34, 197, 94, 0.2);
+            border-top: 1px dashed #22c55e;
+        }
+
+        .detection-marker {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 12px;
+            background: var(--accent-primary);
+            border-radius: 2px;
+            opacity: 0.8;
+            transition: top 0.3s ease;
+        }
+
+        .detection-marker::after {
+            content: '📍';
+            position: absolute;
+            right: -20px;
+            top: -2px;
+            font-size: 14px;
+        }
+
+        .detection-details {
+            flex: 1;
+        }
+
+        .detection-details h4 {
+            margin: 0 0 12px 0;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .detection-list {
+            font-size: 0.85rem;
+        }
+
+        .detection-item {
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .detection-item strong {
+            color: var(--accent-primary);
+        }
+
+        .detection-item .position-label {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .detection-item .position-label.header {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .detection-item .position-label.footer {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        /* ========== STEP 3: Page Selection - Ultra Compact ========== */
         .page-select-screen {
             padding: 8px 12px;
             flex-direction: column;
@@ -2194,16 +2594,21 @@
             <div class="step-connector"></div>
             <div class="step-item" data-step="2">
                 <div class="step-number"><span>2</span></div>
-                <span class="step-label">Page Setup</span>
+                <span class="step-label">Analyze</span>
             </div>
             <div class="step-connector"></div>
             <div class="step-item" data-step="3">
                 <div class="step-number"><span>3</span></div>
-                <span class="step-label">Review</span>
+                <span class="step-label">Page Setup</span>
             </div>
             <div class="step-connector"></div>
             <div class="step-item" data-step="4">
                 <div class="step-number"><span>4</span></div>
+                <span class="step-label">Review</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" data-step="5">
+                <div class="step-number"><span>5</span></div>
                 <span class="step-label">Reports</span>
             </div>
         </div>
@@ -2231,7 +2636,115 @@
         </div>
     </div>
 
-    <!-- STEP 2: Page Selection -->
+    <!-- STEP 2: Analysis -->
+    <div class="screen analysis-screen" id="analysisScreen">
+        <div class="analysis-container">
+            <div class="analysis-header">
+                <h2 class="analysis-title">📊 Document Analysis</h2>
+                <p class="analysis-subtitle" id="analysisFilename">Analyzing document...</p>
+                <div class="analysis-stats" id="analysisStats" style="display: none;">
+                    <span class="stat-badge"><strong id="totalPageCount">0</strong> pages</span>
+                </div>
+            </div>
+            
+            <div class="analysis-loading" id="analysisLoading">
+                <div class="analysis-spinner"></div>
+                <p>Analyzing PDF structure...</p>
+            </div>
+            
+            <div class="analysis-results" id="analysisResults" style="display: none;">
+                <div class="analysis-grid">
+                    <!-- Digital Layer -->
+                    <div class="analysis-card" id="digitalLayerCard">
+                        <div class="analysis-card-icon" id="digitalLayerIcon">📄</div>
+                        <div class="analysis-card-content">
+                            <h4>Digital Text Layer</h4>
+                            <p class="analysis-card-status" id="digitalLayerStatus">Checking...</p>
+                            <p class="analysis-card-detail" id="digitalLayerDetail"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Line Numbers -->
+                    <div class="analysis-card" id="lineNumbersCard">
+                        <div class="analysis-card-icon" id="lineNumbersIcon">🔢</div>
+                        <div class="analysis-card-content">
+                            <h4>Line Numbers</h4>
+                            <p class="analysis-card-status" id="lineNumbersStatus">Checking...</p>
+                            <p class="analysis-card-detail" id="lineNumbersDetail"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Page Numbers -->
+                    <div class="analysis-card clickable" id="pageNumbersCard">
+                        <div class="analysis-card-icon" id="pageNumbersIcon">📑</div>
+                        <div class="analysis-card-content">
+                            <h4>Page Numbers <span class="click-hint">🔍 Click to preview</span></h4>
+                            <p class="analysis-card-status" id="pageNumbersStatus">Checking...</p>
+                            <p class="analysis-card-detail" id="pageNumbersDetail"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- OCR Fallback -->
+                    <div class="analysis-card" id="ocrCard">
+                        <div class="analysis-card-icon" id="ocrIcon">👁️</div>
+                        <div class="analysis-card-content">
+                            <h4>OCR Capability</h4>
+                            <p class="analysis-card-status" id="ocrStatus">Checking...</p>
+                            <p class="analysis-card-detail" id="ocrDetail"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analysis-recommendations" id="analysisRecommendations">
+                    <h4>📋 Recommendations</h4>
+                    <ul id="recommendationsList"></ul>
+                </div>
+                
+                <div class="analysis-actions">
+                    <button class="btn-primary" id="continueToPageSetup">Continue to Page Setup →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Number Position Preview Modal -->
+    <div class="position-preview-modal" id="positionPreviewModal">
+        <div class="position-preview-content">
+            <div class="position-preview-header">
+                <h3>📑 Page Number Detection Preview</h3>
+                <button class="modal-close-btn" id="closePositionPreview">×</button>
+            </div>
+            <div class="position-preview-body">
+                <div class="preview-column">
+                    <div class="page-diagram">
+                        <div class="page-diagram-inner">
+                            <div class="page-zone header-zone">
+                                <span>Header (12%)</span>
+                            </div>
+                            <div class="page-zone content-zone">
+                                <span>Content</span>
+                            </div>
+                            <div class="page-zone footer-zone">
+                                <span>Footer (12%)</span>
+                            </div>
+                            <div class="detection-marker" id="detectionMarker"></div>
+                        </div>
+                    </div>
+                    <div class="capture-preview" id="capturePreview">
+                        <div class="capture-loading" id="captureLoading">Loading preview...</div>
+                        <img id="captureImage" src="" alt="Captured region" style="display: none;">
+                        <p class="capture-label" id="captureLabel"></p>
+                    </div>
+                </div>
+                <div class="detection-details" id="detectionDetails">
+                    <h4>Detection Results</h4>
+                    <div class="detection-list" id="detectionList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: Page Selection -->
     <div class="screen page-select-screen" id="pageSelectScreen">
         <div class="page-select-header">
             <h2 class="page-select-title">Find Page 1</h2>
@@ -2283,6 +2796,7 @@
                     <div class="page-input-group">
                         <label class="page-input-label">Quick select:</label>
                         <div class="page-quick-select">
+                            <button class="quick-select-btn" data-page="1">1</button>
                             <button class="quick-select-btn" data-page="2">2</button>
                             <button class="quick-select-btn active" data-page="3">3</button>
                             <button class="quick-select-btn" data-page="4">4</button>
@@ -2614,20 +3128,22 @@
         function goToStep(step) {
             currentStep = step;
             
-            // Update screens
-            [uploadScreen, pageSelectScreen, summarizeScreen, summaryScreen, reportsScreen].forEach(s => s.classList.remove('active'));
+            // Update screens - now 5 steps
+            const analysisScreen = document.getElementById('analysisScreen');
+            [uploadScreen, analysisScreen, pageSelectScreen, summarizeScreen, summaryScreen, reportsScreen].forEach(s => s.classList.remove('active'));
             
             switch(step) {
                 case 1: uploadScreen.classList.add('active'); break;
-                case 2: pageSelectScreen.classList.add('active'); break;
-                case 3: 
+                case 2: analysisScreen.classList.add('active'); break;
+                case 3: pageSelectScreen.classList.add('active'); break;
+                case 4: 
                     if (analysisComplete) {
                         summaryScreen.classList.add('active');
                     } else {
                         summarizeScreen.classList.add('active');
                     }
                     break;
-                case 4: reportsScreen.classList.add('active'); break;
+                case 5: reportsScreen.classList.add('active'); break;
             }
             
             // Update step indicators
@@ -2664,19 +3180,264 @@
             handleFile(e.dataTransfer.files[0]);
         });
 
+        // Store analysis data for later extraction
+        let currentAnalysis = null;
+        let currentFile = null;
+
         async function handleFile(file) {
             if (!file || file.type !== 'application/pdf') {
                 alert('Please select a valid PDF file');
                 return;
             }
 
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'Processing PDF...';
-            loadingProgress.textContent = 'Converting pages to images and extracting text';
+            currentFile = file;
+
+            // Go to analysis screen and show loading
+            goToStep(2);
+            document.getElementById('analysisLoading').style.display = 'flex';
+            document.getElementById('analysisResults').style.display = 'none';
+            document.getElementById('analysisFilename').textContent = `Analyzing: ${file.name}`;
 
             try {
                 const formData = new FormData();
                 formData.append('pdf', file);
+
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || 'Analysis failed');
+                }
+
+                currentAnalysis = result.analysis;
+                displayAnalysisResults(result.analysis);
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+                goToStep(1);
+            }
+        }
+
+        function displayAnalysisResults(analysis) {
+            document.getElementById('analysisLoading').style.display = 'none';
+            document.getElementById('analysisResults').style.display = 'block';
+            document.getElementById('analysisFilename').textContent = analysis.filename;
+            document.getElementById('totalPageCount').textContent = analysis.totalPages;
+            document.getElementById('analysisStats').style.display = 'flex';
+
+            // Digital Layer Card
+            const digitalCard = document.getElementById('digitalLayerCard');
+            const digitalStatus = document.getElementById('digitalLayerStatus');
+            const digitalDetail = document.getElementById('digitalLayerDetail');
+            
+            if (analysis.hasDigitalLayer) {
+                digitalCard.className = 'analysis-card success';
+                digitalStatus.textContent = `✓ ${analysis.digitalLayerQuality === 'good' ? 'Good quality' : 'Fair quality'} digital text`;
+                digitalDetail.textContent = `${analysis.digitalTextItemCount} text items detected`;
+            } else {
+                digitalCard.className = 'analysis-card warning';
+                digitalStatus.textContent = '⚠ No digital text layer';
+                digitalDetail.textContent = 'Will use OCR for text extraction';
+            }
+
+            // Line Numbers Card
+            const lineCard = document.getElementById('lineNumbersCard');
+            const lineStatus = document.getElementById('lineNumbersStatus');
+            const lineDetail = document.getElementById('lineNumbersDetail');
+            
+            if (analysis.lineNumbersInDigital.found) {
+                lineCard.className = 'analysis-card success';
+                lineStatus.textContent = '✓ Line numbers detected';
+                const sample = analysis.lineNumbersInDigital.samplePages[0];
+                lineDetail.textContent = `Found on ${analysis.lineNumbersInDigital.count} pages (e.g., lines ${sample?.sample?.join(', ') || 'N/A'})`;
+            } else if (analysis.ocrFallback.lineNumbersFound) {
+                lineCard.className = 'analysis-card warning';
+                lineStatus.textContent = '⚠ Line numbers in images only';
+                lineDetail.textContent = 'Readable via OCR';
+            } else {
+                lineCard.className = 'analysis-card neutral';
+                lineStatus.textContent = '— No line numbers found';
+                lineDetail.textContent = 'Will estimate from content layout';
+            }
+
+            // Page Numbers Card
+            const pageCard = document.getElementById('pageNumbersCard');
+            const pageStatus = document.getElementById('pageNumbersStatus');
+            const pageDetail = document.getElementById('pageNumbersDetail');
+            
+            if (analysis.pageNumbersInDigital.found) {
+                pageCard.className = 'analysis-card success';
+                pageStatus.textContent = '✓ Page numbers detected';
+                pageDetail.textContent = `Found in ${analysis.pageNumbersInDigital.position || 'document'}`;
+            } else {
+                pageCard.className = 'analysis-card neutral';
+                pageStatus.textContent = '— Page numbers not detected';
+                pageDetail.textContent = 'Manual page selection may be needed';
+            }
+
+            // OCR Card
+            const ocrCard = document.getElementById('ocrCard');
+            const ocrStatus = document.getElementById('ocrStatus');
+            const ocrDetail = document.getElementById('ocrDetail');
+            
+            if (analysis.ocrFallback.needed) {
+                if (analysis.ocrFallback.readable) {
+                    ocrCard.className = 'analysis-card success';
+                    ocrStatus.textContent = '✓ OCR working';
+                    ocrDetail.textContent = `Confidence: ${analysis.ocrFallback.confidence}%`;
+                } else {
+                    ocrCard.className = 'analysis-card error';
+                    ocrStatus.textContent = '✗ OCR failed';
+                    ocrDetail.textContent = 'Text may not be extractable';
+                }
+            } else {
+                ocrCard.className = 'analysis-card neutral';
+                ocrStatus.textContent = '— Not needed';
+                ocrDetail.textContent = 'Digital text layer is sufficient';
+            }
+
+            // Recommendations
+            const recList = document.getElementById('recommendationsList');
+            recList.innerHTML = '';
+            for (const rec of analysis.recommendations) {
+                const li = document.createElement('li');
+                li.textContent = rec;
+                recList.appendChild(li);
+            }
+            
+            // Store analysis data for position preview
+            window.currentAnalysisData = analysis;
+        }
+
+        // Page Numbers Position Preview Modal
+        const positionPreviewModal = document.getElementById('positionPreviewModal');
+        const closePositionPreview = document.getElementById('closePositionPreview');
+        const pageNumbersCard = document.getElementById('pageNumbersCard');
+        
+        pageNumbersCard.addEventListener('click', async () => {
+            if (!window.currentAnalysisData) {
+                return;
+            }
+            
+            const analysis = window.currentAnalysisData;
+            const findings = analysis.pageNumbersInDigital.detailFindings || [];
+            const pageHeight = analysis.pageHeight || 792;
+            const position = analysis.pageNumbersInDigital.position || 'footer';
+            
+            // Update detection marker position
+            const marker = document.getElementById('detectionMarker');
+            if (findings.length > 0) {
+                const yPercent = parseFloat(findings[0].yPercent);
+                const topPercent = 100 - yPercent;
+                marker.style.top = `${topPercent}%`;
+                marker.style.display = 'block';
+            } else {
+                // Default to footer or header based on detected position
+                marker.style.top = position === 'header' ? '6%' : '94%';
+                marker.style.display = 'block';
+            }
+            
+            // Populate detection list
+            const detectionList = document.getElementById('detectionList');
+            detectionList.innerHTML = '';
+            
+            if (findings.length === 0) {
+                const noData = document.createElement('div');
+                noData.style.cssText = 'padding: 12px; background: var(--bg-elevated); border-radius: 8px; color: var(--text-muted);';
+                noData.innerHTML = analysis.pageNumbersInDigital.found 
+                    ? `<p>Page numbers detected in <strong>${position}</strong></p>`
+                    : '<p>No page numbers detected in digital layer</p>';
+                detectionList.appendChild(noData);
+            } else {
+                findings.forEach(f => {
+                    const item = document.createElement('div');
+                    item.className = 'detection-item';
+                    const posClass = f.position === 'header' ? 'header' : 'footer';
+                    item.innerHTML = `
+                        <strong>Page ${f.page}:</strong> Found "${f.number}"
+                        <span class="position-label ${posClass}">${f.position}</span>
+                        <br>
+                        <small style="color: var(--text-muted);">
+                            Position: X=${f.pdfX?.toFixed(0)}, Y=${f.pdfY?.toFixed(0)} (${f.yPercent}% from bottom)
+                            <br>Text: "${f.text || f.number}" • Format: ${f.format || 'number'}
+                        </small>
+                    `;
+                    detectionList.appendChild(item);
+                });
+            }
+            
+            // Add explanation
+            const explanation = document.createElement('div');
+            explanation.style.cssText = 'margin-top: 16px; padding: 12px; background: var(--bg-surface); border-radius: 8px; font-size: 0.8rem; color: var(--text-secondary);';
+            explanation.innerHTML = `
+                <strong>Detection rules:</strong><br>
+                • Items in left margin (X < 15%) are excluded (line numbers)<br>
+                • Y > 88% of page height → <span class="position-label header">Header</span><br>
+                • Y < 12% of page height → <span class="position-label footer">Footer</span><br>
+                • "Page X" format is detected anywhere in header/footer
+            `;
+            detectionList.appendChild(explanation);
+            
+            // Show modal
+            positionPreviewModal.classList.add('active');
+            
+            // Load captured image preview
+            const captureLoading = document.getElementById('captureLoading');
+            const captureImage = document.getElementById('captureImage');
+            const captureLabel = document.getElementById('captureLabel');
+            
+            captureLoading.style.display = 'block';
+            captureImage.style.display = 'none';
+            captureLabel.textContent = '';
+            
+            if (analysis.tempPath) {
+                try {
+                    const region = position || 'footer';
+                    const pageToCapture = findings.length > 0 ? findings[0].page : 1;
+                    const captureUrl = `/api/capture-region?page=${pageToCapture}&region=${region}&path=${encodeURIComponent(analysis.tempPath)}`;
+                    
+                    captureImage.onload = () => {
+                        captureLoading.style.display = 'none';
+                        captureImage.style.display = 'block';
+                        captureLabel.textContent = `Page ${pageToCapture} ${region} region`;
+                    };
+                    captureImage.onerror = () => {
+                        captureLoading.textContent = 'Failed to load preview';
+                    };
+                    captureImage.src = captureUrl;
+                } catch (e) {
+                    captureLoading.textContent = 'Preview not available';
+                }
+            } else {
+                captureLoading.textContent = 'No PDF available for preview';
+            }
+        });
+        
+        closePositionPreview.addEventListener('click', () => {
+            positionPreviewModal.classList.remove('active');
+        });
+        
+        positionPreviewModal.addEventListener('click', (e) => {
+            if (e.target === positionPreviewModal) {
+                positionPreviewModal.classList.remove('active');
+            }
+        });
+
+        // Continue from analysis to page setup
+        document.getElementById('continueToPageSetup').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'Extracting PDF...';
+            loadingProgress.textContent = 'Converting pages and extracting text';
+
+            try {
+                const formData = new FormData();
+                formData.append('pdf', currentFile);
 
                 const response = await fetch('/api/extract', {
                     method: 'POST',
@@ -2698,15 +3459,15 @@
                 previewTotalPages.textContent = pages.length;
                 renderPreviewPage(0);
                 
-                // Go to step 2
-                goToStep(2);
+                // Go to step 3 (Page Setup)
+                goToStep(3);
 
             } catch (error) {
                 alert('Error: ' + error.message);
             } finally {
                 loadingOverlay.classList.remove('active');
             }
-        }
+        });
 
         // ===== Page Preview =====
         function renderPreviewPage(index) {
@@ -2886,7 +3647,7 @@
             });
         });
 
-        continueToSummarize.addEventListener('click', () => goToStep(3));
+        continueToSummarize.addEventListener('click', () => goToStep(4));
 
         // ===== Summarize =====
         startSummarizeBtn.addEventListener('click', async () => {
@@ -2947,7 +3708,7 @@
                 renderSidePage(0);
                 
                 analysisComplete = true;
-                goToStep(3); // Stay on step 3 but show summary screen
+                goToStep(4); // Stay on step 4 but show summary screen
 
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -3843,11 +4604,11 @@
         const backToReviewBtn = document.getElementById('backToReviewBtn');
         
         goToReportsBtn.addEventListener('click', () => {
-            goToStep(4);
+            goToStep(5);
         });
         
         backToReviewBtn.addEventListener('click', () => {
-            goToStep(3);
+            goToStep(4);
         });
 
         // ===== Utilities =====
