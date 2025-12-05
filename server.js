@@ -3,12 +3,13 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-// Add Ghostscript to PATH if installed in standard location
+// Add Ghostscript to PATH if installed in standard Windows location
 const gsPath = 'C:\\Program Files\\gs\\gs10.02.1\\bin';
 if (fs.existsSync(gsPath)) {
     process.env.PATH = gsPath + ';' + process.env.PATH;
     console.log('Added Ghostscript to PATH:', gsPath);
 }
+// On Linux/Railway, Ghostscript is typically already in PATH
 
 const { TextReconstructor } = require('./dist/text-reconstructor.js');
 
@@ -417,7 +418,7 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
     }
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = path.join(__dirname, 'temp', 'uploads');
 const IMAGES_DIR = path.join(__dirname, 'temp', 'images');
 
@@ -2383,10 +2384,12 @@ server.listen(PORT, () => {
     console.log('    - Navigate through Q/A pairs');
     console.log(`\n${'='.repeat(50)}\n`);
 
-    // Open in default browser
-    const { exec } = require('child_process');
-    const url = `http://localhost:${PORT}/`;
-    
-    // Windows
-    exec(`start ${url}`);
+    // Open in default browser (only in development, not production)
+    if (!process.env.RAILWAY_ENVIRONMENT && !process.env.RENDER) {
+        const { exec } = require('child_process');
+        const url = `http://localhost:${PORT}/`;
+        
+        // Windows
+        exec(`start ${url}`);
+    }
 });
