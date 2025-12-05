@@ -2049,9 +2049,22 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     console.log(`Using AI for summarization on all ${qaItems.length} items...`);
                     qaItems = await batchSummarizeQA(qaItems);
                     
-                    // Classify topics, extract people, detect dates
-                    console.log('Analyzing topics, people, and dates...');
-                    qaItems = await classifyTopicsAndExtractMetadata(qaItems);
+                    // Skip topic analysis for large documents to avoid timeout
+                    // Topic analysis takes ~1 second per item which is too slow for 100+ items
+                    if (qaItems.length <= 50) {
+                        console.log('Analyzing topics, people, and dates...');
+                        qaItems = await classifyTopicsAndExtractMetadata(qaItems);
+                    } else {
+                        console.log(`Skipping topic analysis for ${qaItems.length} items (too many - would timeout)`);
+                        qaItems = qaItems.map(qa => ({ 
+                            ...qa, 
+                            topic: 'Uncategorized',
+                            peopleMentioned: [],
+                            hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                            crossPoint: qa.crossPoint || false,
+                            notes: qa.notes || ''
+                        }));
+                    }
                 } else if (!OPENAI_API_KEY) {
                     console.log('No OpenAI API key - using rule-based summaries');
                     qaItems = qaItems.map(qa => ({ 
