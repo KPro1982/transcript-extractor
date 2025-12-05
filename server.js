@@ -1286,7 +1286,7 @@ async function extractPDFWithImages(pdfPath) {
         
         // Convert PDF to images
         console.log('  Converting PDF to images...');
-        const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+        const imageConverter = new ExternalPDFToImageConverter({ dpi: 100, outputDir: IMAGES_DIR });
         images = await imageConverter.convert(pdfPath);
         
         // Initialize OCR engine
@@ -1311,7 +1311,7 @@ async function extractPDFWithImages(pdfPath) {
         
         // Still need images for display
         console.log('  Converting PDF to images for display...');
-        const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+        const imageConverter = new ExternalPDFToImageConverter({ dpi: 100, outputDir: IMAGES_DIR });
         images = await imageConverter.convert(pdfPath);
     }
 
@@ -1738,7 +1738,7 @@ async function analyzePDF(pdfPath) {
         try {
             // Convert just page 7 or 8 to image for OCR test
             const testPage = Math.min(7, totalPages);
-            const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+            const imageConverter = new ExternalPDFToImageConverter({ dpi: 100, outputDir: IMAGES_DIR });
             const images = await imageConverter.convert(pdfPath, testPage, testPage);
             
             if (images.length > 0) {
@@ -1825,6 +1825,14 @@ const server = http.createServer(async (req, res) => {
             fs.createReadStream(imagePath).pipe(res);
             return;
         } else {
+            console.error(`Image not found: ${imagePath}`);
+            // List what images ARE available
+            try {
+                const available = fs.readdirSync(IMAGES_DIR);
+                console.error(`Available images in ${IMAGES_DIR}: ${available.slice(0, 5).join(', ')}${available.length > 5 ? '...' : ''} (${available.length} total)`);
+            } catch (e) {
+                console.error(`Cannot read IMAGES_DIR: ${e.message}`);
+            }
             res.writeHead(404);
             res.end('Image not found');
             return;
@@ -2184,7 +2192,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
             const sharp = require('sharp');
             
             // Convert the specific page to image
-            const imageConverter = new ExternalPDFToImageConverter({ dpi: 150, outputDir: IMAGES_DIR });
+            const imageConverter = new ExternalPDFToImageConverter({ dpi: 100, outputDir: IMAGES_DIR });
             const images = await imageConverter.convert(tempPath, pageNum, pageNum);
             
             if (images.length === 0) {
