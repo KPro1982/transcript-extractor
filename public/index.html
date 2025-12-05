@@ -43,6 +43,192 @@
             overflow-x: hidden;
         }
 
+        /* Access Code Screen */
+        .access-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-base);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 1;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .access-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .access-screen::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 30% 30%, rgba(232, 93, 4, 0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 70%, rgba(244, 140, 6, 0.08) 0%, transparent 50%);
+            animation: accessPulse 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes accessPulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .access-container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 48px;
+            background: rgba(18, 18, 26, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            max-width: 420px;
+            width: 90%;
+        }
+
+        .access-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .access-logo-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+
+        .access-logo-text {
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .access-title {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        .access-input-group {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .access-input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-base);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            text-align: center;
+            letter-spacing: 0.1em;
+            transition: all 0.3s ease;
+        }
+
+        .access-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 4px var(--accent-subtle);
+        }
+
+        .access-input::placeholder {
+            color: var(--text-muted);
+            letter-spacing: normal;
+        }
+
+        .access-btn {
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .access-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-glow);
+        }
+
+        .access-btn:active {
+            transform: translateY(0);
+        }
+
+        .access-error {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 16px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .access-error.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .access-hint {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 24px;
+        }
+
+        .access-input.shake {
+            animation: shake 0.5s ease-in-out;
+            border-color: #ef4444;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+            20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+
+        .main-app {
+            display: none;
+        }
+
+        .main-app.authenticated {
+            display: block;
+        }
+
         /* Ambient background */
         body::before {
             content: '';
@@ -2815,6 +3001,25 @@
     </style>
 </head>
 <body>
+    <!-- Access Code Screen -->
+    <div class="access-screen" id="accessScreen">
+        <div class="access-container">
+            <div class="access-logo">
+                <div class="access-logo-icon">📜</div>
+                <span class="access-logo-text">DepoDigest</span>
+            </div>
+            <p class="access-title">Enter access code to continue</p>
+            <div class="access-input-group">
+                <input type="password" class="access-input" id="accessCodeInput" placeholder="Access Code" autocomplete="off">
+            </div>
+            <button class="access-btn" id="accessSubmitBtn">Enter</button>
+            <p class="access-error" id="accessError">Invalid access code. Please try again.</p>
+            <p class="access-hint">Contact your administrator for access</p>
+        </div>
+    </div>
+
+    <!-- Main Application (hidden until authenticated) -->
+    <div class="main-app" id="mainApp">
     <header class="header">
         <div class="logo">
             <div class="logo-icon">📜</div>
@@ -5946,6 +6151,71 @@
         document.getElementById('castExportBtn').addEventListener('click', exportCastToWord);
         document.getElementById('crossPointExportBtn').addEventListener('click', exportCrossPointsToWord);
         document.getElementById('exportAllBtn').addEventListener('click', exportAllReports);
+    </script>
+    </div><!-- End main-app -->
+
+    <!-- Access Code Authentication Script -->
+    <script>
+        (function() {
+            const ACCESS_CODE = 'CravensCorpAI';
+            const SESSION_KEY = 'depodigest_authenticated';
+            
+            const accessScreen = document.getElementById('accessScreen');
+            const mainApp = document.getElementById('mainApp');
+            const accessCodeInput = document.getElementById('accessCodeInput');
+            const accessSubmitBtn = document.getElementById('accessSubmitBtn');
+            const accessError = document.getElementById('accessError');
+            
+            // Check if already authenticated in this session
+            function checkAuth() {
+                if (sessionStorage.getItem(SESSION_KEY) === 'true') {
+                    grantAccess();
+                }
+            }
+            
+            // Grant access to the application
+            function grantAccess() {
+                sessionStorage.setItem(SESSION_KEY, 'true');
+                accessScreen.classList.add('hidden');
+                mainApp.classList.add('authenticated');
+            }
+            
+            // Validate access code
+            function validateCode() {
+                const enteredCode = accessCodeInput.value.trim();
+                
+                if (enteredCode === ACCESS_CODE) {
+                    grantAccess();
+                } else {
+                    accessError.classList.add('visible');
+                    accessCodeInput.classList.add('shake');
+                    setTimeout(() => {
+                        accessCodeInput.classList.remove('shake');
+                    }, 500);
+                    accessCodeInput.value = '';
+                    accessCodeInput.focus();
+                }
+            }
+            
+            // Event listeners
+            accessSubmitBtn.addEventListener('click', validateCode);
+            
+            accessCodeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    validateCode();
+                }
+            });
+            
+            accessCodeInput.addEventListener('input', function() {
+                accessError.classList.remove('visible');
+            });
+            
+            // Focus input on load
+            accessCodeInput.focus();
+            
+            // Check authentication on page load
+            checkAuth();
+        })();
     </script>
 </body>
 </html>
