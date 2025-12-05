@@ -3268,6 +3268,14 @@
                 We'll scan through the transcript to find the examination section and extract all Q&A pairs. 
                 <strong style="color: var(--accent-secondary);">AI-powered summarization</strong> will generate intelligent summaries for each exchange.
             </p>
+            
+            <div class="analysis-options" style="margin: 20px 0; padding: 16px; background: var(--bg-elevated); border-radius: 12px; border: 1px solid var(--border);">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary);">
+                    <input type="checkbox" id="enableTopicsCheckbox" checked style="width: 18px; height: 18px; accent-color: var(--accent-primary);">
+                    <span><strong style="color: var(--text-primary);">Enable Topic Classification</strong> — Categorizes each Q&A by topic (slower)</span>
+                </label>
+            </div>
+            
             <button class="btn summarize-btn" id="startSummarizeBtn">
                 <span>⚡</span>
                 Start AI Analysis
@@ -3278,6 +3286,7 @@
                     <div class="progress-bar-fill" id="progressFill"></div>
                 </div>
                 <p class="progress-text" id="progressText">Analyzing transcript...</p>
+                <p class="progress-chunks" id="progressChunks" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);"></p>
             </div>
         </div>
     </div>
@@ -4124,74 +4133,115 @@
         continueToSummarize.addEventListener('click', () => goToStep(4));
 
         // ===== Summarize =====
+        const enableTopicsCheckbox = document.getElementById('enableTopicsCheckbox');
+        const progressChunks = document.getElementById('progressChunks');
+        
         startSummarizeBtn.addEventListener('click', async () => {
             startSummarizeBtn.disabled = true;
             summarizeProgress.classList.add('active');
-            progressFill.style.width = '10%';
-            progressText.textContent = 'Analyzing transcript structure...';
+            progressFill.style.width = '5%';
+            progressText.textContent = 'Starting analysis...';
+            progressChunks.textContent = '';
+
+            const enableTopics = enableTopicsCheckbox.checked;
 
             try {
-                progressFill.style.width = '30%';
-                progressText.textContent = 'Finding examination section...';
-                
-                await new Promise(r => setTimeout(r, 300));
-
-                progressFill.style.width = '40%';
-                progressText.innerHTML = 'Extracting Q&A pairs... <span style="color: var(--accent-secondary);">(this may take a few minutes for large documents)</span>';
-
-                // Animate progress bar while waiting
-                let progressAnimation = setInterval(() => {
-                    const currentWidth = parseFloat(progressFill.style.width) || 40;
-                    if (currentWidth < 85) {
-                        progressFill.style.width = (currentWidth + 0.5) + '%';
-                    }
-                }, 1000);
-
-                // Use standard endpoint
+                // Use SSE for progress updates
                 const response = await fetch('/api/parse-qa', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         pages: pages,
                         firstPrintedPage: firstPrintedPage,
-                        useAI: true
+                        useAI: true,
+                        enableTopics: enableTopics
                     })
                 });
 
-                clearInterval(progressAnimation);
-
                 if (!response.ok) {
-                    throw new Error('Failed to parse Q&A pairs');
+                    throw new Error('Failed to start analysis');
                 }
 
-                const result = await response.json();
-                qaItems = result.qaItems || [];
+                // Read SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let totalChunks = 1;
+                let completedChunks = 0;
 
-                if (qaItems.length === 0) {
-                    alert('No Q&A pairs found. The examination section may not have been detected.');
-                    startSummarizeBtn.disabled = false;
-                    summarizeProgress.classList.remove('active');
-                    return;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                switch (data.type) {
+                                    case 'start':
+                                        totalChunks = data.totalChunks;
+                                        progressText.textContent = `Processing ${data.totalPages} pages in ${totalChunks} chunks...`;
+                                        progressChunks.textContent = `Chunk 0/${totalChunks} complete`;
+                                        break;
+                                        
+                                    case 'chunk-start':
+                                        progressText.innerHTML = `<strong>Chunk ${data.chunk}/${data.totalChunks}</strong>: Pages ${data.startPage}-${data.endPage}`;
+                                        break;
+                                        
+                                    case 'step':
+                                        const stepNames = ['', 'Parsing Q&A', 'Summarizing', 'Topics'];
+                                        progressText.innerHTML = `<strong>Chunk ${data.chunk}/${totalChunks}</strong>: ${data.message}`;
+                                        break;
+                                        
+                                    case 'chunk-complete':
+                                        completedChunks = data.chunk;
+                                        const pct = Math.round((completedChunks / totalChunks) * 90) + 5;
+                                        progressFill.style.width = pct + '%';
+                                        progressChunks.innerHTML = `<span style="color: var(--success);">✓ Chunk ${data.chunk}/${data.totalChunks} complete</span> — ${data.totalQA} Q&A pairs found`;
+                                        break;
+                                        
+                                    case 'complete':
+                                        qaItems = data.qaItems || [];
+                                        
+                                        if (qaItems.length === 0) {
+                                            alert('No Q&A pairs found. The examination section may not have been detected.');
+                                            startSummarizeBtn.disabled = false;
+                                            summarizeProgress.classList.remove('active');
+                                            return;
+                                        }
+
+                                        progressFill.style.width = '100%';
+                                        progressText.innerHTML = `✨ Complete! <span style="color: var(--success); font-weight: 600;">${qaItems.length}</span> Q&A pairs ready`;
+                                        progressChunks.innerHTML = `<span style="color: var(--success);">All ${totalChunks} chunks processed successfully</span>`;
+
+                                        // Show summary screen
+                                        totalQACount.textContent = qaItems.length;
+                                        totalPagesEl.textContent = pages.length;
+                                        renderSummaryTable();
+                                        renderSidePage(0);
+                                        
+                                        analysisComplete = true;
+                                        goToStep(4);
+                                        
+                                        setTimeout(() => {
+                                            summarizeProgress.classList.remove('active');
+                                        }, 2000);
+                                        break;
+                                        
+                                    case 'error':
+                                        throw new Error(data.message);
+                                }
+                            } catch (parseError) {
+                                console.error('Failed to parse SSE data:', parseError);
+                            }
+                        }
+                    }
                 }
-
-                progressFill.style.width = '90%';
-                progressText.innerHTML = `📋 Found <span style="color: var(--success); font-weight: 600;">${qaItems.length}</span> Q&A pairs with AI summaries`;
-
-                // Show summary screen
-                totalQACount.textContent = qaItems.length;
-                totalPagesEl.textContent = pages.length;
-                renderSummaryTable();
-                renderSidePage(0);
-                
-                analysisComplete = true;
-                goToStep(4);
-                
-                progressFill.style.width = '100%';
-                progressText.innerHTML = `✨ Complete! <span style="color: var(--success); font-weight: 600;">${qaItems.length}</span> Q&A pairs ready`;
-                
-                setTimeout(() => {
-                    summarizeProgress.classList.remove('active');
-                }, 2000);
 
             } catch (error) {
                 alert('Error: ' + error.message);

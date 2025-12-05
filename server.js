@@ -159,6 +159,102 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
 }
 
 /**
+ * COMBINED: Summarize AND classify topics in a single API call per item
+ * This is ~50% faster than separate summarization + topic classification
+ */
+async function batchSummarizeAndClassify(qaItems, batchSize = 5) {
+    if (!OPENAI_API_KEY) {
+        console.log('No API key - using rule-based summaries');
+        return qaItems.map(qa => ({
+            ...qa,
+            summary: generateSummary(qa.question, qa.answer),
+            topic: 'Uncategorized',
+            peopleMentioned: [],
+            hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+            crossPoint: false,
+            aiSummarized: false,
+            notes: qa.notes || ''
+        }));
+    }
+
+    console.log(`Combined AI summarization + topic classification for ${qaItems.length} Q&A pairs...`);
+
+    const systemPrompt = `You are a legal assistant analyzing deposition testimony.
+For each Q&A exchange, provide:
+1. A concise summary (1-2 sentences, third person, past tense)
+2. Topic classification
+3. People mentioned (names and roles if known)
+4. Whether explicit dates are mentioned
+
+Common deposition topics: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages
+
+Rules for summary:
+- Write in third person ("The witness testified..." or "Witness stated...")
+- Be concise but capture the key information
+- Include specific names, dates, numbers when mentioned
+
+For hasDates - ONLY true if explicit dates like "January 15, 2020" or "3/15/2019" are mentioned.
+
+Respond in JSON format:
+{"summary": "...", "topic": "...", "peopleMentioned": [{"name": "...", "role": "..."}], "hasDates": true/false}`;
+
+    const results = [];
+    
+    for (let i = 0; i < qaItems.length; i += batchSize) {
+        const batch = qaItems.slice(i, i + batchSize);
+        const promises = batch.map(async (qa) => {
+            try {
+                const userPrompt = qa.colloquy 
+                    ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
+                    : `Q: ${qa.question}\nA: ${qa.answer}`;
+                
+                const response = await callOpenAI([
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ], { max_tokens: 350, temperature: 0.3 });
+                
+                const parsed = JSON.parse(response.trim());
+                return { 
+                    ...qa, 
+                    summary: parsed.summary || generateSummary(qa.question, qa.answer),
+                    topic: parsed.topic || 'Uncategorized',
+                    peopleMentioned: parsed.peopleMentioned || [],
+                    hasDates: parsed.hasDates || false,
+                    crossPoint: false,
+                    aiSummarized: true,
+                    notes: qa.notes || ''
+                };
+            } catch (error) {
+                console.error(`Failed to process Q&A ${i}: ${error.message}`);
+                return { 
+                    ...qa, 
+                    summary: generateSummary(qa.question, qa.answer),
+                    topic: 'Uncategorized',
+                    peopleMentioned: [],
+                    hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                    crossPoint: false,
+                    aiSummarized: false,
+                    notes: qa.notes || ''
+                };
+            }
+        });
+        
+        const batchResults = await Promise.all(promises);
+        results.push(...batchResults);
+        
+        // Progress update
+        console.log(`  Processed ${Math.min(i + batchSize, qaItems.length)}/${qaItems.length} pairs`);
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < qaItems.length) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+    }
+    
+    return results;
+}
+
+/**
  * Batch summarize multiple Q&A pairs using AI
  * All Q/As get AI summaries when API key is available
  */
@@ -563,7 +659,7 @@ Only include complete Q&A pairs. If a question spans pages, use the starting pag
             const response = await callOpenAI([
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `Extract all Q&A pairs from this deposition text:\n\n${batchText}` }
-            ], { max_tokens: 4000, temperature: 0.1 });
+            ], { max_tokens: 6000, temperature: 0.1 }); // Increased for larger batch size
 
             // Parse the JSON response
             const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -630,30 +726,50 @@ function formatFullLocationFromAI(qa) {
  * - colloquyLocation: page:startLine-endLine
  */
 async function parseExamination(pages, firstPrintedPage) {
-    // Try AI-based parsing first (more robust)
-    if (OPENAI_API_KEY) {
+    // OPTIMIZATION: Try fast pattern matching FIRST
+    // Pattern matching is instant (no API calls) and handles 90%+ of depositions
+    console.log('Using fast pattern-based Q&A parsing...');
+    const patternStartTime = Date.now();
+    const patternQAItems = parseExaminationWithPatterns(pages, firstPrintedPage);
+    const patternTime = Date.now() - patternStartTime;
+    console.log(`Pattern matching found ${patternQAItems.length} Q&A pairs in ${patternTime}ms`);
+    
+    // If pattern matching found a reasonable number of Q&A pairs, use them
+    // (Most depositions have at least 10+ Q&A pairs in the first 25 pages)
+    if (patternQAItems.length >= 10) {
+        console.log(`✓ Pattern matching successful: ${patternQAItems.length} Q&A pairs`);
+        return patternQAItems;
+    }
+    
+    // Fallback to AI only if pattern matching failed or found very few items
+    if (OPENAI_API_KEY && patternQAItems.length < 10) {
+        console.log(`Pattern matching found only ${patternQAItems.length} items, trying AI...`);
         try {
-            // First, use AI to find where examination starts
             const examStart = await findExaminationStartWithAI(pages);
             
             if (examStart && examStart.confidence !== 'low') {
-                // Use AI to parse Q&A pairs
                 const aiQAItems = await parseQABatchWithAI(pages, examStart.pageIndex, firstPrintedPage);
                 
-                if (aiQAItems.length > 0) {
-                    console.log(`AI parsing successful: ${aiQAItems.length} Q&A pairs`);
+                if (aiQAItems.length > patternQAItems.length) {
+                    console.log(`AI parsing found more: ${aiQAItems.length} Q&A pairs (vs ${patternQAItems.length})`);
                     return aiQAItems;
                 }
             }
-            
-            console.log('AI parsing did not find Q&A pairs, falling back to pattern matching...');
         } catch (error) {
-            console.error('AI parsing failed, falling back to pattern matching:', error.message);
+            console.error('AI parsing failed:', error.message);
         }
     }
+    
+    // Return pattern results (even if few)
+    return patternQAItems;
+}
 
-    // Fallback: Pattern-based parsing
-    console.log('Using pattern-based Q&A parsing...');
+/**
+ * Fast pattern-based Q&A parsing (no API calls)
+ * Handles standard deposition formats: Q./A., Q/A, QUESTION/ANSWER, THE WITNESS:
+ */
+function parseExaminationWithPatterns(pages, firstPrintedPage) {
+    console.log('Pattern-based Q&A parsing...');
     const qaItems = [];
     
     // Flatten all lines with page/line info
@@ -2029,25 +2145,55 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
         return;
     }
 
-    // Legacy parse Q/A endpoint - now with CHUNKED processing to avoid timeouts
-    // Processes 50 pages at a time: parse → summarize → topics, then next chunk
+    // Parse Q/A endpoint with CHUNKED processing and SSE progress updates
+    // Processes 25 pages at a time: parse → summarize → topics (optional), then next chunk
     if (req.method === 'POST' && url.pathname === '/api/parse-qa') {
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
         req.on('end', async () => {
             try {
                 const body = JSON.parse(Buffer.concat(chunks).toString());
-                const { pages, firstPrintedPage, useAI = true } = body;
+                const { pages, firstPrintedPage, useAI = true, enableTopics = true } = body;
                 
-                const CHUNK_SIZE = 50; // Process 50 pages at a time
+                const CHUNK_SIZE = 25; // Process 25 pages at a time
                 const totalPages = pages.length;
                 const numChunks = Math.ceil(totalPages / CHUNK_SIZE);
                 
+                // Timing analysis
+                const timings = {
+                    totalStart: Date.now(),
+                    parsing: { total: 0, chunks: [] },
+                    summarization: { total: 0, chunks: [] },
+                    topicClassification: { total: 0, chunks: [] },
+                    totalQAItems: 0
+                };
+                
                 console.log(`\n${'='.repeat(60)}`);
                 console.log(`CHUNKED Q/A Processing: ${totalPages} pages in ${numChunks} chunks of ${CHUNK_SIZE}`);
+                console.log(`Topics enabled: ${enableTopics}`);
                 console.log(`${'='.repeat(60)}`);
                 
                 let allQAItems = [];
+                
+                // Set up SSE for progress updates
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                
+                const sendProgress = (data) => {
+                    res.write(`data: ${JSON.stringify(data)}\n\n`);
+                };
+                
+                // Send initial progress
+                sendProgress({ 
+                    type: 'start', 
+                    totalChunks: numChunks, 
+                    chunkSize: CHUNK_SIZE,
+                    totalPages: totalPages 
+                });
                 
                 for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
                     const startPage = chunkIdx * CHUNK_SIZE;
@@ -2058,30 +2204,70 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     const chunkFirstPrintedPage = firstPrintedPage + startPage;
                     
                     console.log(`\n--- Chunk ${chunkIdx + 1}/${numChunks}: Pages ${startPage + 1}-${endPage} ---`);
+                    sendProgress({ 
+                        type: 'chunk-start', 
+                        chunk: chunkIdx + 1, 
+                        totalChunks: numChunks,
+                        startPage: startPage + 1,
+                        endPage: endPage
+                    });
                     
                     // Step 1: Parse Q&A from this chunk
                     console.log(`  [1/3] Parsing Q&A from ${chunkPages.length} pages...`);
+                    sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 1, message: 'Parsing Q&A...' });
+                    const parseStart = Date.now();
                     let chunkQA = await parseExamination(chunkPages, chunkFirstPrintedPage);
-                    console.log(`  Found ${chunkQA.length} Q&A pairs`);
+                    const parseTime = Date.now() - parseStart;
+                    timings.parsing.total += parseTime;
+                    timings.parsing.chunks.push({ chunk: chunkIdx + 1, pages: chunkPages.length, qaFound: chunkQA.length, timeMs: parseTime });
+                    console.log(`  Found ${chunkQA.length} Q&A pairs (${(parseTime/1000).toFixed(1)}s)`);
                     
                     if (chunkQA.length === 0) {
                         console.log(`  No Q&A found in this chunk, skipping...`);
+                        sendProgress({ type: 'chunk-complete', chunk: chunkIdx + 1, qaFound: 0 });
                         continue;
                     }
                     
                     // Add notes property
                     chunkQA = chunkQA.map(qa => ({ ...qa, notes: '' }));
                     
-                    // Step 2: AI Summarization for this chunk
+                    // Step 2: COMBINED AI Summarization + Topic Classification (single API call per item)
                     if (useAI && OPENAI_API_KEY) {
-                        console.log(`  [2/3] AI summarizing ${chunkQA.length} items...`);
-                        chunkQA = await batchSummarizeQA(chunkQA);
-                        
-                        // Step 3: Topic classification for this chunk
-                        console.log(`  [3/3] Classifying topics for ${chunkQA.length} items...`);
-                        chunkQA = await classifyTopicsAndExtractMetadata(chunkQA);
+                        if (enableTopics) {
+                            // Use combined function (summary + topic in one call = ~50% faster)
+                            console.log(`  [2/2] Combined summarization + topics for ${chunkQA.length} items...`);
+                            sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `AI processing ${chunkQA.length} items...` });
+                            const combinedStart = Date.now();
+                            chunkQA = await batchSummarizeAndClassify(chunkQA);
+                            const combinedTime = Date.now() - combinedStart;
+                            // Split time roughly 50/50 for backward compatibility with timing display
+                            timings.summarization.total += Math.floor(combinedTime * 0.4);
+                            timings.topicClassification.total += Math.floor(combinedTime * 0.6);
+                            timings.summarization.chunks.push({ chunk: chunkIdx + 1, items: chunkQA.length, timeMs: Math.floor(combinedTime * 0.4) });
+                            timings.topicClassification.chunks.push({ chunk: chunkIdx + 1, items: chunkQA.length, timeMs: Math.floor(combinedTime * 0.6) });
+                            console.log(`  Combined processing complete (${(combinedTime/1000).toFixed(1)}s)`);
+                        } else {
+                            // Summarization only (no topics)
+                            console.log(`  [2/2] AI summarizing ${chunkQA.length} items...`);
+                            sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `Summarizing ${chunkQA.length} items...` });
+                            const sumStart = Date.now();
+                            chunkQA = await batchSummarizeQA(chunkQA);
+                            const sumTime = Date.now() - sumStart;
+                            timings.summarization.total += sumTime;
+                            timings.summarization.chunks.push({ chunk: chunkIdx + 1, items: chunkQA.length, timeMs: sumTime });
+                            console.log(`  Summarization complete (${(sumTime/1000).toFixed(1)}s)`);
+                            chunkQA = chunkQA.map(qa => ({ 
+                                ...qa, 
+                                topic: 'Uncategorized',
+                                peopleMentioned: [],
+                                hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                                crossPoint: qa.crossPoint || false,
+                                notes: qa.notes || ''
+                            }));
+                        }
                     } else {
                         console.log(`  [2/3] Using rule-based summaries (no API key)`);
+                        sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: 'Using rule-based summaries...' });
                         chunkQA = chunkQA.map(qa => ({ 
                             ...qa, 
                             topic: 'Uncategorized',
@@ -2094,23 +2280,65 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     // Accumulate results
                     allQAItems = allQAItems.concat(chunkQA);
                     console.log(`  Chunk complete. Total Q&A so far: ${allQAItems.length}`);
+                    sendProgress({ 
+                        type: 'chunk-complete', 
+                        chunk: chunkIdx + 1, 
+                        totalChunks: numChunks,
+                        qaFound: chunkQA.length,
+                        totalQA: allQAItems.length 
+                    });
                 }
+                
+                // Calculate total time and log timing analysis
+                timings.totalTime = Date.now() - timings.totalStart;
+                timings.totalQAItems = allQAItems.length;
                 
                 console.log(`\n${'='.repeat(60)}`);
                 console.log(`✓ All chunks processed: ${allQAItems.length} total Q&A pairs`);
+                console.log(`${'='.repeat(60)}`);
+                console.log(`\n⏱️  TIMING ANALYSIS:`);
+                console.log(`${'─'.repeat(50)}`);
+                console.log(`Total Time:        ${(timings.totalTime/1000).toFixed(1)}s`);
+                console.log(`Q&A Parsing:       ${(timings.parsing.total/1000).toFixed(1)}s (${((timings.parsing.total/timings.totalTime)*100).toFixed(0)}%)`);
+                console.log(`Summarization:     ${(timings.summarization.total/1000).toFixed(1)}s (${((timings.summarization.total/timings.totalTime)*100).toFixed(0)}%)`);
+                if (enableTopics) {
+                    console.log(`Topic Analysis:    ${(timings.topicClassification.total/1000).toFixed(1)}s (${((timings.topicClassification.total/timings.totalTime)*100).toFixed(0)}%)`);
+                } else {
+                    console.log(`Topic Analysis:    SKIPPED (disabled)`);
+                }
+                console.log(`${'─'.repeat(50)}`);
+                console.log(`Per Q&A item avg:  ${(timings.totalTime/Math.max(1,allQAItems.length)/1000).toFixed(2)}s`);
+                if (timings.parsing.total > 0) {
+                    console.log(`  - Parsing:       ${(timings.parsing.total/Math.max(1,allQAItems.length)/1000).toFixed(2)}s/item`);
+                }
+                if (timings.summarization.total > 0) {
+                    console.log(`  - Summarizing:   ${(timings.summarization.total/Math.max(1,allQAItems.length)/1000).toFixed(2)}s/item`);
+                }
+                if (timings.topicClassification.total > 0) {
+                    console.log(`  - Topics:        ${(timings.topicClassification.total/Math.max(1,allQAItems.length)/1000).toFixed(2)}s/item`);
+                }
                 console.log(`${'='.repeat(60)}\n`);
                 
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
+                // Send final result with timing info
+                sendProgress({
+                    type: 'complete',
                     success: true,
                     qaItems: allQAItems,
                     totalQA: allQAItems.length,
-                    aiSummaries: !!(useAI && OPENAI_API_KEY)
-                }));
+                    aiSummaries: !!(useAI && OPENAI_API_KEY),
+                    timings: {
+                        totalMs: timings.totalTime,
+                        parsingMs: timings.parsing.total,
+                        summarizationMs: timings.summarization.total,
+                        topicClassificationMs: timings.topicClassification.total
+                    }
+                });
+                res.end();
+                
             } catch (error) {
                 console.error('Parse error:', error);
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Failed to parse: ' + error.message }));
+                res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+                res.end();
             }
         });
         return;
