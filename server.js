@@ -2298,7 +2298,28 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
 
                 console.log(`\n${'='.repeat(50)}`);
                 console.log(`Processing: ${filePart.filename}`);
+                console.log(`Temp path: ${tempPath}`);
+                console.log(`File size: ${filePart.data.length} bytes`);
                 console.log(`${'='.repeat(50)}`);
+
+                // Check if PDF tools are available
+                const { exec } = require('child_process');
+                const { promisify } = require('util');
+                const execAsync = promisify(exec);
+                
+                try {
+                    const gsResult = await execAsync('gs --version').catch(() => ({ stdout: 'not found' }));
+                    console.log(`Ghostscript: ${gsResult.stdout.trim()}`);
+                } catch (e) {
+                    console.log('Ghostscript: not available');
+                }
+                
+                try {
+                    const popplerResult = await execAsync('pdftoppm -v 2>&1').catch(() => ({ stdout: 'not found' }));
+                    console.log(`Poppler: ${popplerResult.stdout || popplerResult.stderr || 'available'}`);
+                } catch (e) {
+                    console.log('Poppler: not available');
+                }
 
                 const result = await extractPDFWithImages(tempPath);
 
@@ -2317,6 +2338,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
 
             } catch (error) {
                 console.error('Extraction error:', error);
+                console.error('Error stack:', error.stack);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to extract: ' + error.message }));
             }
