@@ -168,7 +168,8 @@ async function batchSummarizeQA(qaItems, batchSize = 5) {
             ...qa,
             summary: generateSummary(qa.question, qa.answer),
             topic: 'Uncategorized',
-            crossPoint: false
+            crossPoint: false,
+            notes: qa.notes || ''
         }));
     }
 
@@ -182,10 +183,10 @@ async function batchSummarizeQA(qaItems, batchSize = 5) {
         const promises = batch.map(async (qa) => {
             try {
                 const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
-                return { ...qa, summary, aiSummarized: true, crossPoint: false };
+                return { ...qa, summary, aiSummarized: true, crossPoint: false, notes: qa.notes || '' };
             } catch (error) {
                 console.error(`Failed to summarize Q&A ${i}: ${error.message}`);
-                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false, crossPoint: false };
+                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false, crossPoint: false, notes: qa.notes || '' };
             }
         });
         
@@ -216,7 +217,8 @@ async function classifyTopicsAndExtractMetadata(qaItems) {
             topic: 'Uncategorized',
             peopleMentioned: [],
             hasDates: false,
-            crossPoint: qa.crossPoint || false
+            crossPoint: qa.crossPoint || false,
+            notes: qa.notes || ''
         }));
     }
 
@@ -274,7 +276,8 @@ Respond in JSON format:
                 topic: parsed.topic || 'Uncategorized',
                 peopleMentioned: parsed.peopleMentioned || [],
                 hasDates: parsed.hasDates || false,
-                crossPoint: qa.crossPoint || false
+                crossPoint: qa.crossPoint || false,
+                notes: qa.notes || ''
             });
         } catch (error) {
             console.error(`Failed to analyze Q&A ${i}: ${error.message}`);
@@ -283,7 +286,8 @@ Respond in JSON format:
                 topic: 'Uncategorized',
                 peopleMentioned: [],
                 hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
-                crossPoint: qa.crossPoint || false
+                crossPoint: qa.crossPoint || false,
+                notes: qa.notes || ''
             });
         }
         
@@ -1826,7 +1830,197 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // Parse Q/A endpoint - with AI summarization, topic classification, people extraction, and date detection
+    // Parse Q/A endpoint - with progressive AI summarization via Server-Sent Events
+    // Returns first 25 items immediately, then streams AI updates for the rest
+    if (req.method === 'POST' && url.pathname === '/api/parse-qa-stream') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            try {
+                const body = JSON.parse(Buffer.concat(chunks).toString());
+                const { pages, firstPrintedPage, useAI = true } = body;
+                
+                // Set up SSE headers
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Accel-Buffering': 'no' // Disable nginx buffering if behind proxy
+                });
+                
+                // Disable Node.js response buffering for SSE
+                res.socket?.setNoDelay?.(true);
+                
+                const sendEvent = (event, data) => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                    // Force flush on Windows/some environments
+                    if (res.flush) res.flush();
+                };
+                
+                // Send a keepalive comment to start the stream immediately
+                res.write(': keepalive\n\n');
+                
+                console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
+                
+                // Send parsing started event
+                sendEvent('parsing', { status: 'started', message: 'Detecting examination section...' });
+                
+                let qaItems = await parseExamination(pages, firstPrintedPage);
+                
+                sendEvent('parsing', { status: 'complete', count: qaItems.length });
+                
+                if (qaItems.length === 0) {
+                    sendEvent('complete', { qaItems: [], totalQA: 0 });
+                    res.end();
+                    return;
+                }
+                
+                // Add notes property and initial metadata to all items
+                qaItems = qaItems.map(qa => ({
+                    ...qa,
+                    notes: '',
+                    topic: 'Uncategorized',
+                    peopleMentioned: [],
+                    hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                    crossPoint: false,
+                    aiSummarized: false
+                }));
+                
+                const INITIAL_BATCH = 25;
+                const initialItems = qaItems.slice(0, INITIAL_BATCH);
+                const remainingItems = qaItems.slice(INITIAL_BATCH);
+                
+                // Send initial batch immediately with rule-based summaries
+                console.log(`Sending initial ${initialItems.length} items with rule-based summaries...`);
+                sendEvent('initial', {
+                    qaItems: initialItems,
+                    totalQA: qaItems.length,
+                    hasMore: remainingItems.length > 0
+                });
+                
+                // If no AI or no remaining items, complete now
+                if (!useAI || !OPENAI_API_KEY) {
+                    if (remainingItems.length > 0) {
+                        sendEvent('batch', { 
+                            startIndex: INITIAL_BATCH, 
+                            items: remainingItems 
+                        });
+                    }
+                    sendEvent('complete', { totalQA: qaItems.length });
+                    res.end();
+                    return;
+                }
+                
+                // Process AI summaries in background
+                (async () => {
+                    try {
+                        // First, AI summarize the initial batch
+                        console.log(`AI summarizing initial ${initialItems.length} items...`);
+                        for (let i = 0; i < initialItems.length; i += 5) {
+                            const batch = initialItems.slice(i, i + 5);
+                            const promises = batch.map(async (qa, batchIdx) => {
+                                const idx = i + batchIdx;
+                                try {
+                                    const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
+                                    return { index: idx, summary, aiSummarized: true };
+                                } catch (error) {
+                                    return { index: idx, summary: qa.summary, aiSummarized: false };
+                                }
+                            });
+                            
+                            const results = await Promise.all(promises);
+                            sendEvent('ai-update', { updates: results });
+                            
+                            if (i + 5 < initialItems.length) {
+                                await new Promise(r => setTimeout(r, 200));
+                            }
+                        }
+                        
+                        // Send remaining items with rule-based summaries
+                        if (remainingItems.length > 0) {
+                            console.log(`Sending remaining ${remainingItems.length} items...`);
+                            sendEvent('batch', { 
+                                startIndex: INITIAL_BATCH, 
+                                items: remainingItems 
+                            });
+                            
+                            // AI summarize remaining items
+                            console.log(`AI summarizing remaining ${remainingItems.length} items...`);
+                            for (let i = 0; i < remainingItems.length; i += 5) {
+                                const batch = remainingItems.slice(i, i + 5);
+                                const promises = batch.map(async (qa, batchIdx) => {
+                                    const idx = INITIAL_BATCH + i + batchIdx;
+                                    try {
+                                        const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
+                                        return { index: idx, summary, aiSummarized: true };
+                                    } catch (error) {
+                                        return { index: idx, summary: qa.summary, aiSummarized: false };
+                                    }
+                                });
+                                
+                                const results = await Promise.all(promises);
+                                sendEvent('ai-update', { updates: results });
+                                
+                                if (i + 5 < remainingItems.length) {
+                                    await new Promise(r => setTimeout(r, 200));
+                                }
+                            }
+                        }
+                        
+                        // Now classify topics for all items
+                        console.log('Analyzing topics, people, and dates...');
+                        for (let i = 0; i < qaItems.length; i++) {
+                            const qa = qaItems[i];
+                            try {
+                                const systemPrompt = `You are a legal assistant analyzing deposition testimony.
+Analyze this Q&A and provide topic classification, people mentioned, and whether explicit dates are present.
+Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": "..."}], "hasDates": true/false}`;
+                                const response = await callOpenAI([
+                                    { role: 'system', content: systemPrompt },
+                                    { role: 'user', content: `Q: ${qa.question}\nA: ${qa.answer}` }
+                                ], { max_tokens: 200 });
+                                
+                                const parsed = JSON.parse(response.trim());
+                                sendEvent('metadata-update', {
+                                    index: i,
+                                    topic: parsed.topic || 'Uncategorized',
+                                    peopleMentioned: parsed.peopleMentioned || [],
+                                    hasDates: parsed.hasDates || false
+                                });
+                            } catch (error) {
+                                // Keep defaults on error
+                            }
+                            
+                            if ((i + 1) % 10 === 0) {
+                                console.log(`  Analyzed ${i + 1}/${qaItems.length} items`);
+                            }
+                            
+                            if (i < qaItems.length - 1) {
+                                await new Promise(r => setTimeout(r, 100));
+                            }
+                        }
+                        
+                        sendEvent('complete', { totalQA: qaItems.length });
+                        res.end();
+                        
+                    } catch (error) {
+                        console.error('Background processing error:', error);
+                        sendEvent('error', { message: error.message });
+                        res.end();
+                    }
+                })();
+                
+            } catch (error) {
+                console.error('Parse error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to parse: ' + error.message }));
+            }
+        });
+        return;
+    }
+
+    // Legacy parse Q/A endpoint (non-streaming) - kept for compatibility
     if (req.method === 'POST' && url.pathname === '/api/parse-qa') {
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
@@ -1837,6 +2031,9 @@ const server = http.createServer(async (req, res) => {
                 
                 console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
                 let qaItems = await parseExamination(pages, firstPrintedPage);
+                
+                // Add notes property to all items
+                qaItems = qaItems.map(qa => ({ ...qa, notes: '' }));
                 
                 // Use AI summarization if enabled and API key is available
                 if (useAI && OPENAI_API_KEY && qaItems.length > 0) {

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DepoDigest - Deposition Summarization</title>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- docx library for Word document generation -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
     <style>
         :root {
             --bg-base: #0a0a0f;
@@ -1208,6 +1210,30 @@
             display: block;
         }
 
+        .summarize-progress.background-processing {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            margin-top: 0;
+            width: auto;
+            max-width: 400px;
+        }
+
+        .summarize-progress.background-processing .progress-bar-track {
+            margin-bottom: 8px;
+        }
+
+        .summarize-progress.background-processing .progress-text {
+            font-size: 0.85rem;
+        }
+
         .progress-bar-track {
             width: 100%;
             height: 6px;
@@ -2014,8 +2040,25 @@
         }
 
         .report-card-btn {
-            width: 100%;
+            flex: 1;
             justify-content: center;
+        }
+
+        .report-card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .report-card-actions .btn-secondary {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .report-card-actions .btn-secondary:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         .reports-nav {
@@ -2404,6 +2447,112 @@
 
         .merge-btn svg, .unmerge-btn svg {
             display: block;
+        }
+
+        /* Notes button and panel */
+        .notes-btn {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .notes-btn:hover {
+            background: var(--info);
+            border-color: var(--info);
+            color: white;
+        }
+
+        .notes-btn.has-notes {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: var(--info);
+            color: var(--info);
+        }
+
+        .notes-panel {
+            display: none;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+            position: relative;
+        }
+
+        .notes-panel.open {
+            display: block;
+        }
+
+        .notes-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .notes-panel-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--info);
+        }
+
+        .notes-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .notes-panel-close:hover {
+            color: var(--text-primary);
+        }
+
+        .notes-textarea {
+            width: 100%;
+            min-height: 80px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            color: var(--text-primary);
+            font-family: 'Outfit', system-ui, sans-serif;
+            font-size: 0.85rem;
+            resize: vertical;
+        }
+
+        .notes-textarea:focus {
+            outline: none;
+            border-color: var(--info);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .notes-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* AI-summarized row indicator */
+        tr.ai-summarized .row-summary {
+            position: relative;
+        }
+
+        tr.ai-summarized .row-summary::before {
+            content: '✨';
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 0.7rem;
+            opacity: 0.5;
         }
 
         .merged-indicator {
@@ -3071,28 +3220,40 @@
                     <div class="report-card-icon">📅</div>
                     <h3>Chronological Report</h3>
                     <p>View all summaries organized by date, with timeline context for each entry.</p>
-                    <button class="btn report-card-btn" id="chronReportBtn">Generate Chron Report</button>
+                    <div class="report-card-actions">
+                        <button class="btn report-card-btn" id="chronReportBtn">View Report</button>
+                        <button class="btn btn-secondary report-card-btn" id="chronExportBtn">📄 Export Word</button>
+                    </div>
                 </div>
                 
                 <div class="report-card" id="castReportCard">
                     <div class="report-card-icon">👥</div>
                     <h3>Cast of Characters</h3>
                     <p>List all people mentioned in the deposition with their roles and references.</p>
-                    <button class="btn report-card-btn" id="castReportBtn">Generate Cast Report</button>
+                    <div class="report-card-actions">
+                        <button class="btn report-card-btn" id="castReportBtn">View Report</button>
+                        <button class="btn btn-secondary report-card-btn" id="castExportBtn">📄 Export Word</button>
+                    </div>
                 </div>
                 
                 <div class="report-card" id="crossPointReportCard">
                     <div class="report-card-icon">⚔️</div>
                     <h3>Cross Examination Points</h3>
                     <p>View all items marked as potential cross examination points for trial preparation.</p>
-                    <button class="btn report-card-btn" id="crossPointReportBtn">Generate Cross Points</button>
+                    <div class="report-card-actions">
+                        <button class="btn report-card-btn" id="crossPointReportBtn">View Report</button>
+                        <button class="btn btn-secondary report-card-btn" id="crossPointExportBtn">📄 Export Word</button>
+                    </div>
                 </div>
                 
                 <div class="report-card" id="exportReportCard">
                     <div class="report-card-icon">📥</div>
-                    <h3>Export Summary</h3>
-                    <p>Download the complete deposition summary as a formatted document.</p>
-                    <button class="btn report-card-btn" id="exportBtn">Export to File</button>
+                    <h3>Export All Reports</h3>
+                    <p>Download all reports as Word documents with hyperlinked page references.</p>
+                    <div class="report-card-actions">
+                        <button class="btn report-card-btn" id="exportAllBtn">📦 Export All to Word</button>
+                        <button class="btn btn-secondary report-card-btn" id="exportBtn">CSV Export</button>
+                    </div>
                 </div>
             </div>
             
@@ -3768,11 +3929,20 @@
                 progressFill.style.width = '30%';
                 progressText.textContent = 'Finding examination section...';
                 
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 300));
 
-                progressFill.style.width = '50%';
-                progressText.textContent = 'Extracting Q&A pairs...';
+                progressFill.style.width = '40%';
+                progressText.innerHTML = 'Extracting Q&A pairs... <span style="color: var(--accent-secondary);">(this may take a few minutes for large documents)</span>';
 
+                // Animate progress bar while waiting
+                let progressAnimation = setInterval(() => {
+                    const currentWidth = parseFloat(progressFill.style.width) || 40;
+                    if (currentWidth < 85) {
+                        progressFill.style.width = (currentWidth + 0.5) + '%';
+                    }
+                }, 1000);
+
+                // Use standard endpoint
                 const response = await fetch('/api/parse-qa', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3783,17 +3953,14 @@
                     })
                 });
 
-                progressFill.style.width = '70%';
-                progressText.textContent = '🤖 Generating AI summaries...';
+                clearInterval(progressAnimation);
 
-                const result = await response.json();
-
-                if (!response.ok || result.error) {
-                    throw new Error(result.error || 'Parsing failed');
+                if (!response.ok) {
+                    throw new Error('Failed to parse Q&A pairs');
                 }
 
-                qaItems = result.qaItems;
-                const usedAI = result.aiSummaries;
+                const result = await response.json();
+                qaItems = result.qaItems || [];
 
                 if (qaItems.length === 0) {
                     alert('No Q&A pairs found. The examination section may not have been detected.');
@@ -3802,27 +3969,29 @@
                     return;
                 }
 
-                progressFill.style.width = '100%';
-                progressText.textContent = usedAI 
-                    ? `✨ Found ${qaItems.length} Q&A pairs with AI summaries!`
-                    : `Found ${qaItems.length} Q&A pairs!`;
+                progressFill.style.width = '90%';
+                progressText.innerHTML = `📋 Found <span style="color: var(--success); font-weight: 600;">${qaItems.length}</span> Q&A pairs with AI summaries`;
 
-                await new Promise(r => setTimeout(r, 800));
-
-                // Populate summary screen
+                // Show summary screen
                 totalQACount.textContent = qaItems.length;
                 totalPagesEl.textContent = pages.length;
                 renderSummaryTable();
                 renderSidePage(0);
                 
                 analysisComplete = true;
-                goToStep(4); // Stay on step 4 but show summary screen
+                goToStep(4);
+                
+                progressFill.style.width = '100%';
+                progressText.innerHTML = `✨ Complete! <span style="color: var(--success); font-weight: 600;">${qaItems.length}</span> Q&A pairs ready`;
+                
+                setTimeout(() => {
+                    summarizeProgress.classList.remove('active');
+                }, 2000);
 
             } catch (error) {
                 alert('Error: ' + error.message);
                 startSummarizeBtn.disabled = false;
-            } finally {
-                summarizeProgress.classList.remove('active');
+                summarizeProgress.classList.remove('active', 'background-processing');
             }
         });
 
@@ -4024,8 +4193,34 @@
                     actionsDiv.appendChild(mergeBtn);
                 }
                 
+                // Notes button
+                const notesBtn = document.createElement('button');
+                notesBtn.className = 'notes-btn' + (qa.notes ? ' has-notes' : '');
+                notesBtn.title = qa.notes ? 'View/Edit Notes' : 'Add Notes';
+                notesBtn.innerHTML = '📝';
+                notesBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleNotesPanel(index, tr);
+                });
+                actionsDiv.appendChild(notesBtn);
+                
                 metaRow.appendChild(actionsDiv);
                 topicControls.appendChild(metaRow);
+                
+                // Notes panel (hidden by default)
+                const notesPanel = document.createElement('div');
+                notesPanel.className = 'notes-panel';
+                notesPanel.id = `notes-panel-${index}`;
+                notesPanel.innerHTML = `
+                    <div class="notes-panel-header">
+                        <span class="notes-panel-title">📝 Notes</span>
+                        <button class="notes-panel-close" onclick="closeNotesPanel(${index})">×</button>
+                    </div>
+                    <textarea class="notes-textarea" placeholder="Add your notes here..." 
+                        onchange="saveNotes(${index}, this.value)">${escapeHtml(qa.notes || '')}</textarea>
+                `;
+                topicControls.appendChild(notesPanel);
+                
                 tdTopic.appendChild(topicControls);
                 
                 // Column: Q&A Preview (now on LEFT before summary)
@@ -4195,6 +4390,128 @@
             
             if (!wasOpen) {
                 list.classList.add('show');
+            }
+        }
+
+        // Toggle notes panel visibility
+        function toggleNotesPanel(index, row) {
+            const panel = document.getElementById(`notes-panel-${index}`);
+            const wasOpen = panel.classList.contains('open');
+            
+            // Close all other notes panels
+            document.querySelectorAll('.notes-panel.open').forEach(p => p.classList.remove('open'));
+            
+            if (!wasOpen) {
+                panel.classList.add('open');
+                // Focus the textarea
+                const textarea = panel.querySelector('.notes-textarea');
+                if (textarea) textarea.focus();
+            }
+        }
+
+        // Close notes panel
+        function closeNotesPanel(index) {
+            const panel = document.getElementById(`notes-panel-${index}`);
+            if (panel) {
+                panel.classList.remove('open');
+            }
+        }
+
+        // Save notes
+        function saveNotes(index, value) {
+            if (qaItems[index]) {
+                qaItems[index].notes = value;
+                // Update the notes button appearance
+                const row = document.querySelector(`tr[data-index="${index}"]`);
+                if (row) {
+                    const notesBtn = row.querySelector('.notes-btn');
+                    if (notesBtn) {
+                        notesBtn.classList.toggle('has-notes', value.trim().length > 0);
+                        notesBtn.title = value.trim() ? 'View/Edit Notes' : 'Add Notes';
+                    }
+                }
+            }
+        }
+
+        // Update a single summary row without re-rendering the whole table
+        function updateSummaryRow(index) {
+            const row = document.querySelector(`tr[data-index="${index}"]`);
+            if (!row || !qaItems[index]) return;
+            
+            const qa = qaItems[index];
+            
+            // Update summary textarea
+            const summaryTextarea = row.querySelector('.summary-textarea');
+            if (summaryTextarea && summaryTextarea.value !== qa.summary) {
+                summaryTextarea.value = qa.summary || '';
+            }
+            
+            // Update topic dropdown
+            const topicSelect = row.querySelector('.topic-select');
+            if (topicSelect) {
+                // Add new topic to options if needed
+                if (qa.topic && !Array.from(topicSelect.options).some(o => o.value === qa.topic)) {
+                    const newOption = document.createElement('option');
+                    newOption.value = qa.topic;
+                    newOption.textContent = qa.topic;
+                    topicSelect.insertBefore(newOption, topicSelect.lastChild);
+                    allTopics.add(qa.topic);
+                }
+                topicSelect.value = qa.topic || 'Uncategorized';
+            }
+            
+            // Update chron checkbox
+            const chronCheckbox = row.querySelector('.chron-checkbox input');
+            if (chronCheckbox) {
+                chronCheckbox.checked = qa.hasDates || false;
+                chronCheckbox.parentElement.classList.toggle('has-date', qa.hasDates);
+            }
+            
+            // Update crosspoint checkbox
+            const crossPointCheckbox = row.querySelector('.crosspoint-checkbox input');
+            if (crossPointCheckbox) {
+                crossPointCheckbox.checked = qa.crossPoint || false;
+                crossPointCheckbox.parentElement.classList.toggle('is-crosspoint', qa.crossPoint);
+            }
+            
+            // Update people button
+            const peopleBtn = row.querySelector('.people-btn');
+            if (peopleBtn) {
+                const peopleCount = (qa.peopleMentioned && qa.peopleMentioned.length) || 0;
+                peopleBtn.innerHTML = `👥${peopleCount}`;
+                peopleBtn.classList.toggle('has-people', peopleCount > 0);
+                
+                // Update people list
+                const peopleList = row.querySelector('.people-list');
+                if (peopleList) {
+                    peopleList.innerHTML = '';
+                    if (qa.peopleMentioned && qa.peopleMentioned.length > 0) {
+                        qa.peopleMentioned.forEach(person => {
+                            const item = document.createElement('div');
+                            item.className = 'people-list-item';
+                            item.textContent = person.name || person;
+                            peopleList.appendChild(item);
+                        });
+                    } else {
+                        const item = document.createElement('div');
+                        item.className = 'people-list-item';
+                        item.textContent = 'No people';
+                        item.style.fontStyle = 'italic';
+                        item.style.color = 'var(--text-muted)';
+                        peopleList.appendChild(item);
+                    }
+                }
+            }
+            
+            // Update notes button
+            const notesBtn = row.querySelector('.notes-btn');
+            if (notesBtn) {
+                notesBtn.classList.toggle('has-notes', qa.notes && qa.notes.trim().length > 0);
+            }
+            
+            // Add visual indicator for AI-processed rows
+            if (qa.aiSummarized) {
+                row.classList.add('ai-summarized');
             }
         }
 
@@ -5091,11 +5408,11 @@
         // ===== Export =====
         document.getElementById('exportBtn').addEventListener('click', () => {
             // Generate CSV export with all fields
-            let csv = 'Number,Location,Topic,HasDates,CrossPoint,People,Summary,Question,Answer\n';
+            let csv = 'Number,Location,Topic,HasDates,CrossPoint,People,Summary,Notes,Question,Answer\n';
             qaItems.forEach((qa, idx) => {
                 const people = (qa.peopleMentioned || []).map(p => typeof p === 'string' ? p : p.name).join('; ');
                 const fullLocation = qa.location || qa.questionLocation;
-                csv += `${idx + 1},"${fullLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${qa.crossPoint ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
+                csv += `${idx + 1},"${fullLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${qa.crossPoint ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${(qa.notes || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -5115,6 +5432,520 @@
                 crossPointReportModal.classList.remove('show');
             }
         });
+
+        // ===== Word Document Export Functions =====
+        const { Document, Paragraph, TextRun, HeadingLevel, ExternalHyperlink, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, Packer } = docx;
+
+        // Get source PDF filename for hyperlinks
+        function getSourcePdfName() {
+            return currentFile ? currentFile.name : 'deposition.pdf';
+        }
+
+        // Create a hyperlink to a specific page in the PDF
+        function createPdfPageLink(location, text) {
+            // Extract page number from location (e.g., "5:10-15" -> page 5)
+            const pageMatch = location.match(/^(\d+)/);
+            const pageNum = pageMatch ? parseInt(pageMatch[1]) : 1;
+            const pdfName = getSourcePdfName();
+            
+            // Create a hyperlink that will open the PDF at the specific page
+            // Format: file:///path/to/file.pdf#page=X
+            return new ExternalHyperlink({
+                children: [
+                    new TextRun({
+                        text: text || location,
+                        style: "Hyperlink",
+                        color: "0563C1",
+                        underline: { type: "single" }
+                    })
+                ],
+                link: `${pdfName}#page=${pageNum}`
+            });
+        }
+
+        // Export Chronological Report to Word
+        async function exportChronToWord() {
+            const chronItems = qaItems
+                .filter(qa => qa.hasDates)
+                .map((qa, idx) => ({
+                    ...qa,
+                    originalIndex: qaItems.indexOf(qa),
+                    dateExtracted: extractDateFromText(qa.question + ' ' + qa.answer)
+                }))
+                .sort((a, b) => {
+                    if (a.dateExtracted && b.dateExtracted) {
+                        return new Date(a.dateExtracted) - new Date(b.dateExtracted);
+                    }
+                    return 0;
+                });
+
+            if (chronItems.length === 0) {
+                alert('No items marked with dates. Check the "Chron" checkbox on items that contain date references.');
+                return;
+            }
+
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        new Paragraph({
+                            text: "Chronological Summary",
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { after: 300 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `Source: ${getSourcePdfName()}`,
+                                    italics: true,
+                                    color: "666666"
+                                })
+                            ],
+                            spacing: { after: 400 }
+                        }),
+                        ...chronItems.flatMap((item, index) => {
+                            const fullLocation = item.location || item.questionLocation;
+                            return [
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: item.dateExtracted || 'Date TBD',
+                                            bold: true,
+                                            color: item.dateExtracted ? "2E74B5" : "999999"
+                                        }),
+                                        new TextRun({ text: "  |  " }),
+                                        createPdfPageLink(fullLocation, `Page ${fullLocation}`)
+                                    ],
+                                    spacing: { before: 200 }
+                                }),
+                                new Paragraph({
+                                    text: item.summary || '',
+                                    spacing: { after: 200 }
+                                }),
+                                new Paragraph({
+                                    border: {
+                                        bottom: { color: "CCCCCC", size: 1, style: BorderStyle.SINGLE }
+                                    },
+                                    spacing: { after: 200 }
+                                })
+                            ];
+                        })
+                    ]
+                }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, 'chronological-report.docx');
+        }
+
+        // Export Cast of Characters Report to Word
+        async function exportCastToWord() {
+            const peopleMap = new Map();
+            
+            qaItems.forEach((qa, idx) => {
+                if (qa.peopleMentioned && qa.peopleMentioned.length > 0) {
+                    qa.peopleMentioned.forEach(person => {
+                        const name = typeof person === 'string' ? person : person.name;
+                        const role = typeof person === 'object' ? person.role : null;
+                        
+                        if (!peopleMap.has(name)) {
+                            peopleMap.set(name, { name, role, mentions: [] });
+                        }
+                        
+                        const entry = peopleMap.get(name);
+                        if (role && !entry.role) entry.role = role;
+                        entry.mentions.push({
+                            index: idx,
+                            location: qa.location || qa.questionLocation,
+                            summary: qa.summary
+                        });
+                    });
+                }
+            });
+
+            if (peopleMap.size === 0) {
+                alert('No people detected in the testimony. People are identified during AI analysis.');
+                return;
+            }
+
+            const sortedPeople = Array.from(peopleMap.values()).sort((a, b) => {
+                const aLast = a.name.split(' ').pop() || a.name;
+                const bLast = b.name.split(' ').pop() || b.name;
+                return aLast.localeCompare(bLast);
+            });
+
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        new Paragraph({
+                            text: "Cast of Characters",
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { after: 300 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `Source: ${getSourcePdfName()}`,
+                                    italics: true,
+                                    color: "666666"
+                                })
+                            ],
+                            spacing: { after: 400 }
+                        }),
+                        ...sortedPeople.flatMap(person => [
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: person.name,
+                                        bold: true,
+                                        size: 28
+                                    })
+                                ],
+                                spacing: { before: 300 }
+                            }),
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: person.role || 'Role unknown',
+                                        italics: true,
+                                        color: "666666"
+                                    })
+                                ],
+                                spacing: { after: 100 }
+                            }),
+                            ...person.mentions.map(mention => 
+                                new Paragraph({
+                                    children: [
+                                        createPdfPageLink(mention.location, mention.location),
+                                        new TextRun({ text: " - " }),
+                                        new TextRun({
+                                            text: truncate(mention.summary || 'No summary', 150)
+                                        })
+                                    ],
+                                    indent: { left: 360 },
+                                    spacing: { after: 100 }
+                                })
+                            ),
+                            new Paragraph({
+                                border: {
+                                    bottom: { color: "CCCCCC", size: 1, style: BorderStyle.SINGLE }
+                                },
+                                spacing: { after: 200 }
+                            })
+                        ])
+                    ]
+                }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, 'cast-of-characters.docx');
+        }
+
+        // Export Cross Points Report to Word
+        async function exportCrossPointsToWord() {
+            const crossPointItems = qaItems
+                .map((qa, idx) => ({ ...qa, originalIndex: idx }))
+                .filter(qa => qa.crossPoint);
+
+            if (crossPointItems.length === 0) {
+                alert('No cross examination points marked. Check the "⚔️" checkbox on items you want to use for cross examination.');
+                return;
+            }
+
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        new Paragraph({
+                            text: "Cross Examination Points",
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { after: 300 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `Source: ${getSourcePdfName()}`,
+                                    italics: true,
+                                    color: "666666"
+                                })
+                            ],
+                            spacing: { after: 400 }
+                        }),
+                        ...crossPointItems.flatMap((item, index) => {
+                            const fullLocation = item.location || item.questionLocation;
+                            return [
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: `${index + 1}. `,
+                                            bold: true,
+                                            color: "D97706"
+                                        }),
+                                        createPdfPageLink(fullLocation, `Page ${fullLocation}`)
+                                    ],
+                                    spacing: { before: 300 }
+                                }),
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: "Summary: ",
+                                            bold: true
+                                        }),
+                                        new TextRun({
+                                            text: item.summary || ''
+                                        })
+                                    ],
+                                    spacing: { after: 100 }
+                                }),
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: "Q: ",
+                                            bold: true,
+                                            color: "2563EB"
+                                        }),
+                                        new TextRun({
+                                            text: truncate(item.question, 300)
+                                        })
+                                    ],
+                                    indent: { left: 360 }
+                                }),
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: "A: ",
+                                            bold: true,
+                                            color: "059669"
+                                        }),
+                                        new TextRun({
+                                            text: truncate(item.answer, 300)
+                                        })
+                                    ],
+                                    indent: { left: 360 },
+                                    spacing: { after: 100 }
+                                }),
+                                ...(item.notes ? [
+                                    new Paragraph({
+                                        children: [
+                                            new TextRun({
+                                                text: "Notes: ",
+                                                bold: true,
+                                                color: "3B82F6"
+                                            }),
+                                            new TextRun({
+                                                text: item.notes,
+                                                italics: true
+                                            })
+                                        ],
+                                        indent: { left: 360 },
+                                        spacing: { after: 100 }
+                                    })
+                                ] : []),
+                                new Paragraph({
+                                    border: {
+                                        bottom: { color: "CCCCCC", size: 1, style: BorderStyle.SINGLE }
+                                    },
+                                    spacing: { after: 200 }
+                                })
+                            ];
+                        })
+                    ]
+                }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, 'cross-examination-points.docx');
+        }
+
+        // Export Full Summary Report to Word
+        async function exportFullSummaryToWord() {
+            if (qaItems.length === 0) {
+                alert('No Q&A items to export.');
+                return;
+            }
+
+            // Group by topic
+            const topicGroups = new Map();
+            qaItems.forEach((qa, idx) => {
+                const topic = qa.topic || 'Uncategorized';
+                if (!topicGroups.has(topic)) {
+                    topicGroups.set(topic, []);
+                }
+                topicGroups.get(topic).push({ ...qa, originalIndex: idx });
+            });
+
+            const sections = [];
+            
+            // Title section
+            sections.push(
+                new Paragraph({
+                    text: "Deposition Summary",
+                    heading: HeadingLevel.HEADING_1,
+                    spacing: { after: 300 }
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Source: ${getSourcePdfName()}`,
+                            italics: true,
+                            color: "666666"
+                        })
+                    ],
+                    spacing: { after: 100 }
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Total Q&A Pairs: ${qaItems.length}`,
+                            color: "666666"
+                        })
+                    ],
+                    spacing: { after: 400 }
+                })
+            );
+
+            // Add each topic group
+            for (const [topic, items] of topicGroups) {
+                sections.push(
+                    new Paragraph({
+                        text: topic,
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { before: 400, after: 200 }
+                    })
+                );
+
+                items.forEach((item, index) => {
+                    const fullLocation = item.location || item.questionLocation;
+                    sections.push(
+                        new Paragraph({
+                            children: [
+                                createPdfPageLink(fullLocation, fullLocation),
+                                item.hasDates ? new TextRun({ text: " 📅", size: 20 }) : new TextRun({ text: "" }),
+                                item.crossPoint ? new TextRun({ text: " ⚔️", size: 20 }) : new TextRun({ text: "" }),
+                                item.notes ? new TextRun({ text: " 📝", size: 20 }) : new TextRun({ text: "" })
+                            ],
+                            spacing: { before: 200 }
+                        }),
+                        new Paragraph({
+                            text: item.summary || '',
+                            spacing: { after: 100 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: "Q: " + truncate(item.question, 200),
+                                    italics: true,
+                                    color: "666666",
+                                    size: 20
+                                })
+                            ],
+                            indent: { left: 360 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: "A: " + truncate(item.answer, 200),
+                                    italics: true,
+                                    color: "666666",
+                                    size: 20
+                                })
+                            ],
+                            indent: { left: 360 },
+                            spacing: { after: item.notes ? 50 : 150 }
+                        })
+                    );
+                    
+                    // Add notes if present
+                    if (item.notes) {
+                        sections.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: "Notes: ",
+                                        bold: true,
+                                        color: "3B82F6",
+                                        size: 20
+                                    }),
+                                    new TextRun({
+                                        text: item.notes,
+                                        italics: true,
+                                        color: "666666",
+                                        size: 20
+                                    })
+                                ],
+                                indent: { left: 360 },
+                                spacing: { after: 150 }
+                            })
+                        );
+                    }
+                });
+            }
+
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: sections
+                }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, 'deposition-summary.docx');
+        }
+
+        // Export all reports
+        async function exportAllReports() {
+            loadingOverlay.classList.add('active');
+            document.getElementById('loadingText').textContent = 'Generating Word documents...';
+            
+            try {
+                // Small delay between exports to prevent browser issues
+                await exportFullSummaryToWord();
+                await new Promise(r => setTimeout(r, 500));
+                
+                const hasChronItems = qaItems.some(qa => qa.hasDates);
+                if (hasChronItems) {
+                    await exportChronToWord();
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                
+                const hasPeople = qaItems.some(qa => qa.peopleMentioned && qa.peopleMentioned.length > 0);
+                if (hasPeople) {
+                    await exportCastToWord();
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                
+                const hasCrossPoints = qaItems.some(qa => qa.crossPoint);
+                if (hasCrossPoints) {
+                    await exportCrossPointsToWord();
+                }
+                
+                alert('All available reports have been exported!');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Error exporting reports: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        // Helper function to download blob
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Wire up export buttons
+        document.getElementById('chronExportBtn').addEventListener('click', exportChronToWord);
+        document.getElementById('castExportBtn').addEventListener('click', exportCastToWord);
+        document.getElementById('crossPointExportBtn').addEventListener('click', exportCrossPointsToWord);
+        document.getElementById('exportAllBtn').addEventListener('click', exportAllReports);
     </script>
 </body>
 </html>
