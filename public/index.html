@@ -1751,6 +1751,29 @@
             color: var(--success);
         }
 
+        /* Cross Point checkbox */
+        .crosspoint-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .crosspoint-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #f59e0b;
+            cursor: pointer;
+        }
+
+        .crosspoint-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .crosspoint-checkbox.is-crosspoint .crosspoint-label {
+            color: #f59e0b;
+        }
+
         /* Resizable columns with sticky headers */
         .summary-table th {
             position: sticky;
@@ -1945,9 +1968,15 @@
 
         .reports-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 24px;
             margin-bottom: 40px;
+        }
+        
+        @media (min-width: 1200px) {
+            .reports-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
 
         .report-card {
@@ -2145,6 +2174,63 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.75rem;
             color: var(--question-accent);
+        }
+
+        /* Cross Points report */
+        .crosspoint-entry {
+            display: flex;
+            gap: 20px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .crosspoint-entry:last-child {
+            border-bottom: none;
+        }
+
+        .crosspoint-number {
+            flex-shrink: 0;
+            width: 40px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: #f59e0b;
+            font-weight: 700;
+        }
+
+        .crosspoint-content {
+            flex: 1;
+        }
+
+        .crosspoint-summary {
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .crosspoint-qa {
+            background: var(--bg-base);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .crosspoint-question {
+            color: var(--question-accent);
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .crosspoint-answer {
+            color: var(--answer-accent);
+            font-size: 0.85rem;
+        }
+
+        .crosspoint-location {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
         /* Needs AI button for merged entries */
@@ -2995,6 +3081,13 @@
                     <button class="btn report-card-btn" id="castReportBtn">Generate Cast Report</button>
                 </div>
                 
+                <div class="report-card" id="crossPointReportCard">
+                    <div class="report-card-icon">⚔️</div>
+                    <h3>Cross Examination Points</h3>
+                    <p>View all items marked as potential cross examination points for trial preparation.</p>
+                    <button class="btn report-card-btn" id="crossPointReportBtn">Generate Cross Points</button>
+                </div>
+                
                 <div class="report-card" id="exportReportCard">
                     <div class="report-card-icon">📥</div>
                     <h3>Export Summary</h3>
@@ -3034,6 +3127,21 @@
                 <button class="report-close" id="castReportClose">×</button>
             </div>
             <div class="report-body" id="castReportBody">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Cross Points Report Modal -->
+    <div class="report-modal" id="crossPointReportModal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title">
+                    <span>⚔️</span> Cross Examination Points
+                </div>
+                <button class="report-close" id="crossPointReportClose">×</button>
+            </div>
+            <div class="report-body" id="crossPointReportBody">
                 <!-- Populated dynamically -->
             </div>
         </div>
@@ -3819,6 +3927,29 @@
                 chronDiv.appendChild(chronCheckbox);
                 chronDiv.appendChild(chronLabel);
                 metaRow.appendChild(chronDiv);
+                
+                // Cross Point checkbox
+                const crossPointDiv = document.createElement('div');
+                crossPointDiv.className = 'crosspoint-checkbox' + (qa.crossPoint ? ' is-crosspoint' : '');
+                crossPointDiv.title = 'Cross examination point';
+                
+                const crossPointCheckbox = document.createElement('input');
+                crossPointCheckbox.type = 'checkbox';
+                crossPointCheckbox.checked = qa.crossPoint || false;
+                crossPointCheckbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    qaItems[index].crossPoint = e.target.checked;
+                    e.target.parentElement.classList.toggle('is-crosspoint', e.target.checked);
+                });
+                crossPointCheckbox.addEventListener('click', (e) => e.stopPropagation());
+                
+                const crossPointLabel = document.createElement('span');
+                crossPointLabel.className = 'crosspoint-label';
+                crossPointLabel.textContent = '⚔️';
+                
+                crossPointDiv.appendChild(crossPointCheckbox);
+                crossPointDiv.appendChild(crossPointLabel);
+                metaRow.appendChild(crossPointDiv);
                 
                 // People dropdown
                 const peopleDiv = document.createElement('div');
@@ -4886,14 +5017,85 @@
             });
         }
 
+        // ===== Cross Point Report =====
+        const crossPointReportBtn = document.getElementById('crossPointReportBtn');
+        const crossPointReportModal = document.getElementById('crossPointReportModal');
+        const crossPointReportClose = document.getElementById('crossPointReportClose');
+        const crossPointReportBody = document.getElementById('crossPointReportBody');
+
+        crossPointReportBtn.addEventListener('click', () => {
+            generateCrossPointReport();
+            crossPointReportModal.classList.add('show');
+        });
+
+        crossPointReportClose.addEventListener('click', () => {
+            crossPointReportModal.classList.remove('show');
+        });
+
+        crossPointReportModal.addEventListener('click', (e) => {
+            if (e.target === crossPointReportModal) {
+                crossPointReportModal.classList.remove('show');
+            }
+        });
+
+        function generateCrossPointReport() {
+            crossPointReportBody.innerHTML = '';
+            
+            // Filter items marked as cross points
+            const crossPointItems = qaItems
+                .map((qa, idx) => ({ ...qa, originalIndex: idx }))
+                .filter(qa => qa.crossPoint);
+
+            if (crossPointItems.length === 0) {
+                crossPointReportBody.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px;">No cross examination points marked. Check the "⚔️" checkbox on items you want to use for cross examination.</p>';
+                return;
+            }
+
+            crossPointItems.forEach((item, index) => {
+                const entry = document.createElement('div');
+                entry.className = 'crosspoint-entry';
+                
+                const numberDiv = document.createElement('div');
+                numberDiv.className = 'crosspoint-number';
+                numberDiv.textContent = index + 1;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'crosspoint-content';
+                
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'crosspoint-summary';
+                summaryDiv.textContent = item.summary || '';
+                
+                const qaDiv = document.createElement('div');
+                qaDiv.className = 'crosspoint-qa';
+                qaDiv.innerHTML = `
+                    <div class="crosspoint-question">Q: ${escapeHtml(truncate(item.question, 200))}</div>
+                    <div class="crosspoint-answer">A: ${escapeHtml(truncate(item.answer, 200))}</div>
+                `;
+                
+                const locationDiv = document.createElement('div');
+                locationDiv.className = 'crosspoint-location';
+                const fullLocation = item.location || item.questionLocation;
+                locationDiv.textContent = `📍 ${fullLocation}`;
+                
+                contentDiv.appendChild(summaryDiv);
+                contentDiv.appendChild(qaDiv);
+                contentDiv.appendChild(locationDiv);
+                
+                entry.appendChild(numberDiv);
+                entry.appendChild(contentDiv);
+                crossPointReportBody.appendChild(entry);
+            });
+        }
+
         // ===== Export =====
         document.getElementById('exportBtn').addEventListener('click', () => {
             // Generate CSV export with all fields
-            let csv = 'Number,Location,Topic,HasDates,People,Summary,Question,Answer\n';
+            let csv = 'Number,Location,Topic,HasDates,CrossPoint,People,Summary,Question,Answer\n';
             qaItems.forEach((qa, idx) => {
                 const people = (qa.peopleMentioned || []).map(p => typeof p === 'string' ? p : p.name).join('; ');
                 const fullLocation = qa.location || qa.questionLocation;
-                csv += `${idx + 1},"${fullLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
+                csv += `${idx + 1},"${fullLocation}","${(qa.topic || 'Uncategorized').replace(/"/g, '""')}","${qa.hasDates ? 'Yes' : 'No'}","${qa.crossPoint ? 'Yes' : 'No'}","${people.replace(/"/g, '""')}","${(qa.summary || '').replace(/"/g, '""')}","${qa.question.replace(/"/g, '""')}","${qa.answer.replace(/"/g, '""')}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -4910,6 +5112,7 @@
             if (e.key === 'Escape') {
                 chronReportModal.classList.remove('show');
                 castReportModal.classList.remove('show');
+                crossPointReportModal.classList.remove('show');
             }
         });
     </script>

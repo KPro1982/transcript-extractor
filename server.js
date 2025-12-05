@@ -159,41 +159,33 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
 
 /**
  * Batch summarize multiple Q&A pairs using AI
- * Limited to AI_SUMMARY_LIMIT items to save costs - remainder use rule-based summaries
+ * All Q/As get AI summaries when API key is available
  */
-const AI_SUMMARY_LIMIT = 20; // Limit AI summarization to 15-25 Q/As to save money
-
 async function batchSummarizeQA(qaItems, batchSize = 5) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => ({
             ...qa,
             summary: generateSummary(qa.question, qa.answer),
-            topic: 'Uncategorized'
+            topic: 'Uncategorized',
+            crossPoint: false
         }));
     }
 
-    // Split items: AI summarize first AI_SUMMARY_LIMIT, rule-based for the rest
-    const aiItems = qaItems.slice(0, AI_SUMMARY_LIMIT);
-    const ruleBasedItems = qaItems.slice(AI_SUMMARY_LIMIT);
-
-    console.log(`Generating AI summaries for ${aiItems.length} Q&A pairs (limit: ${AI_SUMMARY_LIMIT})...`);
-    if (ruleBasedItems.length > 0) {
-        console.log(`Using rule-based summaries for remaining ${ruleBasedItems.length} pairs to save costs`);
-    }
+    console.log(`Generating AI summaries for all ${qaItems.length} Q&A pairs...`);
 
     const results = [];
     
-    // Process AI items in batches
-    for (let i = 0; i < aiItems.length; i += batchSize) {
-        const batch = aiItems.slice(i, i + batchSize);
+    // Process all items in batches
+    for (let i = 0; i < qaItems.length; i += batchSize) {
+        const batch = qaItems.slice(i, i + batchSize);
         const promises = batch.map(async (qa) => {
             try {
                 const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
-                return { ...qa, summary, aiSummarized: true };
+                return { ...qa, summary, aiSummarized: true, crossPoint: false };
             } catch (error) {
                 console.error(`Failed to summarize Q&A ${i}: ${error.message}`);
-                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false };
+                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false, crossPoint: false };
             }
         });
         
@@ -201,21 +193,12 @@ async function batchSummarizeQA(qaItems, batchSize = 5) {
         results.push(...batchResults);
         
         // Progress update
-        console.log(`  Summarized ${Math.min(i + batchSize, aiItems.length)}/${aiItems.length} pairs`);
+        console.log(`  Summarized ${Math.min(i + batchSize, qaItems.length)}/${qaItems.length} pairs`);
         
         // Small delay between batches to avoid rate limiting
-        if (i + batchSize < aiItems.length) {
+        if (i + batchSize < qaItems.length) {
             await new Promise(r => setTimeout(r, 200));
         }
-    }
-    
-    // Add rule-based items
-    for (const qa of ruleBasedItems) {
-        results.push({
-            ...qa,
-            summary: generateSummary(qa.question, qa.answer),
-            aiSummarized: false
-        });
     }
     
     return results;
@@ -232,7 +215,8 @@ async function classifyTopicsAndExtractMetadata(qaItems) {
             ...qa, 
             topic: 'Uncategorized',
             peopleMentioned: [],
-            hasDates: false
+            hasDates: false,
+            crossPoint: qa.crossPoint || false
         }));
     }
 
@@ -271,16 +255,12 @@ For hasDates - ONLY set to true if an EXPLICIT, SPECIFIC date is mentioned:
 Respond in JSON format:
 {"topic": "...", "peopleMentioned": [{"name": "...", "role": "..."}], "hasDates": true/false}`;
 
-    console.log(`Analyzing ${Math.min(qaItems.length, AI_SUMMARY_LIMIT)} Q&A pairs for topics, people, and dates...`);
-    
-    // Only analyze the first AI_SUMMARY_LIMIT items to save costs
-    const itemsToAnalyze = qaItems.slice(0, AI_SUMMARY_LIMIT);
-    const remainingItems = qaItems.slice(AI_SUMMARY_LIMIT);
+    console.log(`Analyzing all ${qaItems.length} Q&A pairs for topics, people, and dates...`);
     
     const results = [];
     
-    for (let i = 0; i < itemsToAnalyze.length; i++) {
-        const qa = itemsToAnalyze[i];
+    for (let i = 0; i < qaItems.length; i++) {
+        const qa = qaItems[i];
         try {
             const userPrompt = `Q: ${qa.question}\nA: ${qa.answer}`;
             const response = await callOpenAI([
@@ -293,7 +273,8 @@ Respond in JSON format:
                 ...qa, 
                 topic: parsed.topic || 'Uncategorized',
                 peopleMentioned: parsed.peopleMentioned || [],
-                hasDates: parsed.hasDates || false
+                hasDates: parsed.hasDates || false,
+                crossPoint: qa.crossPoint || false
             });
         } catch (error) {
             console.error(`Failed to analyze Q&A ${i}: ${error.message}`);
@@ -301,29 +282,20 @@ Respond in JSON format:
                 ...qa, 
                 topic: 'Uncategorized',
                 peopleMentioned: [],
-                hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
+                hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                crossPoint: qa.crossPoint || false
             });
         }
         
         // Progress update every 10 items
         if ((i + 1) % 10 === 0) {
-            console.log(`  Analyzed ${i + 1}/${itemsToAnalyze.length} items`);
+            console.log(`  Analyzed ${i + 1}/${qaItems.length} items`);
         }
         
         // Small delay to avoid rate limiting
-        if (i < itemsToAnalyze.length - 1) {
+        if (i < qaItems.length - 1) {
             await new Promise(r => setTimeout(r, 100));
         }
-    }
-    
-    // Add remaining items with basic metadata
-    for (const qa of remainingItems) {
-        results.push({ 
-            ...qa, 
-            topic: 'Uncategorized',
-            peopleMentioned: [],
-            hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
-        });
     }
     
     return results;
@@ -368,13 +340,12 @@ Be conservative - only change topics if the new topic is clearly more appropriat
 
 Respond in JSON format: {"shouldChange": true/false, "newTopic": "..." or null}`;
 
-    console.log(`Reevaluating ${Math.min(qaItems.length, AI_SUMMARY_LIMIT)} Q&A items with new topic "${newTopic}"...`);
+    console.log(`Reevaluating all ${qaItems.length} Q&A items with new topic "${newTopic}"...`);
     
-    const itemsToEvaluate = qaItems.slice(0, AI_SUMMARY_LIMIT);
     const updates = [];
     
-    for (let i = 0; i < itemsToEvaluate.length; i++) {
-        const qa = itemsToEvaluate[i];
+    for (let i = 0; i < qaItems.length; i++) {
+        const qa = qaItems[i];
         try {
             const userPrompt = `Current topic: ${qa.currentTopic}\n\nQ: ${qa.question}\nA: ${qa.answer}`;
             const response = await callOpenAI([
@@ -391,14 +362,9 @@ Respond in JSON format: {"shouldChange": true/false, "newTopic": "..." or null}`
         }
         
         // Small delay to avoid rate limiting
-        if (i < itemsToEvaluate.length - 1) {
+        if (i < qaItems.length - 1) {
             await new Promise(r => setTimeout(r, 50));
         }
-    }
-    
-    // Add null updates for remaining items
-    for (let i = itemsToEvaluate.length; i < qaItems.length; i++) {
-        updates.push({ newTopic: null });
     }
     
     return { updates };
@@ -1874,7 +1840,7 @@ const server = http.createServer(async (req, res) => {
                 
                 // Use AI summarization if enabled and API key is available
                 if (useAI && OPENAI_API_KEY && qaItems.length > 0) {
-                    console.log(`Using AI for summarization (limited to first ${AI_SUMMARY_LIMIT} items)...`);
+                    console.log(`Using AI for summarization on all ${qaItems.length} items...`);
                     qaItems = await batchSummarizeQA(qaItems);
                     
                     // Classify topics, extract people, detect dates
@@ -1886,7 +1852,8 @@ const server = http.createServer(async (req, res) => {
                         ...qa, 
                         topic: 'Uncategorized',
                         peopleMentioned: [],
-                        hasDates: detectDatesInText(qa.question + ' ' + qa.answer)
+                        hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                        crossPoint: false
                     }));
                 }
                 
@@ -1895,8 +1862,7 @@ const server = http.createServer(async (req, res) => {
                     success: true,
                     qaItems: qaItems,
                     totalQA: qaItems.length,
-                    aiSummaries: !!(useAI && OPENAI_API_KEY),
-                    aiSummaryLimit: AI_SUMMARY_LIMIT
+                    aiSummaries: !!(useAI && OPENAI_API_KEY)
                 }));
             } catch (error) {
                 console.error('Parse error:', error);
