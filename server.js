@@ -2029,7 +2029,8 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
         return;
     }
 
-    // Legacy parse Q/A endpoint (non-streaming) - kept for compatibility
+    // Legacy parse Q/A endpoint - now with CHUNKED processing to avoid timeouts
+    // Processes 50 pages at a time: parse → summarize → topics, then next chunk
     if (req.method === 'POST' && url.pathname === '/api/parse-qa') {
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
@@ -2038,49 +2039,72 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                 const body = JSON.parse(Buffer.concat(chunks).toString());
                 const { pages, firstPrintedPage, useAI = true } = body;
                 
-                console.log(`\nParsing Q/A with first printed page = ${firstPrintedPage}`);
-                let qaItems = await parseExamination(pages, firstPrintedPage);
+                const CHUNK_SIZE = 50; // Process 50 pages at a time
+                const totalPages = pages.length;
+                const numChunks = Math.ceil(totalPages / CHUNK_SIZE);
                 
-                // Add notes property to all items
-                qaItems = qaItems.map(qa => ({ ...qa, notes: '' }));
+                console.log(`\n${'='.repeat(60)}`);
+                console.log(`CHUNKED Q/A Processing: ${totalPages} pages in ${numChunks} chunks of ${CHUNK_SIZE}`);
+                console.log(`${'='.repeat(60)}`);
                 
-                // Use AI summarization if enabled and API key is available
-                if (useAI && OPENAI_API_KEY && qaItems.length > 0) {
-                    console.log(`Using AI for summarization on all ${qaItems.length} items...`);
-                    qaItems = await batchSummarizeQA(qaItems);
+                let allQAItems = [];
+                
+                for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
+                    const startPage = chunkIdx * CHUNK_SIZE;
+                    const endPage = Math.min(startPage + CHUNK_SIZE, totalPages);
+                    const chunkPages = pages.slice(startPage, endPage);
                     
-                    // Skip topic analysis for large documents to avoid timeout
-                    // Topic analysis takes ~1 second per item which is too slow for 100+ items
-                    if (qaItems.length <= 50) {
-                        console.log('Analyzing topics, people, and dates...');
-                        qaItems = await classifyTopicsAndExtractMetadata(qaItems);
+                    // Calculate adjusted first printed page for this chunk
+                    const chunkFirstPrintedPage = firstPrintedPage + startPage;
+                    
+                    console.log(`\n--- Chunk ${chunkIdx + 1}/${numChunks}: Pages ${startPage + 1}-${endPage} ---`);
+                    
+                    // Step 1: Parse Q&A from this chunk
+                    console.log(`  [1/3] Parsing Q&A from ${chunkPages.length} pages...`);
+                    let chunkQA = await parseExamination(chunkPages, chunkFirstPrintedPage);
+                    console.log(`  Found ${chunkQA.length} Q&A pairs`);
+                    
+                    if (chunkQA.length === 0) {
+                        console.log(`  No Q&A found in this chunk, skipping...`);
+                        continue;
+                    }
+                    
+                    // Add notes property
+                    chunkQA = chunkQA.map(qa => ({ ...qa, notes: '' }));
+                    
+                    // Step 2: AI Summarization for this chunk
+                    if (useAI && OPENAI_API_KEY) {
+                        console.log(`  [2/3] AI summarizing ${chunkQA.length} items...`);
+                        chunkQA = await batchSummarizeQA(chunkQA);
+                        
+                        // Step 3: Topic classification for this chunk
+                        console.log(`  [3/3] Classifying topics for ${chunkQA.length} items...`);
+                        chunkQA = await classifyTopicsAndExtractMetadata(chunkQA);
                     } else {
-                        console.log(`Skipping topic analysis for ${qaItems.length} items (too many - would timeout)`);
-                        qaItems = qaItems.map(qa => ({ 
+                        console.log(`  [2/3] Using rule-based summaries (no API key)`);
+                        chunkQA = chunkQA.map(qa => ({ 
                             ...qa, 
                             topic: 'Uncategorized',
                             peopleMentioned: [],
                             hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
-                            crossPoint: qa.crossPoint || false,
-                            notes: qa.notes || ''
+                            crossPoint: false
                         }));
                     }
-                } else if (!OPENAI_API_KEY) {
-                    console.log('No OpenAI API key - using rule-based summaries');
-                    qaItems = qaItems.map(qa => ({ 
-                        ...qa, 
-                        topic: 'Uncategorized',
-                        peopleMentioned: [],
-                        hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
-                        crossPoint: false
-                    }));
+                    
+                    // Accumulate results
+                    allQAItems = allQAItems.concat(chunkQA);
+                    console.log(`  Chunk complete. Total Q&A so far: ${allQAItems.length}`);
                 }
+                
+                console.log(`\n${'='.repeat(60)}`);
+                console.log(`✓ All chunks processed: ${allQAItems.length} total Q&A pairs`);
+                console.log(`${'='.repeat(60)}\n`);
                 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: true,
-                    qaItems: qaItems,
-                    totalQA: qaItems.length,
+                    qaItems: allQAItems,
+                    totalQA: allQAItems.length,
                     aiSummaries: !!(useAI && OPENAI_API_KEY)
                 }));
             } catch (error) {
