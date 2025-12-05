@@ -1,6 +1,6 @@
 FROM node:20-bullseye
 
-# Install system dependencies for sharp, canvas, ghostscript
+# Install system dependencies for sharp, canvas, ghostscript, poppler
 RUN apt-get update && apt-get install -y \
     ghostscript \
     graphicsmagick \
@@ -14,7 +14,11 @@ RUN apt-get update && apt-get install -y \
     libpixman-1-dev \
     libvips-dev \
     python3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "Verifying tools..." \
+    && gs --version \
+    && pdftoppm -v \
+    && echo "All PDF tools verified!"
 
 # Create app directory
 WORKDIR /app
@@ -31,8 +35,9 @@ COPY . .
 # Build TypeScript if needed
 RUN npm run build || true
 
-# Create necessary directories
-RUN mkdir -p temp/uploads temp/images output
+# Create necessary directories with proper permissions
+RUN mkdir -p temp/uploads temp/images output \
+    && chmod -R 777 temp output
 
 # Expose port (Railway sets PORT env var)
 EXPOSE 3000
