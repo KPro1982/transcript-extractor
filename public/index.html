@@ -3426,6 +3426,15 @@
                     </div>
                 </div>
                 
+                <div class="report-card" id="pageLineSummaryReportCard">
+                    <div class="report-card-icon">⊞</div>
+                    <h3>Page/Line Summary</h3>
+                    <p>Complete table of all Q&A items with page/line references, summaries, and topics.</p>
+                    <div class="report-card-actions">
+                        <button class="btn report-card-btn" id="pageLineSummaryExportBtn">Export to Word</button>
+                    </div>
+                </div>
+                
                 <div class="report-card" id="exportReportCard">
                     <div class="report-card-icon">↓</div>
                     <h3>Export All Reports</h3>
@@ -6066,6 +6075,121 @@
             downloadBlob(blob, 'cross-examination-points.docx');
         }
 
+        // Export Page/Line Summary Report to Word
+        async function exportPageLineSummaryToWord() {
+            if (qaItems.length === 0) {
+                alert('No Q&A items to export.');
+                return;
+            }
+
+            // Create table rows for each Q&A item
+            const tableRows = [
+                // Header row
+                new TableRow({
+                    tableHeader: true,
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({ 
+                                text: "Page/Line",
+                                bold: true
+                            })],
+                            shading: { fill: "D4A574" },
+                            width: { size: 20, type: WidthType.PERCENTAGE }
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ 
+                                text: "Summary",
+                                bold: true
+                            })],
+                            shading: { fill: "D4A574" },
+                            width: { size: 60, type: WidthType.PERCENTAGE }
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ 
+                                text: "Topic",
+                                bold: true
+                            })],
+                            shading: { fill: "D4A574" },
+                            width: { size: 20, type: WidthType.PERCENTAGE }
+                        })
+                    ]
+                }),
+                // Data rows
+                ...qaItems.map((qa, idx) => {
+                    const fullLocation = qa.location || qa.questionLocation;
+                    return new TableRow({
+                        children: [
+                            new TableCell({
+                                children: [
+                                    new Paragraph({
+                                        children: [
+                                            createPdfPageLink(fullLocation, fullLocation)
+                                        ]
+                                    })
+                                ],
+                                width: { size: 20, type: WidthType.PERCENTAGE }
+                            }),
+                            new TableCell({
+                                children: [
+                                    new Paragraph({
+                                        text: qa.summary || '—',
+                                        spacing: { before: 100, after: 100 }
+                                    })
+                                ],
+                                width: { size: 60, type: WidthType.PERCENTAGE }
+                            }),
+                            new TableCell({
+                                children: [
+                                    new Paragraph({
+                                        text: qa.topic || 'Uncategorized'
+                                    })
+                                ],
+                                width: { size: 20, type: WidthType.PERCENTAGE }
+                            })
+                        ]
+                    });
+                })
+            ];
+
+            const doc = new Document({
+                sections: [{
+                    children: [
+                        new Paragraph({
+                            text: "Page/Line Summary Report",
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { after: 300 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `Source: ${getSourcePdfName()}`,
+                                    italics: true,
+                                    color: "666666"
+                                })
+                            ],
+                            spacing: { after: 100 }
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `Total Items: ${qaItems.length}`,
+                                    color: "666666"
+                                })
+                            ],
+                            spacing: { after: 400 }
+                        }),
+                        new Table({
+                            rows: tableRows,
+                            width: { size: 100, type: WidthType.PERCENTAGE }
+                        })
+                    ]
+                }]
+            });
+
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, 'page-line-summary.docx');
+        }
+
         // Export Full Summary Report to Word
         async function exportFullSummaryToWord() {
             if (qaItems.length === 0) {
@@ -6226,7 +6350,11 @@
                 const hasCrossPoints = qaItems.some(qa => qa.crossPoint);
                 if (hasCrossPoints) {
                     await exportCrossPointsToWord();
+                    await new Promise(r => setTimeout(r, 500));
                 }
+                
+                // Always export Page/Line Summary
+                await exportPageLineSummaryToWord();
                 
                 alert('All available reports have been exported!');
             } catch (error) {
@@ -6253,6 +6381,7 @@
         document.getElementById('chronExportBtn').addEventListener('click', exportChronToWord);
         document.getElementById('castExportBtn').addEventListener('click', exportCastToWord);
         document.getElementById('crossPointExportBtn').addEventListener('click', exportCrossPointsToWord);
+        document.getElementById('pageLineSummaryExportBtn').addEventListener('click', exportPageLineSummaryToWord);
         document.getElementById('exportAllBtn').addEventListener('click', exportAllReports);
     </script>
     </div><!-- End main-app -->
