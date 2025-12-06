@@ -2347,6 +2347,15 @@
             margin-top: 4px;
         }
 
+        .chron-location .pdf-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .chron-location .pdf-link:hover {
+            text-decoration: underline;
+        }
+
         /* Cast of characters report */
         .cast-entry {
             padding: 14px 0;
@@ -2386,7 +2395,13 @@
         .cast-mention-loc {
             font-family: 'IBM Plex Mono', monospace;
             font-size: 0.7rem;
-            color: var(--question);
+            color: var(--accent);
+            text-decoration: none;
+            margin-right: 8px;
+        }
+
+        .cast-mention-loc:hover {
+            text-decoration: underline;
         }
 
         /* Cross Points report */
@@ -2444,6 +2459,61 @@
             font-family: 'IBM Plex Mono', monospace;
             font-size: 0.7rem;
             color: var(--text-muted);
+        }
+
+        .crosspoint-location .pdf-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .crosspoint-location .pdf-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Page/Line Summary Report Table */
+        .page-line-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .page-line-summary-table th {
+            background: var(--accent);
+            color: var(--bg-base);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .page-line-summary-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+
+        .page-line-summary-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .page-line-summary-table .pdf-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
+        }
+
+        .page-line-summary-table .pdf-link:hover {
+            text-decoration: underline;
+        }
+
+        .report-empty {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-style: italic;
         }
 
         /* Needs AI button for merged entries */
@@ -3431,7 +3501,8 @@
                     <h3>Page/Line Summary</h3>
                     <p>Complete table of all Q&A items with page/line references, summaries, and topics.</p>
                     <div class="report-card-actions">
-                        <button class="btn report-card-btn" id="pageLineSummaryExportBtn">Export to Word</button>
+                        <button class="btn report-card-btn" id="pageLineSummaryReportBtn">View Report</button>
+                        <button class="btn btn-secondary report-card-btn" id="pageLineSummaryExportBtn">Export to Word</button>
                     </div>
                 </div>
                 
@@ -3492,6 +3563,21 @@
                 <button class="report-close" id="crossPointReportClose">×</button>
             </div>
             <div class="report-body" id="crossPointReportBody">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Page/Line Summary Report Modal -->
+    <div class="report-modal" id="pageLineSummaryReportModal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title">
+                    Page/Line Summary
+                </div>
+                <button class="report-close" id="pageLineSummaryReportClose">×</button>
+            </div>
+            <div class="report-body" id="pageLineSummaryReportBody">
                 <!-- Populated dynamically -->
             </div>
         </div>
@@ -5524,12 +5610,24 @@
                 const chronFullLocation = item.location || item.questionLocation;
                 summaryDiv.innerHTML = `
                     ${escapeHtml(item.summary || '')}
-                    <div class="chron-location">📍 ${chronFullLocation}</div>
+                    <div class="chron-location">📍 <a href="#" class="pdf-link" data-page="${extractPageNumber(chronFullLocation)}">${escapeHtml(chronFullLocation)}</a></div>
                 `;
                 
                 entry.appendChild(dateDiv);
                 entry.appendChild(summaryDiv);
                 chronReportBody.appendChild(entry);
+            });
+            
+            // Add click handlers for PDF links
+            chronReportBody.querySelectorAll('.pdf-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageNum = parseInt(e.target.dataset.page);
+                    if (pageNum && !isNaN(pageNum)) {
+                        showPdfPage(pageNum);
+                        chronReportModal.classList.remove('show');
+                    }
+                });
             });
         }
 
@@ -5638,7 +5736,7 @@
                     const item = document.createElement('div');
                     item.className = 'cast-mention-item';
                     item.innerHTML = `
-                        <span class="cast-mention-loc">${mention.location}</span>
+                        <a href="#" class="pdf-link cast-mention-loc" data-page="${extractPageNumber(mention.location)}">${escapeHtml(mention.location)}</a>
                         ${escapeHtml(truncate(mention.summary || 'No summary', 100))}
                     `;
                     mentionsDiv.appendChild(item);
@@ -5648,6 +5746,18 @@
                 entry.appendChild(roleDiv);
                 entry.appendChild(mentionsDiv);
                 castReportBody.appendChild(entry);
+            });
+            
+            // Add click handlers for PDF links
+            castReportBody.querySelectorAll('.pdf-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageNum = parseInt(e.target.dataset.page);
+                    if (pageNum && !isNaN(pageNum)) {
+                        showPdfPage(pageNum);
+                        castReportModal.classList.remove('show');
+                    }
+                });
             });
         }
 
@@ -5710,7 +5820,7 @@
                 const locationDiv = document.createElement('div');
                 locationDiv.className = 'crosspoint-location';
                 const fullLocation = item.location || item.questionLocation;
-                locationDiv.textContent = `📍 ${fullLocation}`;
+                locationDiv.innerHTML = `📍 <a href="#" class="pdf-link" data-page="${extractPageNumber(fullLocation)}">${escapeHtml(fullLocation)}</a>`;
                 
                 contentDiv.appendChild(summaryDiv);
                 contentDiv.appendChild(qaDiv);
@@ -5720,6 +5830,114 @@
                 entry.appendChild(contentDiv);
                 crossPointReportBody.appendChild(entry);
             });
+            
+            // Add click handlers for PDF links
+            crossPointReportBody.querySelectorAll('.pdf-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageNum = parseInt(e.target.dataset.page);
+                    if (pageNum && !isNaN(pageNum)) {
+                        showPdfPage(pageNum);
+                        crossPointReportModal.classList.remove('show');
+                    }
+                });
+            });
+        }
+
+        // ===== Page/Line Summary Report =====
+        const pageLineSummaryReportBtn = document.getElementById('pageLineSummaryReportBtn');
+        const pageLineSummaryReportModal = document.getElementById('pageLineSummaryReportModal');
+        const pageLineSummaryReportClose = document.getElementById('pageLineSummaryReportClose');
+        const pageLineSummaryReportBody = document.getElementById('pageLineSummaryReportBody');
+
+        pageLineSummaryReportBtn.addEventListener('click', () => {
+            generatePageLineSummaryReport();
+            pageLineSummaryReportModal.classList.add('show');
+        });
+
+        pageLineSummaryReportClose.addEventListener('click', () => {
+            pageLineSummaryReportModal.classList.remove('show');
+        });
+
+        pageLineSummaryReportModal.addEventListener('click', (e) => {
+            if (e.target === pageLineSummaryReportModal) {
+                pageLineSummaryReportModal.classList.remove('show');
+            }
+        });
+
+        function generatePageLineSummaryReport() {
+            pageLineSummaryReportBody.innerHTML = '';
+            
+            if (qaItems.length === 0) {
+                pageLineSummaryReportBody.innerHTML = '<div class="report-empty">No Q&A items available.</div>';
+                return;
+            }
+            
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'page-line-summary-table';
+            
+            // Create header
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th style="width: 15%">Page/Line</th>
+                    <th style="width: 60%">Summary</th>
+                    <th style="width: 25%">Topic</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+            
+            // Create body
+            const tbody = document.createElement('tbody');
+            qaItems.forEach((qa, idx) => {
+                const row = document.createElement('tr');
+                const fullLocation = qa.location || qa.questionLocation;
+                
+                row.innerHTML = `
+                    <td><a href="#" class="pdf-link" data-page="${extractPageNumber(fullLocation)}">${escapeHtml(fullLocation)}</a></td>
+                    <td>${escapeHtml(qa.summary || '—')}</td>
+                    <td>${escapeHtml(qa.topic || 'Uncategorized')}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            
+            pageLineSummaryReportBody.appendChild(table);
+            
+            // Add click handlers for PDF links
+            table.querySelectorAll('.pdf-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageNum = parseInt(e.target.dataset.page);
+                    if (pageNum && !isNaN(pageNum)) {
+                        showPdfPage(pageNum);
+                    }
+                });
+            });
+        }
+
+        // Helper function to extract page number from location string
+        function extractPageNumber(location) {
+            const match = location.match(/^(\d+)/);
+            return match ? parseInt(match[1]) : 1;
+        }
+
+        // Helper function to show PDF page in side panel
+        function showPdfPage(pageNum) {
+            // Convert printed page to digital page index
+            const digitalPageIndex = pageNum - 1 + firstPrintedPage - 1;
+            if (digitalPageIndex >= 0 && digitalPageIndex < pages.length) {
+                renderSidePage(digitalPageIndex);
+                // Ensure PDF panel is expanded
+                const pdfPanel = document.getElementById('pdfSidePanel');
+                const summaryBody = document.querySelector('.summary-body');
+                if (pdfPanel && pdfPanel.classList.contains('collapsed')) {
+                    pdfPanel.classList.remove('collapsed');
+                    summaryBody.classList.remove('pdf-collapsed');
+                }
+            }
         }
 
         // ===== Export =====
