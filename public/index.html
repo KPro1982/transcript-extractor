@@ -1409,127 +1409,6 @@
             display: flex !important;
         }
 
-        .summary-header {
-            padding: 16px 24px;
-            background: var(--bg-raised);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .summary-header.collapsed {
-            padding: 0;
-            height: 0;
-            overflow: hidden;
-            border-bottom: none;
-        }
-
-        .header-collapse-btn {
-            position: absolute;
-            bottom: -14px;
-            right: 24px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-            width: 40px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            transition: all var(--transition);
-            z-index: 10;
-        }
-
-        .header-collapse-btn:hover {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--bg-base);
-        }
-
-        .header-collapse-btn svg {
-            display: block;
-            transition: transform 0.3s;
-        }
-
-        .summary-header.collapsed + .summary-body .header-expand-btn {
-            display: flex;
-        }
-
-        .header-expand-btn {
-            position: fixed;
-            top: 53px;
-            right: 24px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-            width: 40px;
-            height: 20px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            transition: all var(--transition);
-            z-index: 10;
-        }
-
-        .header-expand-btn:hover {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--bg-base);
-        }
-
-        .header-expand-btn.show {
-            display: flex;
-        }
-
-        .summary-screen.header-collapsed .summary-body {
-            height: calc(100vh - 53px);
-        }
-
-        .summary-header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .summary-title {
-            font-family: 'Source Serif 4', Georgia, serif;
-            font-size: 1.1rem;
-            font-weight: 500;
-        }
-
-        .summary-stats {
-            display: flex;
-            gap: 16px;
-        }
-
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .stat-value {
-            color: var(--accent);
-            font-weight: 500;
-            font-family: 'IBM Plex Mono', monospace;
-        }
-
-        .summary-actions {
-            display: flex;
-            gap: 10px;
-        }
-
         .summary-body {
             flex: 1;
             display: flex;
@@ -2014,6 +1893,69 @@
             overflow: auto;
             padding: 0;
             position: relative;
+        }
+
+        /* Large Continue to Reports button at bottom of table */
+        .table-footer-action {
+            padding: 40px 24px 60px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(to bottom, transparent 0%, var(--bg-elevated) 30%);
+        }
+
+        .btn-continue-reports {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: linear-gradient(135deg, var(--accent) 0%, #c48f5a 100%);
+            color: var(--bg-base);
+            border: none;
+            padding: 18px 48px;
+            border-radius: var(--radius-lg);
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Source Serif 4', Georgia, serif;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 20px rgba(212, 165, 116, 0.3), 
+                        0 2px 8px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-continue-reports::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-continue-reports:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 30px rgba(212, 165, 116, 0.4), 
+                        0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .btn-continue-reports:hover::before {
+            left: 100%;
+        }
+
+        .btn-continue-reports:active {
+            transform: translateY(-1px) scale(1.01);
+        }
+
+        .btn-continue-reports svg {
+            transition: transform 0.3s ease;
+        }
+
+        .btn-continue-reports:hover svg {
+            transform: translateX(4px);
         }
 
         .resize-handle {
@@ -3334,37 +3276,6 @@
 
     <!-- STEP 4: Summary Document -->
     <div class="screen summary-screen" id="summaryScreen">
-        <div class="summary-header">
-            <div class="summary-header-left">
-                <h2 class="summary-title">Deposition Summary</h2>
-                <div class="summary-stats">
-                    <div class="stat-item">
-                        <span class="stat-value" id="totalQACount">0</span>
-                        <span>Q&A Pairs</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="totalPages">0</span>
-                        <span>Pages</span>
-                    </div>
-                </div>
-            </div>
-            <div class="summary-actions">
-                <button class="btn" id="goToReportsBtn">
-                    Continue to Reports →
-                </button>
-            </div>
-            <button class="header-collapse-btn" id="headerCollapseBtn" title="Collapse header">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-            </button>
-        </div>
-        <button class="header-expand-btn" id="headerExpandBtn" title="Expand header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-        </button>
-        
         <div class="summary-body pdf-collapsed">
             <div class="pdf-side-panel collapsed" id="pdfSidePanel">
                 <div class="pdf-side-header">
@@ -3420,6 +3331,17 @@
                         </thead>
                         <tbody id="summaryTableBody"></tbody>
                     </table>
+                    
+                    <!-- Large Continue Button after Q/A table -->
+                    <div class="table-footer-action">
+                        <button class="btn btn-continue-reports" id="continueToReportsBtn">
+                            Continue to Reports
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3630,8 +3552,6 @@
         const progressText = document.getElementById('progressText');
 
         // Summary elements
-        const totalQACount = document.getElementById('totalQACount');
-        const totalPagesEl = document.getElementById('totalPages');
         const summaryTableBody = document.getElementById('summaryTableBody');
         const sideImage = document.getElementById('sideImage');
         const sidePrintedPage = document.getElementById('sidePrintedPage');
@@ -4264,8 +4184,6 @@
                                         progressChunks.innerHTML = `<span style="color: var(--success);">All ${totalChunks} chunks processed successfully</span>`;
 
                                         // Show summary screen
-                                        totalQACount.textContent = qaItems.length;
-                                        totalPagesEl.textContent = pages.length;
                                         renderSummaryTable();
                                         renderSidePage(0);
                                         
@@ -4624,8 +4542,6 @@
             
             // Update header visibility
             updateColumnVisibility();
-            
-            totalQACount.textContent = qaItems.length;
             
             setTimeout(() => {
                 document.querySelectorAll('.row-summary-input').forEach(autoExpandTextarea);
@@ -5225,23 +5141,6 @@
         });
 
         // ===== Summary Header Collapse =====
-        const summaryHeader = document.querySelector('.summary-header');
-        const headerCollapseBtn = document.getElementById('headerCollapseBtn');
-        const headerExpandBtn = document.getElementById('headerExpandBtn');
-        const summaryScreenEl = document.getElementById('summaryScreen');
-
-        headerCollapseBtn.addEventListener('click', () => {
-            summaryHeader.classList.add('collapsed');
-            headerExpandBtn.classList.add('show');
-            summaryScreenEl.classList.add('header-collapsed');
-        });
-
-        headerExpandBtn.addEventListener('click', () => {
-            summaryHeader.classList.remove('collapsed');
-            headerExpandBtn.classList.remove('show');
-            summaryScreenEl.classList.remove('header-collapsed');
-        });
-
         // ===== Detail Panel =====
         function openDetail(index) {
             if (index < 0 || index >= qaItems.length) return;
@@ -5386,10 +5285,11 @@
         });
 
         // ===== Reports Navigation =====
-        const goToReportsBtn = document.getElementById('goToReportsBtn');
         const backToReviewBtn = document.getElementById('backToReviewBtn');
         
-        goToReportsBtn.addEventListener('click', () => {
+        // Large "Continue to Reports" button at bottom of table
+        const continueToReportsBtn = document.getElementById('continueToReportsBtn');
+        continueToReportsBtn.addEventListener('click', () => {
             goToStep(5);
         });
         
