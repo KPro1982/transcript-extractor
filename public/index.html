@@ -192,6 +192,15 @@
             margin-top: 20px;
         }
 
+        .access-version {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            opacity: 0.6;
+        }
+
         .access-input.shake {
             animation: shake 0.4s ease-in-out;
             border-color: var(--error);
@@ -952,6 +961,7 @@
             display: flex;
             gap: 16px;
             min-height: 0;
+            align-items: center;
         }
 
         .pdf-preview-panel {
@@ -3139,6 +3149,7 @@
             <button class="access-btn" id="accessSubmitBtn">Enter</button>
             <p class="access-error" id="accessError">Invalid access code. Please try again.</p>
             <p class="access-hint">Contact your administrator for access</p>
+            <p class="access-version">Version 0.30 • Dec 7, 2025</p>
         </div>
     </div>
 
@@ -5751,13 +5762,15 @@
                     return;
                 }
                 
-                // Navigate table rows
+                // Navigate table rows - up/down move to prior/next summary
                 if (e.key === 'ArrowUp') {
                     selectRow(selectedRowIndex - 1);
+                    focusSummaryForEdit(selectedRowIndex);
                     e.preventDefault();
                 }
                 if (e.key === 'ArrowDown') {
                     selectRow(selectedRowIndex + 1);
+                    focusSummaryForEdit(selectedRowIndex);
                     e.preventDefault();
                 }
                 if (e.key === 'ArrowRight' || e.key === 'Enter') {
