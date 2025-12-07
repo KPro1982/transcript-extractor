@@ -4648,11 +4648,14 @@
                                     nextTextarea.select();
                                 }, 100);
                                 
-                                // Update keyboard selection
+                                // PERFORMANCE FIX: Only update affected rows
+                                const prevRow = document.querySelector(`.summary-table tbody tr[data-index="${selectedRowIndex}"]`);
+                                if (prevRow) prevRow.classList.remove('keyboard-selected');
+                                const newRow = document.querySelector(`.summary-table tbody tr[data-index="${nextIndex}"]`);
+                                if (newRow) newRow.classList.add('keyboard-selected');
+                                
+                                previousSelectedRowIndex = selectedRowIndex;
                                 selectedRowIndex = nextIndex;
-                                document.querySelectorAll('.summary-table tbody tr').forEach((tr, i) => {
-                                    tr.classList.toggle('keyboard-selected', i === nextIndex);
-                                });
                             }
                         }
                     }
@@ -4695,9 +4698,61 @@
             // Update header visibility
             updateColumnVisibility();
             
-            setTimeout(() => {
-                document.querySelectorAll('.row-summary-input').forEach(autoExpandTextarea);
-            }, 50);
+            // PERFORMANCE FIX: Use IntersectionObserver to auto-expand only visible textareas
+            // This prevents 1000+ layout recalculations on initial render
+            if (!window.textareaObserver) {
+                window.textareaObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            autoExpandTextarea(entry.target);
+                            window.textareaObserver.unobserve(entry.target);
+                        }
+                    });
+                }, { rootMargin: '100px' });
+            }
+            
+            document.querySelectorAll('.row-summary-input').forEach(textarea => {
+                window.textareaObserver.observe(textarea);
+            });
+        }
+
+        // PERFORMANCE FIX: Update just a single row's topic select instead of full re-render
+        function updateRowTopicSelect(index) {
+            const select = document.querySelector(`.topic-select[data-index="${index}"]`);
+            if (!select) return;
+            
+            const currentTopic = qaItems[index].topic || 'Uncategorized';
+            select.innerHTML = '';
+            
+            const sortedTopics = Array.from(allTopics).sort();
+            sortedTopics.forEach(topic => {
+                const option = document.createElement('option');
+                option.value = topic;
+                option.textContent = topic;
+                if (topic === currentTopic) option.selected = true;
+                select.appendChild(option);
+            });
+            
+            const addNewOption = document.createElement('option');
+            addNewOption.value = '__new__';
+            addNewOption.textContent = '+ Add new...';
+            select.appendChild(addNewOption);
+        }
+        
+        // PERFORMANCE FIX: Add new topic option to all selects without full re-render
+        function addTopicToAllSelects(newTopic) {
+            document.querySelectorAll('.topic-select').forEach(select => {
+                // Check if topic already exists
+                const exists = Array.from(select.options).some(opt => opt.value === newTopic);
+                if (!exists) {
+                    const option = document.createElement('option');
+                    option.value = newTopic;
+                    option.textContent = newTopic;
+                    // Insert before the "Add new..." option
+                    const addNewOpt = select.querySelector('option[value="__new__"]');
+                    select.insertBefore(option, addNewOpt);
+                }
+            });
         }
 
         // Handle topic change
@@ -4709,15 +4764,17 @@
                     allTopics.add(trimmedTopic);
                     qaItems[index].topic = trimmedTopic;
                     
+                    // PERFORMANCE FIX: Add new topic to all selects without re-render
+                    addTopicToAllSelects(trimmedTopic);
+                    updateRowTopicSelect(index);
+                    
                     // Offer to reevaluate other Q/As with AI
                     if (confirm(`Topic "${trimmedTopic}" added. Would you like AI to check if this topic applies to other Q&A items?`)) {
                         await reevaluateTopicsWithAI(trimmedTopic);
                     }
-                    
-                    renderSummaryTable();
                 } else {
-                    // Reset to previous value
-                    renderSummaryTable();
+                    // Reset to previous value - just update this row's select
+                    updateRowTopicSelect(index);
                 }
             } else {
                 qaItems[index].topic = newTopic;
@@ -4745,16 +4802,20 @@
                 
                 if (response.ok && result.updates) {
                     let updateCount = 0;
+                    const updatedIndices = [];
+                    
                     result.updates.forEach((update, idx) => {
                         if (update.newTopic && update.newTopic !== qaItems[idx].topic) {
                             qaItems[idx].topic = update.newTopic;
+                            updatedIndices.push(idx);
                             updateCount++;
                         }
                     });
                     
                     if (updateCount > 0) {
                         alert(`AI updated ${updateCount} items to use topic "${newTopic}"`);
-                        renderSummaryTable();
+                        // PERFORMANCE FIX: Only update affected rows, not full re-render
+                        updatedIndices.forEach(idx => updateRowTopicSelect(idx));
                     } else {
                         alert(`AI didn't find any other items that fit the topic "${newTopic}"`);
                     }
@@ -4931,6 +4992,45 @@
             textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
         }
 
+        // PERFORMANCE FIX: Update single row's summary UI without full re-render
+        function updateRowSummaryUI(index) {
+            const row = document.querySelector(`.summary-table tbody tr[data-index="${index}"]`);
+            if (!row) return;
+            
+            const qa = qaItems[index];
+            const textarea = row.querySelector('.row-summary-input');
+            const summaryTd = row.querySelector('.row-summary');
+            
+            if (textarea) {
+                textarea.value = qa.summary || '';
+                textarea.disabled = qa.isSummarizing || false;
+                textarea.classList.toggle('loading', qa.isSummarizing || false);
+                autoExpandTextarea(textarea);
+            }
+            
+            // Update loading indicator
+            let indicator = summaryTd?.querySelector('.summarizing-indicator');
+            if (qa.isSummarizing && !indicator && summaryTd) {
+                indicator = document.createElement('div');
+                indicator.className = 'summarizing-indicator';
+                indicator.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span> AI...';
+                summaryTd.appendChild(indicator);
+            } else if (!qa.isSummarizing && indicator) {
+                indicator.remove();
+            }
+            
+            // Update AI button
+            let aiBtn = summaryTd?.querySelector('.needs-ai-btn');
+            if (!qa.needsAISummary && aiBtn) {
+                aiBtn.remove();
+            }
+            
+            // Update topic if changed
+            if (qa.topic) {
+                updateRowTopicSelect(index);
+            }
+        }
+
         // Submit merged entry to AI for summarization
         async function submitMergedToAI(index) {
             if (index < 0 || index >= qaItems.length) return;
@@ -4938,10 +5038,10 @@
             const qa = qaItems[index];
             if (!qa.qaSequence || qa.qaSequence.length <= 1) return;
             
-            // Update UI to show loading
+            // Update UI to show loading - PERFORMANCE FIX: only update this row
             qa.isSummarizing = true;
             qa.needsAISummary = false;
-            renderSummaryTable();
+            updateRowSummaryUI(index);
             
             try {
                 const response = await fetch('/api/summarize-merged', {
@@ -4968,7 +5068,8 @@
             }
             
             qa.isSummarizing = false;
-            renderSummaryTable();
+            // PERFORMANCE FIX: only update this row
+            updateRowSummaryUI(index);
             
             // Update detail panel if open
             if (detailPanel.classList.contains('open') && currentDetailIndex === index) {
@@ -5353,16 +5454,24 @@
             // Hide saved badge when opening new item
             document.getElementById('detailSavedBadge').classList.remove('show');
             
-            // Highlight row and update keyboard selection
-            document.querySelectorAll('.summary-table tr').forEach((tr, i) => {
-                tr.classList.remove('active');
-                tr.classList.toggle('keyboard-selected', i === index);
-            });
+            // PERFORMANCE FIX: Only update affected rows, not all rows
+            // Remove classes from previous row
+            if (previousSelectedRowIndex >= 0 && previousSelectedRowIndex !== index) {
+                const prevRow = document.querySelector(`.summary-table tr[data-index="${previousSelectedRowIndex}"]`);
+                if (prevRow) {
+                    prevRow.classList.remove('active', 'keyboard-selected');
+                }
+            }
+            
+            // Add classes to new row
             const row = document.querySelector(`.summary-table tr[data-index="${index}"]`);
             if (row) {
-                row.classList.add('active');
+                row.classList.add('active', 'keyboard-selected');
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            
+            previousSelectedRowIndex = selectedRowIndex;
+            selectedRowIndex = index;
             
             // Navigate to page (use full location)
             const fullLocation = qa.location || qa.questionLocation;
@@ -5404,7 +5513,9 @@
             // Save before closing
             saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
             detailPanel.classList.remove('open');
-            document.querySelectorAll('.summary-table tr').forEach(tr => tr.classList.remove('active'));
+            // PERFORMANCE FIX: Only update the currently active row, not all rows
+            const activeRow = document.querySelector(`.summary-table tr[data-index="${currentDetailIndex}"]`);
+            if (activeRow) activeRow.classList.remove('active');
         });
 
         detailPrevBtn.addEventListener('click', () => {
@@ -5537,21 +5648,27 @@
 
         // ===== Keyboard Navigation =====
         let selectedRowIndex = 0;
+        let previousSelectedRowIndex = -1;
         
         function selectRow(index) {
             if (index < 0 || index >= qaItems.length) return;
-            selectedRowIndex = index;
             
-            // Update visual selection
-            document.querySelectorAll('.summary-table tbody tr').forEach((tr, i) => {
-                tr.classList.toggle('keyboard-selected', i === index);
-            });
-            
-            // Scroll row into view
-            const selectedRow = document.querySelector(`.summary-table tbody tr:nth-child(${index + 1})`);
-            if (selectedRow) {
-                selectedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // PERFORMANCE FIX: Only update the 2 affected rows, not all rows
+            // Remove class from previous row
+            if (previousSelectedRowIndex >= 0 && previousSelectedRowIndex !== index) {
+                const prevRow = document.querySelector(`.summary-table tbody tr[data-index="${previousSelectedRowIndex}"]`);
+                if (prevRow) prevRow.classList.remove('keyboard-selected');
             }
+            
+            // Add class to new row
+            const newRow = document.querySelector(`.summary-table tbody tr[data-index="${index}"]`);
+            if (newRow) {
+                newRow.classList.add('keyboard-selected');
+                newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            
+            previousSelectedRowIndex = selectedRowIndex;
+            selectedRowIndex = index;
         }
         
         document.addEventListener('keydown', (e) => {

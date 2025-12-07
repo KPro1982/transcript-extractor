@@ -159,10 +159,12 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
 }
 
 /**
- * COMBINED: Summarize AND classify topics in a single API call per item
- * This is ~50% faster than separate summarization + topic classification
+ * COMBINED: Summarize AND classify topics - TRUE BATCHING
+ * Sends multiple Q&A items per API call for ~15-20x faster processing
+ * Previous: 1 API call per Q&A item (1182 calls for large transcript)
+ * New: 15-20 Q&A items per API call (~60-80 calls for large transcript)
  */
-async function batchSummarizeAndClassify(qaItems, batchSize = 5) {
+async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 15) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => ({
@@ -177,57 +179,121 @@ async function batchSummarizeAndClassify(qaItems, batchSize = 5) {
         }));
     }
 
+    const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
     console.log(`Combined AI summarization + topic classification for ${qaItems.length} Q&A pairs...`);
+    console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls (was ${qaItems.length} calls)`);
 
     const systemPrompt = `You are a legal assistant analyzing deposition testimony.
-For each Q&A exchange, provide:
-1. A concise summary (1-2 sentences, third person, past tense)
-2. Topic classification
-3. People mentioned (names and roles if known)
-4. Whether explicit dates are mentioned
+You will receive multiple Q&A exchanges. For EACH one, provide a JSON object with:
+1. "summary": A concise summary (1-2 sentences, third person, past tense)
+2. "topic": Topic classification from this list: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages, Uncategorized
+3. "peopleMentioned": Array of {name, role} objects for people mentioned
+4. "hasDates": true ONLY if explicit dates like "January 15, 2020" or "3/15/2019" are mentioned
 
-Common deposition topics: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages
-
-Rules for summary:
+Rules for summaries:
 - Write in third person ("The witness testified..." or "Witness stated...")
-- Be concise but capture the key information
+- Be concise but capture key information
 - Include specific names, dates, numbers when mentioned
 
-For hasDates - ONLY true if explicit dates like "January 15, 2020" or "3/15/2019" are mentioned.
-
-Respond in JSON format:
-{"summary": "...", "topic": "...", "peopleMentioned": [{"name": "...", "role": "..."}], "hasDates": true/false}`;
+IMPORTANT: Return a JSON array with one object per Q&A in the EXACT same order as input.
+Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":false}, ...]`;
 
     const results = [];
     
-    for (let i = 0; i < qaItems.length; i += batchSize) {
-        const batch = qaItems.slice(i, i + batchSize);
-        const promises = batch.map(async (qa) => {
-            try {
-                const userPrompt = qa.colloquy 
+    // Process items in true batches (multiple items per API call)
+    for (let i = 0; i < qaItems.length; i += itemsPerRequest) {
+        const batch = qaItems.slice(i, i + itemsPerRequest);
+        const batchNum = Math.floor(i / itemsPerRequest) + 1;
+        
+        try {
+            // Build user prompt with all Q&A items in this batch
+            const userPrompt = batch.map((qa, idx) => {
+                const qaText = qa.colloquy 
                     ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
                     : `Q: ${qa.question}\nA: ${qa.answer}`;
-                
-                const response = await callOpenAI([
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ], { max_tokens: 350, temperature: 0.3 });
-                
-                const parsed = JSON.parse(response.trim());
-                return { 
-                    ...qa, 
-                    summary: parsed.summary || generateSummary(qa.question, qa.answer),
-                    topic: parsed.topic || 'Uncategorized',
-                    peopleMentioned: parsed.peopleMentioned || [],
-                    hasDates: parsed.hasDates || false,
-                    crossPoint: false,
-                    aiSummarized: true,
-                    notes: qa.notes || ''
-                };
-            } catch (error) {
-                console.error(`Failed to process Q&A ${i}: ${error.message}`);
-                return { 
-                    ...qa, 
+                return `[${idx + 1}]\n${qaText}`;
+            }).join('\n\n---\n\n');
+            
+            // Calculate max_tokens based on batch size (roughly 100 tokens per item for response)
+            const maxTokens = Math.min(4000, batch.length * 150);
+            
+            const response = await callOpenAI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Analyze these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
+            ], { max_tokens: maxTokens, temperature: 0.2 });
+            
+            // Parse the JSON array response
+            let parsed;
+            try {
+                // Clean response - remove markdown code blocks if present
+                let cleanResponse = response.trim();
+                if (cleanResponse.startsWith('```json')) {
+                    cleanResponse = cleanResponse.slice(7);
+                }
+                if (cleanResponse.startsWith('```')) {
+                    cleanResponse = cleanResponse.slice(3);
+                }
+                if (cleanResponse.endsWith('```')) {
+                    cleanResponse = cleanResponse.slice(0, -3);
+                }
+                parsed = JSON.parse(cleanResponse.trim());
+            } catch (parseError) {
+                console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
+                // Fall back to rule-based for this batch
+                batch.forEach(qa => {
+                    results.push({
+                        ...qa,
+                        summary: generateSummary(qa.question, qa.answer),
+                        topic: 'Uncategorized',
+                        peopleMentioned: [],
+                        hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                        crossPoint: false,
+                        aiSummarized: false,
+                        notes: qa.notes || ''
+                    });
+                });
+                continue;
+            }
+            
+            // Map results back to Q&A items
+            if (Array.isArray(parsed) && parsed.length === batch.length) {
+                batch.forEach((qa, idx) => {
+                    const aiResult = parsed[idx] || {};
+                    results.push({
+                        ...qa,
+                        summary: aiResult.summary || generateSummary(qa.question, qa.answer),
+                        topic: aiResult.topic || 'Uncategorized',
+                        peopleMentioned: aiResult.peopleMentioned || [],
+                        hasDates: aiResult.hasDates || false,
+                        crossPoint: false,
+                        aiSummarized: true,
+                        notes: qa.notes || ''
+                    });
+                });
+            } else {
+                // Response length mismatch - try to salvage what we can
+                console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
+                batch.forEach((qa, idx) => {
+                    const aiResult = (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : {};
+                    results.push({
+                        ...qa,
+                        summary: aiResult.summary || generateSummary(qa.question, qa.answer),
+                        topic: aiResult.topic || 'Uncategorized',
+                        peopleMentioned: aiResult.peopleMentioned || [],
+                        hasDates: aiResult.hasDates || false,
+                        crossPoint: false,
+                        aiSummarized: !!aiResult.summary,
+                        notes: qa.notes || ''
+                    });
+                });
+            }
+            
+        } catch (error) {
+            console.error(`  Batch ${batchNum} failed: ${error.message}`);
+            // Fall back to rule-based for this batch
+            batch.forEach(qa => {
+                results.push({
+                    ...qa,
                     summary: generateSummary(qa.question, qa.answer),
                     topic: 'Uncategorized',
                     peopleMentioned: [],
@@ -235,19 +301,16 @@ Respond in JSON format:
                     crossPoint: false,
                     aiSummarized: false,
                     notes: qa.notes || ''
-                };
-            }
-        });
-        
-        const batchResults = await Promise.all(promises);
-        results.push(...batchResults);
+                });
+            });
+        }
         
         // Progress update
-        console.log(`  Processed ${Math.min(i + batchSize, qaItems.length)}/${qaItems.length} pairs`);
+        console.log(`  Processed ${Math.min(i + itemsPerRequest, qaItems.length)}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
         
         // Small delay between batches to avoid rate limiting
-        if (i + batchSize < qaItems.length) {
-            await new Promise(r => setTimeout(r, 200));
+        if (i + itemsPerRequest < qaItems.length) {
+            await new Promise(r => setTimeout(r, 100));
         }
     }
     
@@ -255,10 +318,10 @@ Respond in JSON format:
 }
 
 /**
- * Batch summarize multiple Q&A pairs using AI
- * All Q/As get AI summaries when API key is available
+ * Batch summarize multiple Q&A pairs using AI - TRUE BATCHING
+ * Sends multiple Q&A items per API call for faster processing
  */
-async function batchSummarizeQA(qaItems, batchSize = 5) {
+async function batchSummarizeQA(qaItems, itemsPerRequest = 15) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => ({
@@ -270,32 +333,110 @@ async function batchSummarizeQA(qaItems, batchSize = 5) {
         }));
     }
 
+    const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
     console.log(`Generating AI summaries for all ${qaItems.length} Q&A pairs...`);
+    console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls`);
+
+    const systemPrompt = `You are a legal assistant summarizing deposition testimony.
+You will receive multiple Q&A exchanges. For EACH one, provide a concise summary (1-2 sentences).
+
+Rules for summaries:
+- Write in third person ("The witness testified..." or "Witness stated...")
+- Be concise but capture key information
+- Include specific names, dates, numbers when mentioned
+
+IMPORTANT: Return a JSON array of summary strings in the EXACT same order as input.
+Example format: ["The witness testified...", "Witness stated...", ...]`;
 
     const results = [];
     
-    // Process all items in batches
-    for (let i = 0; i < qaItems.length; i += batchSize) {
-        const batch = qaItems.slice(i, i + batchSize);
-        const promises = batch.map(async (qa) => {
+    for (let i = 0; i < qaItems.length; i += itemsPerRequest) {
+        const batch = qaItems.slice(i, i + itemsPerRequest);
+        const batchNum = Math.floor(i / itemsPerRequest) + 1;
+        
+        try {
+            // Build user prompt with all Q&A items
+            const userPrompt = batch.map((qa, idx) => {
+                const qaText = qa.colloquy 
+                    ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
+                    : `Q: ${qa.question}\nA: ${qa.answer}`;
+                return `[${idx + 1}]\n${qaText}`;
+            }).join('\n\n---\n\n');
+            
+            const maxTokens = Math.min(3000, batch.length * 80);
+            
+            const response = await callOpenAI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Summarize these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
+            ], { max_tokens: maxTokens, temperature: 0.2 });
+            
+            // Parse response
+            let parsed;
             try {
-                const summary = await generateAISummary(qa.question, qa.answer, qa.colloquy);
-                return { ...qa, summary, aiSummarized: true, crossPoint: false, notes: qa.notes || '' };
-            } catch (error) {
-                console.error(`Failed to summarize Q&A ${i}: ${error.message}`);
-                return { ...qa, summary: generateSummary(qa.question, qa.answer), aiSummarized: false, crossPoint: false, notes: qa.notes || '' };
+                let cleanResponse = response.trim();
+                if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.slice(7);
+                if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.slice(3);
+                if (cleanResponse.endsWith('```')) cleanResponse = cleanResponse.slice(0, -3);
+                parsed = JSON.parse(cleanResponse.trim());
+            } catch (parseError) {
+                console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
+                batch.forEach(qa => {
+                    results.push({
+                        ...qa,
+                        summary: generateSummary(qa.question, qa.answer),
+                        topic: 'Uncategorized',
+                        crossPoint: false,
+                        aiSummarized: false,
+                        notes: qa.notes || ''
+                    });
+                });
+                continue;
             }
-        });
+            
+            // Map results back
+            if (Array.isArray(parsed) && parsed.length === batch.length) {
+                batch.forEach((qa, idx) => {
+                    results.push({
+                        ...qa,
+                        summary: parsed[idx] || generateSummary(qa.question, qa.answer),
+                        topic: 'Uncategorized',
+                        crossPoint: false,
+                        aiSummarized: true,
+                        notes: qa.notes || ''
+                    });
+                });
+            } else {
+                console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
+                batch.forEach((qa, idx) => {
+                    results.push({
+                        ...qa,
+                        summary: (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : generateSummary(qa.question, qa.answer),
+                        topic: 'Uncategorized',
+                        crossPoint: false,
+                        aiSummarized: Array.isArray(parsed) && !!parsed[idx],
+                        notes: qa.notes || ''
+                    });
+                });
+            }
+            
+        } catch (error) {
+            console.error(`  Batch ${batchNum} failed: ${error.message}`);
+            batch.forEach(qa => {
+                results.push({
+                    ...qa,
+                    summary: generateSummary(qa.question, qa.answer),
+                    topic: 'Uncategorized',
+                    crossPoint: false,
+                    aiSummarized: false,
+                    notes: qa.notes || ''
+                });
+            });
+        }
         
-        const batchResults = await Promise.all(promises);
-        results.push(...batchResults);
+        console.log(`  Summarized ${Math.min(i + itemsPerRequest, qaItems.length)}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
         
-        // Progress update
-        console.log(`  Summarized ${Math.min(i + batchSize, qaItems.length)}/${qaItems.length} pairs`);
-        
-        // Small delay between batches to avoid rate limiting
-        if (i + batchSize < qaItems.length) {
-            await new Promise(r => setTimeout(r, 200));
+        if (i + itemsPerRequest < qaItems.length) {
+            await new Promise(r => setTimeout(r, 100));
         }
     }
     
