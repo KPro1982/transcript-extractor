@@ -444,6 +444,7 @@
         }
 
         .upload-area {
+            position: relative;
             background: var(--bg-raised);
             border: 1px dashed var(--border-light);
             border-radius: var(--radius-lg);
@@ -491,6 +492,17 @@
 
         .upload-hint strong {
             color: var(--accent);
+        }
+
+        #fileInput {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
         }
 
         input[type="file"] { display: none; }
@@ -999,6 +1011,38 @@
         .nav-btn:disabled {
             opacity: 0.3;
             cursor: not-allowed;
+        }
+
+        /* Large page navigation arrows for Page Setup */
+        .page-nav-arrow {
+            width: 60px;
+            height: 120px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+
+        .page-nav-arrow:hover:not(:disabled) {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-base);
+        }
+
+        .page-nav-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-nav-arrow svg {
+            width: 40px;
+            height: 40px;
         }
 
         .page-indicator {
@@ -1604,6 +1648,32 @@
         .row-location a:hover {
             color: var(--accent);
             text-decoration: underline;
+        }
+
+        .row-date {
+            width: 100px;
+            vertical-align: middle;
+        }
+
+        .date-input {
+            width: 100%;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 4px 8px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-primary);
+            transition: border-color var(--transition);
+        }
+
+        .date-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .date-input::placeholder {
+            color: var(--text-muted);
         }
 
         .row-summary {
@@ -3098,11 +3168,16 @@
             <div class="step-connector"></div>
             <div class="step-item" data-step="4">
                 <div class="step-number"><span>4</span></div>
-                <span class="step-label">Review</span>
+                <span class="step-label">AI Summary</span>
             </div>
             <div class="step-connector"></div>
             <div class="step-item" data-step="5">
                 <div class="step-number"><span>5</span></div>
+                <span class="step-label">Review</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" data-step="6">
+                <div class="step-number"><span>6</span></div>
                 <span class="step-label">Reports</span>
             </div>
         </div>
@@ -3246,16 +3321,21 @@
         </div>
         
         <div class="page-select-content">
+            <!-- Large left arrow -->
+            <button class="page-nav-arrow page-nav-arrow-left" id="previewPrevBtnLarge" title="Previous page">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            
             <!-- Main PDF preview with magnifier -->
             <div class="pdf-preview-panel magnifier-container">
                 <div class="pdf-preview-header">
                     <span class="pdf-preview-title">PDF Preview</span>
                     <div class="pdf-preview-nav">
-                        <button class="nav-btn" id="previewPrevBtn">◀</button>
                         <span class="page-indicator">
                             Digital Page: <strong id="previewCurrentPage">1</strong>/<span id="previewTotalPages">1</span>
                         </span>
-                        <button class="nav-btn" id="previewNextBtn">▶</button>
                     </div>
                 </div>
                 <div class="pdf-preview-image" id="pdfPreviewArea">
@@ -3273,6 +3353,13 @@
                     Magnifier
                 </button>
             </div>
+            
+            <!-- Large right arrow -->
+            <button class="page-nav-arrow page-nav-arrow-right" id="previewNextBtnLarge" title="Next page">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
             
             <!-- Settings panel -->
             <div class="page-selector-panel">
@@ -3309,11 +3396,11 @@
         </div>
     </div>
 
-    <!-- STEP 3: Summarize -->
+    <!-- STEP 4: AI Summary -->
     <div class="screen summarize-screen" id="summarizeScreen">
         <div class="summarize-container">
             <div class="summarize-icon">AI</div>
-            <h2 class="summarize-title">Ready to Analyze</h2>
+            <h2 class="summarize-title">AI Summary</h2>
             <p class="summarize-desc">
                 We'll scan through the transcript to find the examination section and extract all Q&A pairs. 
                 <strong style="color: var(--accent);">AI-powered summarization</strong> will generate intelligent summaries for each exchange.
@@ -3335,6 +3422,7 @@
                     <div class="progress-bar-fill" id="progressFill"></div>
                 </div>
                 <p class="progress-text" id="progressText">Analyzing transcript...</p>
+                <p class="qa-pair-progress" id="qaPairProgress" style="margin-top: 12px; font-size: 1.1rem; color: var(--accent); font-weight: 500;"></p>
                 <p class="progress-chunks" id="progressChunks" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);"></p>
             </div>
         </div>
@@ -3367,11 +3455,18 @@
             
             <div class="summary-table-panel">
                 <div class="summary-table-container">
+                    <!-- Skip to bottom button -->
+                    <div style="position: sticky; top: 0; z-index: 100; background: var(--bg-raised); padding: 8px; text-align: center; border-bottom: 1px solid var(--border);">
+                        <button id="skipToBottomBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px;">
+                            ⬇ Skip to Bottom
+                        </button>
+                    </div>
                     <table class="summary-table" id="summaryTable">
                         <thead>
                             <tr>
                                 <th data-col="number" style="width: 50px;">#<div class="resize-handle"></div></th>
                                 <th data-col="location" style="width: 90px;">Location<div class="resize-handle"></div></th>
+                                <th data-col="date" style="width: 100px;">Date<div class="resize-handle"></div></th>
                                 <th data-col="topic" style="width: 180px;">Topic / Controls<div class="resize-handle"></div></th>
                                 <th data-col="preview" style="width: 280px;">Q&A<div class="resize-handle"></div></th>
                                 <th data-col="summary" style="min-width: 300px;">
@@ -3386,6 +3481,7 @@
                                         <div class="column-menu-dropdown" id="columnMenuDropdown">
                                             <label class="column-menu-item"><input type="checkbox" checked data-col="number"> #</label>
                                             <label class="column-menu-item"><input type="checkbox" checked data-col="location"> Location</label>
+                                            <label class="column-menu-item"><input type="checkbox" checked data-col="date"> Date</label>
                                             <label class="column-menu-item"><input type="checkbox" checked data-col="topic"> Topic / Controls</label>
                                             <label class="column-menu-item"><input type="checkbox" checked data-col="preview"> Q&A</label>
                                             <label class="column-menu-item"><input type="checkbox" checked data-col="summary"> Summary</label>
@@ -3412,44 +3508,6 @@
             </div>
         </div>
         
-        <!-- Detail slide-out panel -->
-        <div class="detail-panel" id="detailPanel">
-            <div class="detail-header">
-                <div class="detail-title">
-                    <span class="detail-number" id="detailNumber">1</span>
-                    <span>Q&A Detail</span>
-                </div>
-                <button class="detail-close" id="detailClose">×</button>
-            </div>
-            <div class="detail-content">
-                <div class="detail-section">
-                    <div class="detail-section-label" style="color: var(--accent-secondary);">Topic</div>
-                    <div id="detailTopic" style="margin-bottom: 8px;">—</div>
-                </div>
-                <div class="detail-section">
-                    <div class="detail-section-label question">Question</div>
-                    <div class="detail-section-text" id="detailQuestion">—</div>
-                    <div class="detail-location" id="detailQuestionLoc">—</div>
-                </div>
-                <div class="detail-section">
-                    <div class="detail-section-label answer">Answer</div>
-                    <div class="detail-section-text" id="detailAnswer">—</div>
-                    <div class="detail-location" id="detailAnswerLoc">—</div>
-                </div>
-                <div class="detail-section">
-                    <div class="detail-summary-header">
-                        <div class="detail-section-label summary">Summary (editable)</div>
-                        <span class="detail-saved-badge" id="detailSavedBadge">Saved ✓</span>
-                    </div>
-                    <textarea class="detail-summary-input" id="detailSummary" placeholder="Enter summary..."></textarea>
-                    <div id="detailAIBtn" style="margin-top: 8px;"></div>
-                </div>
-            </div>
-            <div class="detail-nav">
-                <button class="btn btn-ghost" id="detailPrevBtn">← Previous</button>
-                <button class="btn btn-ghost" id="detailNextBtn">Next →</button>
-            </div>
-        </div>
     </div>
 
     <!-- STEP 5: Reports -->
@@ -3515,6 +3573,20 @@
             
             <div class="reports-nav">
                 <button class="btn btn-secondary" id="backToReviewBtn">← Back to Review</button>
+            </div>
+            
+            <!-- Dev tools for testing -->
+            <div class="dev-tools" style="margin-top: 32px; padding: 16px; background: var(--bg-elevated); border-radius: var(--radius-md); border: 1px dashed var(--border);">
+                <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Developer Tools</h4>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" id="saveDataBtn" style="font-size: 0.85rem;">
+                        💾 Save Data
+                    </button>
+                    <button class="btn btn-secondary" id="reloadDataBtn" style="font-size: 0.85rem;">
+                        ↻ Reload Saved Data
+                    </button>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">Save your session to avoid re-running AI analysis during UI testing.</p>
             </div>
         </div>
     </div>
@@ -3607,6 +3679,7 @@
         let columnVisibility = {
             number: true,
             location: true,
+            date: true,
             topic: true,
             preview: true,
             summary: true
@@ -3630,8 +3703,6 @@
 
         // Page select elements
         const previewImage = document.getElementById('previewImage');
-        const previewPrevBtn = document.getElementById('previewPrevBtn');
-        const previewNextBtn = document.getElementById('previewNextBtn');
         const previewCurrentPage = document.getElementById('previewCurrentPage');
         const previewTotalPages = document.getElementById('previewTotalPages');
         const currentViewLabel = document.getElementById('currentViewLabel');
@@ -3649,16 +3720,6 @@
         const sidePrintedPage = document.getElementById('sidePrintedPage');
         const sidePrevBtn = document.getElementById('sidePrevBtn');
         const sideNextBtn = document.getElementById('sideNextBtn');
-        const detailPanel = document.getElementById('detailPanel');
-        const detailClose = document.getElementById('detailClose');
-        const detailNumber = document.getElementById('detailNumber');
-        const detailQuestion = document.getElementById('detailQuestion');
-        const detailAnswer = document.getElementById('detailAnswer');
-        const detailSummary = document.getElementById('detailSummary');
-        const detailQuestionLoc = document.getElementById('detailQuestionLoc');
-        const detailAnswerLoc = document.getElementById('detailAnswerLoc');
-        const detailPrevBtn = document.getElementById('detailPrevBtn');
-        const detailNextBtn = document.getElementById('detailNextBtn');
 
         // ===== Step Navigation =====
         // Step 3 can show either summarizeScreen (before analysis) or summaryScreen (after analysis)
@@ -3667,7 +3728,7 @@
         function goToStep(step) {
             currentStep = step;
             
-            // Update screens - now 5 steps
+            // Update screens - now 6 steps
             const analysisScreen = document.getElementById('analysisScreen');
             [uploadScreen, analysisScreen, pageSelectScreen, summarizeScreen, summaryScreen, reportsScreen].forEach(s => s.classList.remove('active'));
             
@@ -3675,14 +3736,9 @@
                 case 1: uploadScreen.classList.add('active'); break;
                 case 2: analysisScreen.classList.add('active'); break;
                 case 3: pageSelectScreen.classList.add('active'); break;
-                case 4: 
-                    if (analysisComplete) {
-                        summaryScreen.classList.add('active');
-                    } else {
-                        summarizeScreen.classList.add('active');
-                    }
-                    break;
-                case 5: reportsScreen.classList.add('active'); break;
+                case 4: summarizeScreen.classList.add('active'); break;
+                case 5: summaryScreen.classList.add('active'); break;
+                case 6: reportsScreen.classList.add('active'); break;
             }
             
             // Update step indicators
@@ -4018,8 +4074,9 @@
             previewImage.src = page.imageUrl;
             previewCurrentPage.textContent = index + 1;
             
-            previewPrevBtn.disabled = index === 0;
-            previewNextBtn.disabled = index === pages.length - 1;
+            // Update large arrow button states
+            document.getElementById('previewPrevBtnLarge').disabled = index === 0;
+            document.getElementById('previewNextBtnLarge').disabled = index === pages.length - 1;
             
             updateCurrentViewLabel();
         }
@@ -4160,8 +4217,9 @@
             }
         }
 
-        previewPrevBtn.addEventListener('click', () => renderPreviewPage(currentPreviewPage - 1));
-        previewNextBtn.addEventListener('click', () => renderPreviewPage(currentPreviewPage + 1));
+        // Large arrow buttons for page navigation
+        document.getElementById('previewPrevBtnLarge').addEventListener('click', () => renderPreviewPage(currentPreviewPage - 1));
+        document.getElementById('previewNextBtnLarge').addEventListener('click', () => renderPreviewPage(currentPreviewPage + 1));
 
         // Printed page input handler
         const printedPageInput = document.getElementById('printedPageInput');
@@ -4291,10 +4349,39 @@
                                         progressText.innerHTML = `<strong>Chunk ${data.chunk}/${totalChunks}</strong>: ${data.message}`;
                                         break;
                                         
+                                    case 'batch-progress':
+                                        // Show detailed Q/A pair progress
+                                        const totalPairs = data.total || window.totalQAPairsEstimate || '?';
+                                        if (data.currentStart === data.currentEnd) {
+                                            progressText.innerHTML = `<strong>Processing Q&A pair ${data.currentStart} of ${totalPairs}</strong>`;
+                                        } else {
+                                            progressText.innerHTML = `<strong>Processing Q&A pairs ${data.currentStart}-${data.currentEnd} of ${totalPairs}</strong>`;
+                                        }
+                                        break;
+                                        
+                                    case 'total-estimate':
+                                        // Store total estimate for later use
+                                        if (data.totalQA) {
+                                            window.totalQAPairsEstimate = data.totalQA;
+                                        }
+                                        break;
+                                        
                                     case 'chunk-complete':
                                         completedChunks = data.chunk;
                                         const pct = Math.round((completedChunks / totalChunks) * 90) + 5;
                                         progressFill.style.width = pct + '%';
+                                        
+                                        // Store total estimate if provided
+                                        if (data.totalEstimate) {
+                                            window.totalQAPairsEstimate = data.totalEstimate;
+                                        }
+                                        
+                                        // Update the prominent Q/A pair counter
+                                        const qaPairProgress = document.getElementById('qaPairProgress');
+                                        if (qaPairProgress && data.totalQA) {
+                                            const estimate = data.totalEstimate || (data.totalQA + (totalChunks - completedChunks) * 10);
+                                            qaPairProgress.textContent = `Processing Q&A pair ${data.totalQA} of ${estimate}`;
+                                        }
                                         
                                         if (data.qaFound === 0) {
                                             // Show warning if no Q&A found
@@ -4311,6 +4398,13 @@
                                         
                                     case 'complete':
                                         qaItems = data.qaItems || [];
+                                        
+                                        // Update final Q/A count
+                                        const finalQaPairProgress = document.getElementById('qaPairProgress');
+                                        if (finalQaPairProgress) {
+                                            finalQaPairProgress.textContent = `✓ Completed ${qaItems.length} Q&A pairs`;
+                                            finalQaPairProgress.style.color = 'var(--success)';
+                                        }
                                         
                                         if (qaItems.length === 0) {
                                             progressFill.style.width = '100%';
@@ -4340,7 +4434,7 @@
                                         renderSidePage(0);
                                         
                                         analysisComplete = true;
-                                        goToStep(4);
+                                        goToStep(5);
                                         
                                         setTimeout(() => {
                                             summarizeProgress.classList.remove('active');
@@ -4396,6 +4490,29 @@
                 tdLocation.style.display = columnVisibility.location ? '' : 'none';
                 const fullLocation = qa.location || qa.questionLocation;
                 tdLocation.innerHTML = `<a data-page="${extractPageFromLocation(fullLocation)}" data-index="${index}">${fullLocation}</a>`;
+                
+                // Column: Date (editable text field)
+                const tdDate = document.createElement('td');
+                tdDate.className = 'row-date';
+                tdDate.dataset.col = 'date';
+                tdDate.style.display = columnVisibility.date ? '' : 'none';
+                
+                const dateInput = document.createElement('input');
+                dateInput.type = 'text';
+                dateInput.className = 'date-input';
+                // Use qa.date if available, otherwise try to extract from text (for consistency with chronology report)
+                dateInput.value = qa.date || extractDateFromText(qa.question + ' ' + qa.answer) || '';
+                dateInput.placeholder = 'YYYY-MM-DD';
+                dateInput.title = 'Date format: YYYY-MM-DD, YYYY-MM, YYYY, or YYYY Season';
+                dateInput.addEventListener('change', (e) => {
+                    qaItems[index].date = e.target.value || null;
+                    // Auto-check hasDates if date is entered
+                    if (e.target.value) {
+                        qaItems[index].hasDates = true;
+                    }
+                });
+                dateInput.addEventListener('click', (e) => e.stopPropagation());
+                tdDate.appendChild(dateInput);
                 
                 // Column: Topic + Controls (consolidated)
                 const tdTopic = document.createElement('td');
@@ -4682,15 +4799,17 @@
                     tdSummary.appendChild(aiBtn);
                 }
                 
-                // Append columns in new order: #, Location, Topic/Controls, Q&A, Summary
+                // Append columns in order: #, Location, Date, Topic/Controls, Q&A, Summary
                 tr.appendChild(tdNumber);
                 tr.appendChild(tdLocation);
+                tr.appendChild(tdDate);
                 tr.appendChild(tdTopic);
                 tr.appendChild(tdPreview);
                 tr.appendChild(tdSummary);
                 
-                tdNumber.addEventListener('click', () => openDetail(index));
-                tdPreview.addEventListener('click', () => openDetail(index));
+                // Click on number or Q&A preview to focus summary for editing
+                tdNumber.addEventListener('click', () => focusSummaryForEdit(index));
+                tdPreview.addEventListener('click', () => focusSummaryForEdit(index));
                 
                 summaryTableBody.appendChild(tr);
             });
@@ -4713,6 +4832,20 @@
             
             document.querySelectorAll('.row-summary-input').forEach(textarea => {
                 window.textareaObserver.observe(textarea);
+            });
+        }
+        
+        // Skip to bottom button handler
+        const skipToBottomBtn = document.getElementById('skipToBottomBtn');
+        if (skipToBottomBtn) {
+            skipToBottomBtn.addEventListener('click', () => {
+                const continueBtn = document.getElementById('continueToReportsBtn');
+                if (continueBtn) {
+                    continueBtn.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    // Fallback: scroll to bottom of table
+                    summaryTableBody.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
             });
         }
 
@@ -5070,11 +5203,6 @@
             qa.isSummarizing = false;
             // PERFORMANCE FIX: only update this row
             updateRowSummaryUI(index);
-            
-            // Update detail panel if open
-            if (detailPanel.classList.contains('open') && currentDetailIndex === index) {
-                openDetail(currentDetailIndex);
-            }
         }
 
         // Save summary from table textarea
@@ -5082,18 +5210,13 @@
             if (index >= 0 && index < qaItems.length) {
                 qaItems[index].summary = value;
                 
-                // Update detail panel if it's showing this item
-                if (currentDetailIndex === index && detailPanel.classList.contains('open')) {
-                    detailSummary.value = value;
-                }
-                
                 // Show saved indicator briefly
                 showSavedIndicator();
             }
         }
 
-        // Save summary from detail panel
-        function saveSummaryFromDetail(index, value) {
+        // Save summary (kept for compatibility with keyboard handlers)
+        function saveSummary(index, value) {
             if (index >= 0 && index < qaItems.length) {
                 qaItems[index].summary = value;
                 
@@ -5128,6 +5251,7 @@
 
         function showDetailSavedBadge() {
             const badge = document.getElementById('detailSavedBadge');
+            if (!badge) return; // Badge no longer exists in UI
             badge.classList.add('show');
             clearTimeout(savedIndicatorTimeout);
             savedIndicatorTimeout = setTimeout(() => {
@@ -5213,14 +5337,6 @@
             
             // Re-render table
             renderSummaryTable();
-            
-            // If detail panel is open, update it
-            if (detailPanel.classList.contains('open')) {
-                if (currentDetailIndex >= index) {
-                    currentDetailIndex = Math.max(0, currentDetailIndex - 1);
-                }
-                openDetail(currentDetailIndex);
-            }
         }
 
         // Unmerge a merged Q&A back into separate items
@@ -5249,11 +5365,6 @@
             
             // Re-render table
             renderSummaryTable();
-            
-            // If detail panel is open, update it
-            if (detailPanel.classList.contains('open')) {
-                openDetail(Math.min(currentDetailIndex, qaItems.length - 1));
-            }
         }
 
         // Merge two location strings to get the full range
@@ -5345,10 +5456,10 @@
                         renderSidePage(digitalIndex);
                     }
                 }
-                // Also open detail
+                // Focus the summary for editing
                 const idx = parseInt(e.target.dataset.index);
                 if (!isNaN(idx)) {
-                    openDetail(idx);
+                    focusSummaryForEdit(idx);
                 }
             }
         });
@@ -5394,68 +5505,13 @@
         });
 
         // ===== Summary Header Collapse =====
-        // ===== Detail Panel =====
-        function openDetail(index) {
+        // ===== Focus Summary for Editing (replaces detail panel) =====
+        function focusSummaryForEdit(index) {
             if (index < 0 || index >= qaItems.length) return;
             currentDetailIndex = index;
-            selectedRowIndex = index; // Sync keyboard selection
+            selectedRowIndex = index;
             
-            const qa = qaItems[index];
-            detailNumber.textContent = index + 1;
-            
-            // Show topic
-            const detailTopic = document.getElementById('detailTopic');
-            const topicClass = getTopicClass(qa.topic);
-            detailTopic.innerHTML = `<span class="topic-badge ${topicClass}">${escapeHtml(qa.topic || 'Uncategorized')}</span>`;
-            
-            // Check if this is a merged entry
-            if (qa.qaSequence && qa.qaSequence.length > 1) {
-                // Show Q/A sequence
-                let qHtml = '';
-                let aHtml = '';
-                qa.qaSequence.forEach((item, i) => {
-                    qHtml += `<div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border);">
-                        <strong style="color: var(--question-accent);">Q${i + 1}:</strong> ${escapeHtml(item.question)}
-                    </div>`;
-                    aHtml += `<div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border);">
-                        <strong style="color: var(--answer-accent);">A${i + 1}:</strong> ${escapeHtml(item.answer)}
-                    </div>`;
-                });
-                detailQuestion.innerHTML = qHtml;
-                detailAnswer.innerHTML = aHtml;
-            } else {
-                detailQuestion.textContent = qa.question;
-                detailAnswer.textContent = qa.answer;
-            }
-            
-            detailSummary.value = qa.summary || '';
-            detailQuestionLoc.textContent = `Location: ${qa.questionLocation}`;
-            detailAnswerLoc.textContent = `Location: ${qa.answerLocation}`;
-            
-            // Show AI submit button for merged entries that need AI
-            const detailAIBtn = document.getElementById('detailAIBtn');
-            if (qa.needsAISummary && qa.qaSequence && qa.qaSequence.length > 1) {
-                detailAIBtn.innerHTML = `<button class="needs-ai-btn" onclick="submitMergedToAI(${index})">✨ Generate AI Summary</button>
-                    <span style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
-                        This merged entry has ${qa.qaSequence.length} Q&A pairs. Click to generate an AI summary.
-                    </span>`;
-            } else {
-                detailAIBtn.innerHTML = '';
-            }
-            
-            // Auto-expand the detail summary textarea
-            setTimeout(() => autoExpandTextarea(detailSummary), 50);
-            
-            detailPrevBtn.disabled = index === 0;
-            detailNextBtn.disabled = index === qaItems.length - 1;
-            
-            detailPanel.classList.add('open');
-            
-            // Hide saved badge when opening new item
-            document.getElementById('detailSavedBadge').classList.remove('show');
-            
-            // PERFORMANCE FIX: Only update affected rows, not all rows
-            // Remove classes from previous row
+            // Remove active from previous row
             if (previousSelectedRowIndex >= 0 && previousSelectedRowIndex !== index) {
                 const prevRow = document.querySelector(`.summary-table tr[data-index="${previousSelectedRowIndex}"]`);
                 if (prevRow) {
@@ -5463,7 +5519,7 @@
                 }
             }
             
-            // Add classes to new row
+            // Add active to current row and scroll to it
             const row = document.querySelector(`.summary-table tr[data-index="${index}"]`);
             if (row) {
                 row.classList.add('active', 'keyboard-selected');
@@ -5473,7 +5529,17 @@
             previousSelectedRowIndex = selectedRowIndex;
             selectedRowIndex = index;
             
-            // Navigate to page (use full location)
+            // Focus the summary textarea in the row
+            const textarea = summaryTableBody.querySelector(`textarea[data-index="${index}"]`);
+            if (textarea) {
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.select();
+                }, 100);
+            }
+            
+            // Navigate to the PDF page for this Q&A
+            const qa = qaItems[index];
             const fullLocation = qa.location || qa.questionLocation;
             const printedPage = extractPageFromLocation(fullLocation);
             const digitalIndex = printedPage + firstPrintedPage - 2;
@@ -5481,54 +5547,6 @@
                 renderSidePage(digitalIndex);
             }
         }
-
-        // Detail panel summary editing
-        detailSummary.addEventListener('input', debounce(() => {
-            saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-        }, 500));
-        
-        detailSummary.addEventListener('blur', () => {
-            saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-        });
-        
-        detailSummary.addEventListener('keydown', (e) => {
-            if (e.key === 'Tab' || e.key === 'Enter') {
-                e.preventDefault();
-                saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-                
-                // Move to next or previous Q&A
-                const nextIndex = e.shiftKey ? currentDetailIndex - 1 : currentDetailIndex + 1;
-                if (nextIndex >= 0 && nextIndex < qaItems.length) {
-                    openDetail(nextIndex);
-                    // Focus summary field after detail opens
-                    setTimeout(() => {
-                        detailSummary.focus();
-                        detailSummary.select();
-                    }, 100);
-                }
-            }
-        });
-
-        detailClose.addEventListener('click', () => {
-            // Save before closing
-            saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-            detailPanel.classList.remove('open');
-            // PERFORMANCE FIX: Only update the currently active row, not all rows
-            const activeRow = document.querySelector(`.summary-table tr[data-index="${currentDetailIndex}"]`);
-            if (activeRow) activeRow.classList.remove('active');
-        });
-
-        detailPrevBtn.addEventListener('click', () => {
-            // Save current before navigating
-            saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-            openDetail(currentDetailIndex - 1);
-        });
-        
-        detailNextBtn.addEventListener('click', () => {
-            // Save current before navigating
-            saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-            openDetail(currentDetailIndex + 1);
-        });
 
         // ===== Start Over =====
         startOverBtn.addEventListener('click', () => {
@@ -5569,7 +5587,6 @@
             // Reset UI state
             startSummarizeBtn.disabled = false;
             summarizeProgress.classList.remove('active');
-            detailPanel.classList.remove('open');
             
             // Reset progress bar
             if (progressFill) progressFill.style.width = '0%';
@@ -5627,11 +5644,55 @@
         // Large "Continue to Reports" button at bottom of table
         const continueToReportsBtn = document.getElementById('continueToReportsBtn');
         continueToReportsBtn.addEventListener('click', () => {
-            goToStep(5);
+            goToStep(6);
         });
         
         backToReviewBtn.addEventListener('click', () => {
-            goToStep(4);
+            goToStep(5);
+        });
+
+        // ===== Save/Reload Data for Testing =====
+        document.getElementById('saveDataBtn').addEventListener('click', () => {
+            const dataToSave = {
+                qaItems: qaItems,
+                pages: pages,
+                firstPrintedPage: firstPrintedPage,
+                printedPageOffset: printedPageOffset,
+                allTopics: Array.from(allTopics),
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem('depodigest_saved_session', JSON.stringify(dataToSave));
+            alert('Session saved! You can now reload this data after making UI changes.');
+        });
+
+        document.getElementById('reloadDataBtn').addEventListener('click', () => {
+            const savedData = localStorage.getItem('depodigest_saved_session');
+            if (!savedData) {
+                alert('No saved session found. Please complete an AI analysis and save it first.');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(savedData);
+                qaItems = data.qaItems || [];
+                pages = data.pages || [];
+                firstPrintedPage = data.firstPrintedPage || 1;
+                printedPageOffset = data.printedPageOffset || 0;
+                allTopics = new Set(data.allTopics || ['Uncategorized']);
+                
+                // Render the data
+                renderSummaryTable();
+                if (pages.length > 0) {
+                    renderSidePage(0);
+                }
+                
+                analysisComplete = true;
+                goToStep(5); // Go to Review step
+                
+                alert(`Session reloaded from ${data.timestamp}!\n${qaItems.length} Q&A pairs loaded.`);
+            } catch (e) {
+                alert('Error loading saved session: ' + e.message);
+            }
         });
 
         // ===== Utilities =====
@@ -5673,13 +5734,13 @@
         
         document.addEventListener('keydown', (e) => {
             // Page setup step - left/right for preview pages
-            if (currentStep === 2) {
+            if (currentStep === 3) {
                 if (e.key === 'ArrowLeft') renderPreviewPage(currentPreviewPage - 1);
                 if (e.key === 'ArrowRight') renderPreviewPage(currentPreviewPage + 1);
             }
             
             // Review step - keyboard navigation
-            if (currentStep === 4) {
+            if (currentStep === 5) {
                 // Don't capture if user is typing in a textarea or input
                 if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
                     // Allow Escape to blur the field
@@ -5690,42 +5751,19 @@
                     return;
                 }
                 
-                if (detailPanel.classList.contains('open')) {
-                    // Detail panel open - navigate within detail
-                    if (e.key === 'ArrowUp') {
-                        saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-                        openDetail(currentDetailIndex - 1);
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowDown') {
-                        saveSummaryFromDetail(currentDetailIndex, detailSummary.value);
-                        openDetail(currentDetailIndex + 1);
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowRight') {
-                        // Focus the summary textarea for editing
-                        detailSummary.focus();
-                        e.preventDefault();
-                    }
-                    if (e.key === 'Escape') {
-                        detailClose.click();
-                        e.preventDefault();
-                    }
-                } else {
-                    // No detail panel - navigate table rows
-                    if (e.key === 'ArrowUp') {
-                        selectRow(selectedRowIndex - 1);
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowDown') {
-                        selectRow(selectedRowIndex + 1);
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowRight' || e.key === 'Enter') {
-                        // Open detail panel for selected row
-                        openDetail(selectedRowIndex);
-                        e.preventDefault();
-                    }
+                // Navigate table rows
+                if (e.key === 'ArrowUp') {
+                    selectRow(selectedRowIndex - 1);
+                    e.preventDefault();
+                }
+                if (e.key === 'ArrowDown') {
+                    selectRow(selectedRowIndex + 1);
+                    e.preventDefault();
+                }
+                if (e.key === 'ArrowRight' || e.key === 'Enter') {
+                    // Focus summary for editing
+                    focusSummaryForEdit(selectedRowIndex);
+                    e.preventDefault();
                 }
             }
         });
@@ -5830,7 +5868,8 @@
                 .map((qa, idx) => ({
                     ...qa,
                     originalIndex: qaItems.indexOf(qa),
-                    dateExtracted: extractDateFromText(qa.question + ' ' + qa.answer)
+                    // Use qa.date if available (from AI extraction), otherwise try to extract from text
+                    dateExtracted: qa.date || extractDateFromText(qa.question + ' ' + qa.answer)
                 }))
                 .sort((a, b) => {
                     // Sort by extracted date if possible, otherwise by location
@@ -6253,7 +6292,8 @@
                 .map((qa, idx) => ({
                     ...qa,
                     originalIndex: qaItems.indexOf(qa),
-                    dateExtracted: extractDateFromText(qa.question + ' ' + qa.answer)
+                    // Use qa.date if available (from AI extraction), otherwise try to extract from text
+                    dateExtracted: qa.date || extractDateFromText(qa.question + ' ' + qa.answer)
                 }))
                 .sort((a, b) => {
                     if (a.dateExtracted && b.dateExtracted) {

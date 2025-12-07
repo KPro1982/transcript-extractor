@@ -164,39 +164,73 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
  * Previous: 1 API call per Q&A item (1182 calls for large transcript)
  * New: 15-20 Q&A items per API call (~60-80 calls for large transcript)
  */
-async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 15) {
+async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 15, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
-        return qaItems.map(qa => ({
-            ...qa,
-            summary: generateSummary(qa.question, qa.answer),
-            topic: 'Uncategorized',
-            peopleMentioned: [],
-            hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
-            crossPoint: false,
-            aiSummarized: false,
-            notes: qa.notes || ''
-        }));
+        return qaItems.map(qa => {
+            // Try to extract date from text, including relative dates
+            let extractedDate = null;
+            const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
+            if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
+                fullText.includes('last month') || fullText.includes('ago'))) {
+                extractedDate = calculateRelativeDate(fullText, depositionDate);
+            }
+            if (!extractedDate) {
+                extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
+            }
+            
+            return {
+                ...qa,
+                summary: generateSummary(qa.question, qa.answer),
+                topic: 'Uncategorized',
+                peopleMentioned: [],
+                hasDates: detectDatesInText(qa.question + ' ' + qa.answer) || !!extractedDate,
+                date: extractedDate,
+                crossPoint: false,
+                aiSummarized: false,
+                notes: qa.notes || ''
+            };
+        });
     }
 
     const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
+    const totalPairs = totalQA !== null ? totalQA : (startIndex + qaItems.length);
     console.log(`Combined AI summarization + topic classification for ${qaItems.length} Q&A pairs...`);
     console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls (was ${qaItems.length} calls)`);
 
-    const systemPrompt = `You are a legal assistant analyzing deposition testimony.
+    // Build system prompt with deposition date context
+    let systemPrompt = `You are a legal assistant analyzing deposition testimony.
 You will receive multiple Q&A exchanges. For EACH one, provide a JSON object with:
 1. "summary": A concise summary (1-2 sentences, third person, past tense)
 2. "topic": Topic classification from this list: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages, Uncategorized
 3. "peopleMentioned": Array of {name, role} objects for people mentioned
-4. "hasDates": true ONLY if explicit dates like "January 15, 2020" or "3/15/2019" are mentioned
+4. "hasDates": true ONLY if any date or time reference is mentioned (even vague ones like "last summer", "last week", "yesterday")
+5. "date": If a date is mentioned, extract it in sortable format. Use these formats:
+   - Specific date: "YYYY-MM-DD" (e.g., "2025-12-07")
+   - Month and year: "YYYY-MM" (e.g., "2021-02" for February 2021)
+   - Year only: "YYYY" (e.g., "2019")
+   - Vague dates: "YYYY Season" (e.g., "2025 Summer", "2020 Fall", "2019 Early")
+   - Relative dates: Calculate actual date from relative references like "last week", "two weeks ago", "last month", "yesterday"
+   - If no date mentioned, use null`;
 
-Rules for summaries:
+    if (depositionDate) {
+        systemPrompt += `\n\nIMPORTANT: The deposition date is ${depositionDate}. When witnesses mention relative dates like:
+- "last week" = 7 days before deposition date
+- "two weeks ago" = 14 days before deposition date  
+- "last month" = approximately 1 month before deposition date
+- "yesterday" = 1 day before deposition date
+- "X days/weeks/months/years ago" = calculate from deposition date
+
+Calculate the actual date for relative references and return in YYYY-MM-DD format.`;
+    }
+
+    systemPrompt += `\n\nRules for summaries:
 - Write in third person ("The witness testified..." or "Witness stated...")
 - Be concise but capture key information
 - Include specific names, dates, numbers when mentioned
 
 IMPORTANT: Return a JSON array with one object per Q&A in the EXACT same order as input.
-Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":false}, ...]`;
+Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":false,"date":null}, ...]`;
 
     const results = [];
     
@@ -247,6 +281,7 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
                         topic: 'Uncategorized',
                         peopleMentioned: [],
                         hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                        date: null,
                         crossPoint: false,
                         aiSummarized: false,
                         notes: qa.notes || ''
@@ -259,12 +294,29 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
             if (Array.isArray(parsed) && parsed.length === batch.length) {
                 batch.forEach((qa, idx) => {
                     const aiResult = parsed[idx] || {};
+                    let extractedDate = aiResult.date || null;
+                    
+                    // If AI didn't extract a date but hasDates is true, try to extract it ourselves
+                    if (!extractedDate && aiResult.hasDates) {
+                        const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
+                        // Try relative date calculation first
+                        if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
+                            fullText.includes('last month') || fullText.includes('ago'))) {
+                            extractedDate = calculateRelativeDate(fullText, depositionDate);
+                        }
+                        // Fall back to explicit date extraction
+                        if (!extractedDate) {
+                            extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
+                        }
+                    }
+                    
                     results.push({
                         ...qa,
                         summary: aiResult.summary || generateSummary(qa.question, qa.answer),
                         topic: aiResult.topic || 'Uncategorized',
                         peopleMentioned: aiResult.peopleMentioned || [],
                         hasDates: aiResult.hasDates || false,
+                        date: extractedDate,
                         crossPoint: false,
                         aiSummarized: true,
                         notes: qa.notes || ''
@@ -275,12 +327,27 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
                 console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
                 batch.forEach((qa, idx) => {
                     const aiResult = (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : {};
+                    let extractedDate = aiResult.date || null;
+                    
+                    // Try to extract date if hasDates is true
+                    if (!extractedDate && aiResult.hasDates) {
+                        const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
+                        if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
+                            fullText.includes('last month') || fullText.includes('ago'))) {
+                            extractedDate = calculateRelativeDate(fullText, depositionDate);
+                        }
+                        if (!extractedDate) {
+                            extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
+                        }
+                    }
+                    
                     results.push({
                         ...qa,
                         summary: aiResult.summary || generateSummary(qa.question, qa.answer),
                         topic: aiResult.topic || 'Uncategorized',
                         peopleMentioned: aiResult.peopleMentioned || [],
                         hasDates: aiResult.hasDates || false,
+                        date: extractedDate,
                         crossPoint: false,
                         aiSummarized: !!aiResult.summary,
                         notes: qa.notes || ''
@@ -298,6 +365,7 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
                     topic: 'Uncategorized',
                     peopleMentioned: [],
                     hasDates: detectDatesInText(qa.question + ' ' + qa.answer),
+                    date: null,
                     crossPoint: false,
                     aiSummarized: false,
                     notes: qa.notes || ''
@@ -306,7 +374,22 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
         }
         
         // Progress update
-        console.log(`  Processed ${Math.min(i + itemsPerRequest, qaItems.length)}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
+        const processedCount = Math.min(i + itemsPerRequest, qaItems.length);
+        const currentStart = startIndex + i + 1;
+        const currentEnd = startIndex + processedCount;
+        console.log(`  Processed ${processedCount}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
+        
+        // Send progress update to frontend
+        if (sendProgress) {
+            sendProgress({
+                type: 'batch-progress',
+                currentStart: currentStart,
+                currentEnd: currentEnd,
+                total: totalPairs,
+                batchNum: batchNum,
+                totalBatches: totalBatches
+            });
+        }
         
         // Small delay between batches to avoid rate limiting
         if (i + itemsPerRequest < qaItems.length) {
@@ -321,7 +404,7 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
  * Batch summarize multiple Q&A pairs using AI - TRUE BATCHING
  * Sends multiple Q&A items per API call for faster processing
  */
-async function batchSummarizeQA(qaItems, itemsPerRequest = 15) {
+async function batchSummarizeQA(qaItems, itemsPerRequest = 15, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => ({
@@ -334,6 +417,7 @@ async function batchSummarizeQA(qaItems, itemsPerRequest = 15) {
     }
 
     const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
+    const totalPairs = totalQA !== null ? totalQA : (startIndex + qaItems.length);
     console.log(`Generating AI summaries for all ${qaItems.length} Q&A pairs...`);
     console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls`);
 
@@ -433,7 +517,23 @@ Example format: ["The witness testified...", "Witness stated...", ...]`;
             });
         }
         
-        console.log(`  Summarized ${Math.min(i + itemsPerRequest, qaItems.length)}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
+        // Progress update
+        const processedCount = Math.min(i + itemsPerRequest, qaItems.length);
+        const currentStart = startIndex + i + 1;
+        const currentEnd = startIndex + processedCount;
+        console.log(`  Summarized ${processedCount}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
+        
+        // Send progress update to frontend
+        if (sendProgress) {
+            sendProgress({
+                type: 'batch-progress',
+                currentStart: currentStart,
+                currentEnd: currentEnd,
+                total: totalPairs,
+                batchNum: batchNum,
+                totalBatches: totalBatches
+            });
+        }
         
         if (i + itemsPerRequest < qaItems.length) {
             await new Promise(r => setTimeout(r, 100));
@@ -557,6 +657,191 @@ function detectDatesInText(text) {
     ];
     
     return datePatterns.some(pattern => pattern.test(text));
+}
+
+/**
+ * Extract deposition date from first few pages
+ * Looks for date patterns typically found on first or second page
+ */
+function extractDepositionDate(pages) {
+    if (!pages || pages.length === 0) return null;
+    
+    // Check first 2 pages for deposition date
+    const pagesToCheck = Math.min(2, pages.length);
+    let allText = '';
+    
+    for (let i = 0; i < pagesToCheck; i++) {
+        const page = pages[i];
+        if (page.lines && page.lines.length > 0) {
+            const pageText = page.lines.map(line => line.text).join(' ');
+            allText += ' ' + pageText;
+        } else if (page.textItems && page.textItems.length > 0) {
+            const pageText = page.textItems.map(item => item.text).join(' ');
+            allText += ' ' + pageText;
+        }
+    }
+    
+    // Look for common deposition date patterns
+    const datePatterns = [
+        // "TUESDAY, SEPTEMBER 16, 2025" or "MONDAY, JANUARY 15, 2024"
+        /\b(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY),?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
+        // "September 16, 2025" or "January 15, 2024"
+        /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
+        // "9/16/2025" or "01/15/2024"
+        /\b\d{1,2}\/\d{1,2}\/\d{4}\b/,
+        // "2025-09-16"
+        /\b\d{4}-\d{2}-\d{2}\b/,
+    ];
+    
+    for (const pattern of datePatterns) {
+        const match = allText.match(pattern);
+        if (match) {
+            const dateStr = match[0];
+            // Try to parse and normalize to YYYY-MM-DD format
+            try {
+                const date = new Date(dateStr);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            } catch (e) {
+                // If parsing fails, try manual extraction
+                const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                                  'july', 'august', 'september', 'october', 'november', 'december'];
+                const monthAbbr = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                                  'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                
+                for (let i = 0; i < monthNames.length; i++) {
+                    const regex = new RegExp(`\\b(${monthNames[i]}|${monthAbbr[i]})\\.?\\s+(\\d{1,2}),?\\s+(\\d{4})\\b`, 'i');
+                    const monthMatch = dateStr.match(regex);
+                    if (monthMatch) {
+                        const month = String(i + 1).padStart(2, '0');
+                        const day = String(parseInt(monthMatch[2])).padStart(2, '0');
+                        const year = monthMatch[3];
+                        return `${year}-${month}-${day}`;
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Extract explicit date from text (not relative dates)
+ */
+function extractDateFromText(text) {
+    if (!text) return null;
+    
+    // Try to find dates in various formats
+    const patterns = [
+        // "January 15, 2020" or "Jan 15, 2020"
+        /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
+        /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[.\s]+\d{1,2},?\s+\d{4}\b/i,
+        // "1/15/2020" or "01/15/2020"
+        /\b\d{1,2}\/\d{1,2}\/\d{4}\b/,
+        // "2020-01-15"
+        /\b\d{4}-\d{2}-\d{2}\b/,
+        // "15 January 2020"
+        /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i
+    ];
+    
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) {
+            try {
+                const date = new Date(match[0]);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            } catch (e) {
+                // Try manual parsing
+                const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                                  'july', 'august', 'september', 'october', 'november', 'december'];
+                const monthAbbr = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                                  'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                
+                for (let i = 0; i < monthNames.length; i++) {
+                    const regex = new RegExp(`\\b(${monthNames[i]}|${monthAbbr[i]})\\.?\\s+(\\d{1,2}),?\\s+(\\d{4})\\b`, 'i');
+                    const monthMatch = match[0].match(regex);
+                    if (monthMatch) {
+                        const month = String(i + 1).padStart(2, '0');
+                        const day = String(parseInt(monthMatch[2])).padStart(2, '0');
+                        const year = monthMatch[3];
+                        return `${year}-${month}-${day}`;
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Calculate actual date from relative date reference using deposition date
+ * Examples: "last week", "two weeks ago", "last month", "yesterday", etc.
+ */
+function calculateRelativeDate(relativeText, depositionDate) {
+    if (!depositionDate || !relativeText) return null;
+    
+    try {
+        const depDate = new Date(depositionDate);
+        if (isNaN(depDate.getTime())) return null;
+        
+        const text = relativeText.toLowerCase().trim();
+        const now = new Date(depDate);
+        
+        // Common relative date patterns
+        if (text.match(/\byesterday\b/)) {
+            now.setDate(now.getDate() - 1);
+        } else if (text.match(/\btoday\b/)) {
+            // Use deposition date as-is
+        } else if (text.match(/\blast\s+week\b/)) {
+            now.setDate(now.getDate() - 7);
+        } else if (text.match(/\btwo\s+weeks\s+ago\b/) || text.match(/\b2\s+weeks\s+ago\b/)) {
+            now.setDate(now.getDate() - 14);
+        } else if (text.match(/\bthree\s+weeks\s+ago\b/) || text.match(/\b3\s+weeks\s+ago\b/)) {
+            now.setDate(now.getDate() - 21);
+        } else if (text.match(/\blast\s+month\b/)) {
+            now.setMonth(now.getMonth() - 1);
+        } else if (text.match(/\btwo\s+months\s+ago\b/) || text.match(/\b2\s+months\s+ago\b/)) {
+            now.setMonth(now.getMonth() - 2);
+        } else if (text.match(/\bthree\s+months\s+ago\b/) || text.match(/\b3\s+months\s+ago\b/)) {
+            now.setMonth(now.getMonth() - 3);
+        } else if (text.match(/\blast\s+year\b/)) {
+            now.setFullYear(now.getFullYear() - 1);
+        } else if (text.match(/\btwo\s+years\s+ago\b/) || text.match(/\b2\s+years\s+ago\b/)) {
+            now.setFullYear(now.getFullYear() - 2);
+        } else if (text.match(/\b(\d+)\s+days?\s+ago\b/)) {
+            const days = parseInt(text.match(/\b(\d+)\s+days?\s+ago\b/)[1]);
+            now.setDate(now.getDate() - days);
+        } else if (text.match(/\b(\d+)\s+weeks?\s+ago\b/)) {
+            const weeks = parseInt(text.match(/\b(\d+)\s+weeks?\s+ago\b/)[1]);
+            now.setDate(now.getDate() - (weeks * 7));
+        } else if (text.match(/\b(\d+)\s+months?\s+ago\b/)) {
+            const months = parseInt(text.match(/\b(\d+)\s+months?\s+ago\b/)[1]);
+            now.setMonth(now.getMonth() - months);
+        } else if (text.match(/\b(\d+)\s+years?\s+ago\b/)) {
+            const years = parseInt(text.match(/\b(\d+)\s+years?\s+ago\b/)[1]);
+            now.setFullYear(now.getFullYear() - years);
+        } else {
+            return null; // Not a recognized relative date
+        }
+        
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    } catch (e) {
+        return null;
+    }
 }
 
 /**
@@ -2779,6 +3064,15 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                 console.log(`${'='.repeat(60)}`);
                 
                 let allQAItems = [];
+                let totalQAPairs = null; // Will be set after first chunk to estimate total
+                
+                // Extract deposition date from first few pages
+                const depositionDate = extractDepositionDate(pages);
+                if (depositionDate) {
+                    console.log(`\n✓ Extracted deposition date: ${depositionDate}`);
+                } else {
+                    console.log(`\n⚠ Could not extract deposition date from first pages`);
+                }
                 
                 // Set up SSE for progress updates
                 res.writeHead(200, {
@@ -2797,7 +3091,8 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     type: 'start', 
                     totalChunks: numChunks, 
                     chunkSize: CHUNK_SIZE,
-                    totalPages: totalPages 
+                    totalPages: totalPages,
+                    depositionDate: depositionDate
                 });
                 
                 for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
@@ -2833,6 +3128,15 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     timings.parsing.chunks.push({ chunk: chunkIdx + 1, pages: chunkPages.length, qaFound: chunkQA.length, timeMs: parseTime });
                     console.log(`  Found ${chunkQA.length} Q&A pairs (${(parseTime/1000).toFixed(1)}s)`);
                     
+                    // Estimate total Q/A pairs after first chunk
+                    if (chunkIdx === 0 && chunkQA.length > 0) {
+                        totalQAPairs = Math.ceil(chunkQA.length * numChunks);
+                        sendProgress({ 
+                            type: 'total-estimate',
+                            totalQA: totalQAPairs
+                        });
+                    }
+                    
                     // Send format analysis on first chunk
                     if (chunkIdx === 0 && (formatInfo || detectionStats)) {
                         sendProgress({ 
@@ -2863,7 +3167,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                             console.log(`  [2/2] Combined summarization + topics for ${chunkQA.length} items...`);
                             sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `AI processing ${chunkQA.length} items...` });
                             const combinedStart = Date.now();
-                            chunkQA = await batchSummarizeAndClassify(chunkQA);
+                            chunkQA = await batchSummarizeAndClassify(chunkQA, 15, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
                             const combinedTime = Date.now() - combinedStart;
                             // Split time roughly 50/50 for backward compatibility with timing display
                             timings.summarization.total += Math.floor(combinedTime * 0.4);
@@ -2876,7 +3180,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                             console.log(`  [2/2] AI summarizing ${chunkQA.length} items...`);
                             sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `Summarizing ${chunkQA.length} items...` });
                             const sumStart = Date.now();
-                            chunkQA = await batchSummarizeQA(chunkQA);
+                            chunkQA = await batchSummarizeQA(chunkQA, 15, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
                             const sumTime = Date.now() - sumStart;
                             timings.summarization.total += sumTime;
                             timings.summarization.chunks.push({ chunk: chunkIdx + 1, items: chunkQA.length, timeMs: sumTime });
@@ -2905,12 +3209,21 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     // Accumulate results
                     allQAItems = allQAItems.concat(chunkQA);
                     console.log(`  Chunk complete. Total Q&A so far: ${allQAItems.length}`);
+                    
+                    // Update total estimate based on actual progress
+                    if (totalQAPairs === null || chunkIdx > 0) {
+                        // Recalculate estimate: average per chunk so far * remaining chunks
+                        const avgPerChunk = allQAItems.length / (chunkIdx + 1);
+                        totalQAPairs = Math.ceil(avgPerChunk * numChunks);
+                    }
+                    
                     sendProgress({ 
                         type: 'chunk-complete', 
                         chunk: chunkIdx + 1, 
                         totalChunks: numChunks,
                         qaFound: chunkQA.length,
-                        totalQA: allQAItems.length 
+                        totalQA: allQAItems.length,
+                        totalEstimate: totalQAPairs
                     });
                 }
                 
