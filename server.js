@@ -599,6 +599,104 @@ Analyze the provided text and return ONLY a JSON object with:
 }
 
 /**
+ * Use AI to analyze the Q&A format used in this specific transcript
+ * Returns regex patterns and format information for dynamic parsing
+ */
+async function analyzeQAFormatWithAI(pages) {
+    if (!OPENAI_API_KEY) {
+        console.log('No API key - cannot use AI for format analysis');
+        return null;
+    }
+
+    // Sample text from first 15 pages to identify Q&A format
+    const samplesToCheck = Math.min(15, pages.length);
+    let sampleText = '';
+    
+    console.log(`[DEBUG] Analyzing ${samplesToCheck} pages out of ${pages.length} total pages`);
+    
+    for (let i = 0; i < samplesToCheck; i++) {
+        const page = pages[i];
+        const lines = page.lines || [];
+        console.log(`[DEBUG] Page ${i + 1}: ${lines.length} lines`);
+        if (lines.length > 0) {
+            console.log(`[DEBUG]   First line: LineNum=${lines[0].lineNumber}, Text="${lines[0].text?.substring(0, 60)}"`);
+        }
+        const pageText = lines.map(l => `${l.lineNumber || ''}: ${l.text || ''}`).join('\n');
+        sampleText += `\n--- PAGE ${i + 1} ---\n${pageText}\n`;
+    }
+    
+    console.log(`[DEBUG] Sample text length: ${sampleText.length} characters`);
+    if (sampleText.length < 100) {
+        console.log('[DEBUG] Sample text is too short - likely extraction problem');
+        console.log(`[DEBUG] Sample text: ${sampleText.substring(0, 500)}`);
+    }
+
+    const systemPrompt = `You are a legal document format analyzer. Your task is to identify the EXACT formatting patterns used for questions and answers in this deposition transcript.
+
+Different court reporting companies use different formats. You must identify what THIS specific transcript uses.
+
+Common Q&A patterns include:
+- "Q." or "Q:" followed by text (e.g., "Q. Did you see...")
+- "Q " with space (e.g., "Q Did you see...")
+- Line numbers followed by "Q." (e.g., "12 Q. Did you...")
+- "QUESTION:" or "Question:" 
+- Attorney name format (e.g., "BY MR. SMITH:")
+
+For answers:
+- "A." or "A:" followed by text
+- "A " with space
+- "THE WITNESS:" 
+- "ANSWER:" or "Answer:"
+
+Examine the provided text and return ONLY a JSON object with this EXACT structure:
+{
+  "questionPatterns": [
+    {"pattern": "Q.", "example": "actual example from text", "count": 5},
+    {"pattern": "Q:", "example": "actual example", "count": 2}
+  ],
+  "answerPatterns": [
+    {"pattern": "A.", "example": "actual example from text", "count": 5},
+    {"pattern": "THE WITNESS:", "example": "actual example", "count": 1}
+  ],
+  "examinationMarker": "EXAMINATION" or "BY MR./MS." or null,
+  "hasLineNumbers": true or false,
+  "confidence": "high" or "medium" or "low",
+  "notes": "any special formatting notes"
+}
+
+Be precise - only include patterns you ACTUALLY see in the text with real examples.`;
+
+    try {
+        console.log('\n=== AI Format Analysis ===');
+        console.log('Analyzing Q&A format patterns in first 15 pages...');
+        const response = await callOpenAI([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Analyze the Q&A format in this deposition:\n\n${sampleText}` }
+        ], { max_tokens: 500, temperature: 0.1 });
+
+        // Parse the JSON response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const format = JSON.parse(jsonMatch[0]);
+            console.log(`\n✓ Format Analysis Complete (${format.confidence} confidence)`);
+            console.log(`  Question patterns: ${format.questionPatterns.map(p => p.pattern).join(', ')}`);
+            console.log(`  Answer patterns: ${format.answerPatterns.map(p => p.pattern).join(', ')}`);
+            console.log(`  Has line numbers: ${format.hasLineNumbers}`);
+            console.log(`  Examination marker: ${format.examinationMarker || 'none'}`);
+            if (format.notes) {
+                console.log(`  Notes: ${format.notes}`);
+            }
+            console.log('======================\n');
+            return format;
+        }
+    } catch (error) {
+        console.error('AI format analysis failed:', error.message);
+    }
+    
+    return null;
+}
+
+/**
  * Use AI to parse Q&A pairs from a batch of pages
  * This is more flexible than pattern matching and works with various transcript formats
  */
@@ -716,7 +814,8 @@ function formatFullLocationFromAI(qa) {
 
 /**
  * Parse Q/A pairs from examination content
- * Uses AI when available for robust parsing, falls back to pattern matching
+ * Uses AI format analysis to adapt to different transcript formats
+ * Falls back to standard patterns if AI not available
  * Each Q/A object contains:
  * - question: text snippet
  * - questionLocation: page:startLine-endLine
@@ -724,51 +823,83 @@ function formatFullLocationFromAI(qa) {
  * - answerLocation: page:startLine-endLine
  * - colloquy: text snippet (objections, etc.)
  * - colloquyLocation: page:startLine-endLine
+ * 
+ * Returns: { qaItems, formatInfo, detectionStats }
  */
 async function parseExamination(pages, firstPrintedPage) {
-    // OPTIMIZATION: Try fast pattern matching FIRST
-    // Pattern matching is instant (no API calls) and handles 90%+ of depositions
-    console.log('Using fast pattern-based Q&A parsing...');
+    // STEP 1: Use AI to analyze the specific format of THIS transcript
+    let formatInfo = null;
+    if (OPENAI_API_KEY) {
+        formatInfo = await analyzeQAFormatWithAI(pages);
+    }
+    
+    // STEP 2: Try pattern matching with dynamic patterns based on format analysis
+    console.log('Using pattern-based Q&A parsing...');
     const patternStartTime = Date.now();
-    const patternQAItems = parseExaminationWithPatterns(pages, firstPrintedPage);
+    const patternResults = parseExaminationWithPatterns(pages, firstPrintedPage, formatInfo);
     const patternTime = Date.now() - patternStartTime;
-    console.log(`Pattern matching found ${patternQAItems.length} Q&A pairs in ${patternTime}ms`);
+    console.log(`Pattern matching found ${patternResults.qaItems.length} Q&A pairs in ${patternTime}ms`);
+    
+    // Build detection stats
+    const detectionStats = {
+        method: 'pattern',
+        formatAnalyzed: !!formatInfo,
+        formatConfidence: formatInfo?.confidence || 'none',
+        qaFound: patternResults.qaItems.length,
+        examinationFound: patternResults.examinationFound,
+        patternsUsed: {
+            questions: formatInfo?.questionPatterns?.map(p => p.pattern) || ['default'],
+            answers: formatInfo?.answerPatterns?.map(p => p.pattern) || ['default']
+        },
+        parseTimeMs: patternTime
+    };
     
     // If pattern matching found a reasonable number of Q&A pairs, use them
     // (Most depositions have at least 10+ Q&A pairs in the first 25 pages)
-    if (patternQAItems.length >= 10) {
-        console.log(`✓ Pattern matching successful: ${patternQAItems.length} Q&A pairs`);
-        return patternQAItems;
+    if (patternResults.qaItems.length >= 10) {
+        console.log(`✓ Pattern matching successful: ${patternResults.qaItems.length} Q&A pairs`);
+        detectionStats.success = true;
+        return { qaItems: patternResults.qaItems, formatInfo, detectionStats };
     }
     
-    // Fallback to AI only if pattern matching failed or found very few items
-    if (OPENAI_API_KEY && patternQAItems.length < 10) {
-        console.log(`Pattern matching found only ${patternQAItems.length} items, trying AI...`);
+    // STEP 3: Fallback to AI parsing only if pattern matching failed or found very few items
+    if (OPENAI_API_KEY && patternResults.qaItems.length < 10) {
+        console.log(`Pattern matching found only ${patternResults.qaItems.length} items, trying AI full parsing...`);
+        detectionStats.fallbackToAI = true;
         try {
             const examStart = await findExaminationStartWithAI(pages);
             
             if (examStart && examStart.confidence !== 'low') {
+                const aiStartTime = Date.now();
                 const aiQAItems = await parseQABatchWithAI(pages, examStart.pageIndex, firstPrintedPage);
+                const aiTime = Date.now() - aiStartTime;
                 
-                if (aiQAItems.length > patternQAItems.length) {
-                    console.log(`AI parsing found more: ${aiQAItems.length} Q&A pairs (vs ${patternQAItems.length})`);
-                    return aiQAItems;
+                if (aiQAItems.length > patternResults.qaItems.length) {
+                    console.log(`AI parsing found more: ${aiQAItems.length} Q&A pairs (vs ${patternResults.qaItems.length})`);
+                    detectionStats.method = 'ai';
+                    detectionStats.success = true;
+                    detectionStats.qaFound = aiQAItems.length;
+                    detectionStats.parseTimeMs = aiTime;
+                    return { qaItems: aiQAItems, formatInfo, detectionStats };
                 }
             }
         } catch (error) {
             console.error('AI parsing failed:', error.message);
+            detectionStats.aiError = error.message;
         }
     }
     
     // Return pattern results (even if few)
-    return patternQAItems;
+    detectionStats.success = patternResults.qaItems.length > 0;
+    return { qaItems: patternResults.qaItems, formatInfo, detectionStats };
 }
 
 /**
  * Fast pattern-based Q&A parsing (no API calls)
  * Handles standard deposition formats: Q./A., Q/A, QUESTION/ANSWER, THE WITNESS:
+ * Now accepts formatInfo from AI analysis to use dynamic patterns
  */
-function parseExaminationWithPatterns(pages, firstPrintedPage) {
+function parseExaminationWithPatterns(pages, firstPrintedPage, formatInfo = null) {
     console.log('Pattern-based Q&A parsing...');
     const qaItems = [];
     
@@ -789,29 +920,86 @@ function parseExaminationWithPatterns(pages, firstPrintedPage) {
         }
     }
     
-    // Find examination start
-    let examStart = -1;
-    for (let i = 0; i < allLines.length; i++) {
-        const text = allLines[i].text.trim();
-        // Look for "EXAMINATION" header or "BY MR./MS. X:"
-        if (text.match(/^EXAMINATION$/i) || 
-            text.match(/^BY\s+M[RS]\.\s+\w+:$/i) ||
-            text.match(/EXAMINATION\s*$/i)) {
-            examStart = i;
-            break;
+    // Build dynamic regex patterns from AI format analysis
+    let questionCheckers = [];
+    let answerCheckers = [];
+    
+    if (formatInfo && formatInfo.questionPatterns && formatInfo.questionPatterns.length > 0) {
+        console.log('Using AI-detected question patterns:', formatInfo.questionPatterns.map(p => p.pattern).join(', '));
+        
+        // Build checkers from AI-detected patterns
+        for (const qp of formatInfo.questionPatterns) {
+            const pattern = qp.pattern.trim();
+            if (pattern === 'Q.') {
+                questionCheckers.push(text => text.match(/^Q\.\s*/i));
+            } else if (pattern === 'Q:') {
+                questionCheckers.push(text => text.match(/^Q:\s*/i));
+            } else if (pattern === 'Q') {
+                questionCheckers.push(text => text.match(/^Q\s+[A-Z]/i));
+            } else if (pattern.match(/QUESTION/i)) {
+                questionCheckers.push(text => text.match(/^QUESTION[:\s]/i));
+            } else if (pattern.match(/BY\s+M[RS]/i)) {
+                questionCheckers.push(text => text.match(/^BY\s+M[RS]\.\s+\w+:/i));
+            }
         }
+    } else {
+        console.log('Using default question patterns');
+        // Default patterns
+        questionCheckers = [
+            text => text.match(/^Q\.\s*/i),
+            text => text.match(/^\s+Q\.\s*/i),
+            text => text.match(/^[·\s]*Q\.[·\s]/i),
+            text => text.match(/^Q\s+[A-Z]/i),
+            text => text.match(/^QUESTION[:\s]/i),
+            text => text.match(/^Question[:\s]/i)
+        ];
     }
     
-    if (examStart === -1) {
-        // Try to find first Q. or Q or QUESTION if no EXAMINATION header
-        // Handle patterns with middle dots like "· · ·Q.·"
-        // Also handle standalone Q without period
+    if (formatInfo && formatInfo.answerPatterns && formatInfo.answerPatterns.length > 0) {
+        console.log('Using AI-detected answer patterns:', formatInfo.answerPatterns.map(p => p.pattern).join(', '));
+        
+        // Build checkers from AI-detected patterns
+        for (const ap of formatInfo.answerPatterns) {
+            const pattern = ap.pattern.trim();
+            if (pattern === 'A.') {
+                answerCheckers.push(text => text.match(/^A\.\s*/i));
+            } else if (pattern === 'A:') {
+                answerCheckers.push(text => text.match(/^A:\s*/i));
+            } else if (pattern === 'A') {
+                answerCheckers.push(text => text.match(/^A\s+[A-Z]/i));
+            } else if (pattern.match(/ANSWER/i)) {
+                answerCheckers.push(text => text.match(/^ANSWER[:\s]/i));
+            } else if (pattern.match(/THE\s+WITNESS/i)) {
+                answerCheckers.push(text => text.match(/^THE\s+WITNESS:/i));
+            }
+        }
+    } else {
+        console.log('Using default answer patterns');
+        // Default patterns
+        answerCheckers = [
+            text => text.match(/^A\.\s*/i),
+            text => text.match(/^\s+A\.\s*/i),
+            text => text.match(/^[·\s]*A\.[·\s]/i),
+            text => text.match(/^A\s+[A-Z]/i),
+            text => text.match(/^ANSWER[:\s]/i),
+            text => text.match(/^Answer[:\s]/i),
+            text => text.match(/^[·\s]*THE\s+WITNESS:[·\s]*/i),
+            text => text.match(/^THE\s+WITNESS:/i)
+        ];
+    }
+    
+    // Find examination start
+    let examStart = -1;
+    const examMarker = formatInfo?.examinationMarker;
+    
+    if (examMarker) {
+        console.log(`Looking for examination marker: "${examMarker}"`);
         for (let i = 0; i < allLines.length; i++) {
-            const lineText = allLines[i].text;
-            if (lineText.match(/[·\s]*Q\.[·\s]/i) || 
-                lineText.match(/^\s*Q\.\s+/i) || 
-                lineText.match(/^\s*Q\s+[A-Z]/i) ||  // Standalone Q followed by content
-                lineText.match(/^\s*QUESTION[:\s]/i)) {
+            const text = allLines[i].text.trim();
+            if (examMarker.match(/EXAMINATION/i) && text.match(/EXAMINATION/i)) {
+                examStart = i;
+                break;
+            } else if (examMarker.match(/BY\s+M[RS]/i) && text.match(/^BY\s+M[RS]\.\s+\w+:$/i)) {
                 examStart = i;
                 break;
             }
@@ -819,11 +1007,49 @@ function parseExaminationWithPatterns(pages, firstPrintedPage) {
     }
     
     if (examStart === -1) {
+        // Standard examination header search
+        for (let i = 0; i < allLines.length; i++) {
+            const text = allLines[i].text.trim();
+            if (text.match(/^EXAMINATION$/i) || 
+                text.match(/^BY\s+M[RS]\.\s+\w+:$/i) ||
+                text.match(/EXAMINATION\s*$/i)) {
+                examStart = i;
+                break;
+            }
+        }
+    }
+    
+    if (examStart === -1) {
+        // Try to find first Q using dynamic patterns
+        for (let i = 0; i < allLines.length; i++) {
+            const lineText = allLines[i].text;
+            const trimmed = lineText.trim();
+            
+            // Test all question checkers
+            for (const checker of questionCheckers) {
+                if (checker(trimmed) || checker(lineText)) {
+                    examStart = i;
+                    break;
+                }
+            }
+            if (examStart !== -1) break;
+        }
+    }
+    
+    if (examStart === -1) {
         console.log('Could not find examination section');
-        return qaItems;
+        return { qaItems, examinationFound: false };
     }
     
     console.log(`Found examination starting at line ${examStart}`);
+    
+    // DEBUG: Show first 20 lines after examination start
+    console.log('\n=== DEBUG: First 20 lines after examination start ===');
+    for (let i = examStart; i < Math.min(examStart + 20, allLines.length); i++) {
+        const line = allLines[i];
+        console.log(`  [${i}] LineNum=${line.lineNumber}, Text="${line.text.substring(0, 80)}"`);
+    }
+    console.log('=== END DEBUG ===\n');
     
     // Parse Q/A pairs
     let currentQ = null;
@@ -839,27 +1065,28 @@ function parseExaminationWithPatterns(pages, firstPrintedPage) {
         // Skip empty lines
         if (!trimmed) continue;
         
-        // Check if this is a Question line (Q. or Q or QUESTION or Question:)
-        // Handle patterns like "· · ·Q.·" with middle dots
-        // Also handle standalone Q without period (like "Q The question...")
-        const isQuestion = trimmed.match(/^Q\.\s*/i) || 
-                          text.match(/^\s+Q\.\s*/i) ||
-                          trimmed.match(/^[·\s]*Q\.[·\s]/i) ||
-                          trimmed.match(/^Q\s+[A-Z]/i) ||  // Standalone Q followed by content
-                          trimmed.match(/^QUESTION[:\s]/i) ||
-                          trimmed.match(/^Question[:\s]/i);
-        // Check if this is an Answer line (A. or A or ANSWER or Answer:)
-        // Handle patterns like "· · ·A.·" with middle dots
-        // Also handle standalone A without period (like "A The answer...")
-        const isAnswer = trimmed.match(/^A\.\s*/i) || 
-                        text.match(/^\s+A\.\s*/i) ||
-                        trimmed.match(/^[·\s]*A\.[·\s]/i) ||
-                        trimmed.match(/^A\s+[A-Z]/i) ||  // Standalone A followed by content
-                        trimmed.match(/^ANSWER[:\s]/i) ||
-                        trimmed.match(/^Answer[:\s]/i);
-        // Check if this is THE WITNESS: (answer after objection)
-        const isWitnessAnswer = trimmed.match(/^[·\s]*THE\s+WITNESS:[·\s]*/i) ||
-                               trimmed.match(/^THE\s+WITNESS:/i);
+        // Check if this is a Question line using dynamic patterns
+        let isQuestion = false;
+        for (const checker of questionCheckers) {
+            if (checker(trimmed) || checker(text)) {
+                isQuestion = true;
+                break;
+            }
+        }
+        
+        // Check if this is an Answer line using dynamic patterns
+        let isAnswer = false;
+        let isWitnessAnswer = false;
+        for (const checker of answerCheckers) {
+            if (checker(trimmed) || checker(text)) {
+                isAnswer = true;
+                if (trimmed.match(/THE\s+WITNESS/i)) {
+                    isWitnessAnswer = true;
+                }
+                break;
+            }
+        }
+        
         // Check if this is colloquy (attorney speaking, objection, etc.)
         // But NOT "THE WITNESS:" which is an answer
         const isColloquy = (trimmed.match(/^M[RS]\.\s+\w+:/i) || 
@@ -996,7 +1223,7 @@ function parseExaminationWithPatterns(pages, firstPrintedPage) {
     }
     
     console.log(`Parsed ${qaItems.length} Q/A pairs`);
-    return qaItems;
+    return { qaItems, examinationFound: examStart !== -1 };
 }
 
 function cleanQAText(text) {
@@ -1550,7 +1777,12 @@ async function extractPDFWithImages(pdfPath) {
         }
 
         // Categorize content - exclude left margin (line numbers area)
-        const digitalLeftMargin = width * 0.12;
+        // Use a more generous margin to exclude line numbers at various X positions
+        const digitalLeftMargin = width * 0.18; // Increased from 0.12 to properly exclude line numbers
+        
+        // Create a set of Y positions for detected line numbers to help exclude them
+        const lineNumberYPositions = new Set(actualLineNumbers.map(ln => Math.round(ln.y)));
+        const lineNumberItems = new Set(actualLineNumbers.map(ln => `${ln.x.toFixed(1)}_${ln.y.toFixed(1)}`));
         
         // Find content Y bounds from line numbers or content
         let minY, maxY;
@@ -1558,22 +1790,42 @@ async function extractPDFWithImages(pdfPath) {
             minY = Math.min(...lineNumbers.map(ln => ln.position.y));
             maxY = Math.max(...lineNumbers.map(ln => ln.position.y));
         } else {
+            // No line numbers detected - use content items or page bounds
             const contentItems = textItems.filter(item => item.x > digitalLeftMargin);
-            minY = Math.min(...contentItems.map(i => i.y), height * 0.1);
-            maxY = Math.max(...contentItems.map(i => i.y), height * 0.9);
+            if (contentItems.length > 0) {
+                const contentYs = contentItems.map(i => i.y);
+                minY = Math.min(...contentYs);
+                maxY = Math.max(...contentYs);
+            } else {
+                // Fallback to page margins (10% header/footer)
+                minY = height * 0.10;
+                maxY = height * 0.90;
+            }
+        }
+        
+        // Ensure valid bounds (not Infinity)
+        if (!isFinite(minY) || !isFinite(maxY)) {
+            minY = height * 0.10;
+            maxY = height * 0.90;
         }
         
         const headerBound = minY - (lineHeight || 25);
         const footerBound = maxY + (lineHeight || 25);
 
-        const mainContent = [];
+        // First pass: collect all content items (excluding line numbers)
+        const rawContent = [];
         for (const item of textItems) {
             const centerY = item.y + (item.height || 0) / 2;
             const centerX = item.x + (item.width || 0) / 2;
+            const itemKey = `${item.x.toFixed(1)}_${item.y.toFixed(1)}`;
 
-            // Exclude items in the left margin (line numbers) from content
-            if (centerY >= headerBound && centerY <= footerBound && centerX >= digitalLeftMargin) {
-                mainContent.push({
+            // Exclude items in the left margin AND items that are line numbers
+            const isInLeftMargin = centerX < digitalLeftMargin;
+            const isLineNumber = lineNumberItems.has(itemKey) || 
+                                 (item.x < leftMarginThreshold && /^[1-9]$|^1[0-9]$|^2[0-5]$/.test(item.text.trim()));
+            
+            if (centerY >= headerBound && centerY <= footerBound && !isInLeftMargin && !isLineNumber) {
+                rawContent.push({
                     text: item.text,
                     position: { x: item.x, y: item.y, width: item.width, height: item.height },
                     confidence: extractionMethod === 'digital' ? 100 : 90,
@@ -1581,25 +1833,218 @@ async function extractPDFWithImages(pdfPath) {
                 });
             }
         }
+        
+        // Second pass: group content items by Y position (same line) and join them
+        // This handles PDFs where Q. and question text are separate items on same line
+        const yTolerance = (lineHeight || 25) * 0.4; // Items within 40% of line height are on same line
+        const groupedByLine = new Map();
+        
+        for (const item of rawContent) {
+            const itemY = item.position.y;
+            let foundGroup = false;
+            
+            // Find existing group within Y tolerance
+            for (const [groupY, items] of groupedByLine) {
+                if (Math.abs(itemY - groupY) < yTolerance) {
+                    items.push(item);
+                    foundGroup = true;
+                    break;
+                }
+            }
+            
+            if (!foundGroup) {
+                groupedByLine.set(itemY, [item]);
+            }
+        }
+        
+        // Sort each group by X position and join text
+        const mainContent = [];
+        for (const [groupY, items] of groupedByLine) {
+            items.sort((a, b) => a.position.x - b.position.x);
+            
+            // Join all items on this line into one content block
+            const joinedText = items.map(i => i.text).join(' ');
+            const firstItem = items[0];
+            const lastItem = items[items.length - 1];
+            
+            mainContent.push({
+                text: joinedText,
+                position: { 
+                    x: firstItem.position.x, 
+                    y: groupY,
+                    width: (lastItem.position.x + (lastItem.position.width || 0)) - firstItem.position.x,
+                    height: firstItem.position.height 
+                },
+                confidence: Math.min(...items.map(i => i.confidence)),
+                type: 'content',
+            });
+        }
+        
+        // Sort mainContent by Y position
+        mainContent.sort((a, b) => a.position.y - b.position.y);
+        
+        // DEBUG: Check page 7 specifically
+        if (pageNum === 7) {
+            console.log(`\n[DEBUG EXTRACTION PAGE 7]`);
+            console.log(`  Text items total: ${textItems.length}`);
+            console.log(`  Line numbers found: ${lineNumbers.length}`);
+            console.log(`  Main content items: ${mainContent.length}`);
+            console.log(`  Header bound: ${headerBound.toFixed(1)}, Footer bound: ${footerBound.toFixed(1)}`);
+            console.log(`  Digital left margin: ${digitalLeftMargin.toFixed(1)}`);
+            
+            // Show first few items that were classified as line numbers
+            const lnItems = textItems.filter(item => item.x < digitalLeftMargin * 1.25).slice(0, 5);
+            console.log(`  First 5 left-margin items:`);
+            lnItems.forEach(item => {
+                console.log(`    "${item.text}" at x=${item.x.toFixed(1)}, y=${item.y.toFixed(1)}`);
+            });
+            
+            // Show first few items that should be content
+            console.log(`  First 5 mainContent items:`);
+            mainContent.slice(0, 5).forEach(item => {
+                console.log(`    "${item.text.substring(0, 40)}" at x=${item.position.x.toFixed(1)}, y=${item.position.y.toFixed(1)}`);
+            });
+        }
 
         // Use TextReconstructor to merge line numbers with content
         const reconstructor = new TextReconstructor();
         const merged = reconstructor.mergeLineNumbersWithContent(lineNumbers, mainContent);
 
+        // DEBUG: Check first page's merge results
+        if (pageNum === 7) {
+            console.log(`\n[DEBUG PAGE 7] Merge results:`);
+            console.log(`  Line numbers: ${lineNumbers.length}`);
+            console.log(`  Main content items: ${mainContent.length}`);
+            console.log(`  Merged lines: ${merged.length}`);
+            
+            // Show first few line numbers with their Y positions
+            console.log(`  First 3 line numbers:`);
+            lineNumbers.slice(0, 3).forEach(ln => {
+                console.log(`    ${ln.text}: y=${ln.position.y.toFixed(1)}`);
+            });
+            
+            // Show first few content items with their Y positions
+            console.log(`  First 5 main content items:`);
+            mainContent.slice(0, 5).forEach((item, i) => {
+                console.log(`    [${i}] "${item.text.substring(0, 40)}" at y=${item.position.y.toFixed(1)}`);
+            });
+            
+            const mergedWithContent = merged.filter(m => m.lineNumber && m.text && m.text.trim());
+            console.log(`  Merged lines with actual text: ${mergedWithContent.length}`);
+            if (mergedWithContent.length > 0) {
+                console.log(`  First merged line with content:`, mergedWithContent[0]);
+            }
+            if (merged.length > 0 && merged[0].lineNumber) {
+                console.log(`  First 3 merged lines:`);
+                merged.slice(0, 3).forEach(m => {
+                    console.log(`    [${m.lineNumber}] "${m.text.substring(0, 60)}"`);
+                });
+            }
+        }
+
         // Get image URL
         const imageFile = images[pageNum - 1];
         const imageFileName = path.basename(imageFile.imagePath);
 
+        // Get lines with content - check quality of merge
+        let linesWithLineNum = merged.filter(m => m.lineNumber);
+        let linesWithContent = linesWithLineNum.filter(m => m.text && m.text.trim().length > 0);
+        
+        // FALLBACK: If merge failed (most lines empty), use mainContent directly
+        if (lineNumbers.length > 5 && linesWithContent.length < lineNumbers.length * 0.3) {
+            console.log(`  ⚠ Page ${pageNum}: Merge quality poor (${linesWithContent.length}/${lineNumbers.length}), using direct content fallback`);
+            
+            // Create synthetic lines from mainContent directly
+            const sortedContent = [...mainContent].sort((a, b) => a.position.y - b.position.y);
+            linesWithLineNum = sortedContent.map((item, i) => ({
+                lineNumber: lineNumbers[i] ? lineNumbers[i].text : String(i + 1),
+                text: item.text
+            }));
+            linesWithContent = linesWithLineNum.filter(m => m.text && m.text.trim().length > 0);
+            console.log(`    → Direct content fallback: ${linesWithContent.length} lines with content`);
+        }
+        
         pages.push({
             pageNumber: pageNum,
             imageUrl: `/images/${imageFileName}`,
-            lines: merged.filter(m => m.lineNumber).map(m => ({
+            lines: linesWithLineNum.map(m => ({
                 lineNumber: m.lineNumber,
                 text: m.text || ''
             })),
             unmatched: merged.filter(m => !m.lineNumber && m.text).map(m => m.text),
-            extractionMethod
+            extractionMethod,
+            // Store raw content for fallback Q/A detection
+            _rawContent: mainContent.map(m => m.text).join(' ')
         });
+    }
+
+    // BELT AND SUSPENDERS: Validate extraction quality across all pages
+    const totalLinesWithContent = pages.reduce((sum, p) => 
+        sum + p.lines.filter(l => l.text && l.text.trim().length > 0).length, 0);
+    const totalExpectedLines = pages.reduce((sum, p) => sum + p.lines.length, 0);
+    const overallQuality = totalExpectedLines > 0 ? totalLinesWithContent / totalExpectedLines : 0;
+    
+    console.log(`\n[Extraction Quality Check]`);
+    console.log(`  Lines with content: ${totalLinesWithContent}/${totalExpectedLines} (${(overallQuality*100).toFixed(0)}%)`);
+    
+    if (overallQuality < 0.5 && totalExpectedLines > 50) {
+        console.log(`  ⚠ Overall extraction quality is poor, applying global fallback...`);
+        
+        // Apply global fallback - re-extract using direct Y-grouping
+        for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+            const page = pages[pageIndex];
+            const digitalPage = digitalPages.find(dp => dp.pageNum === page.pageNumber);
+            
+            if (!digitalPage || page.lines.filter(l => l.text && l.text.trim()).length > page.lines.length * 0.5) {
+                continue; // Skip if already has good content
+            }
+            
+            // Re-group text items by Y position with generous tolerance
+            const { width, height } = digitalPage;
+            const textItems = ocrResults.has(page.pageNumber) 
+                ? ocrResults.get(page.pageNumber).words.map(w => ({ text: w.text, x: w.bbox.x, y: w.bbox.y, width: w.bbox.width, height: w.bbox.height }))
+                : digitalPage.textItems;
+            
+            // Group by Y with 3% tolerance
+            const yTolerance = height * 0.03;
+            const lineGroups = new Map();
+            
+            for (const item of textItems) {
+                if (!item.text || !item.text.trim()) continue;
+                if (item.x < width * 0.1) continue; // Skip left margin (line numbers)
+                
+                let foundGroup = false;
+                for (const [groupY, items] of lineGroups) {
+                    if (Math.abs(item.y - groupY) < yTolerance) {
+                        items.push(item);
+                        foundGroup = true;
+                        break;
+                    }
+                }
+                if (!foundGroup) {
+                    lineGroups.set(item.y, [item]);
+                }
+            }
+            
+            // Build lines from groups
+            const newLines = [];
+            const sortedGroups = [...lineGroups.entries()].sort((a, b) => a[0] - b[0]);
+            
+            for (let i = 0; i < sortedGroups.length; i++) {
+                const [, items] = sortedGroups[i];
+                items.sort((a, b) => a.x - b.x);
+                const text = items.map(it => it.text).join(' ');
+                newLines.push({
+                    lineNumber: String(i + 1),
+                    text: text.trim()
+                });
+            }
+            
+            if (newLines.filter(l => l.text).length > page.lines.filter(l => l.text && l.text.trim()).length) {
+                console.log(`    Page ${page.pageNumber}: Global fallback improved ${page.lines.filter(l => l.text && l.text.trim()).length} → ${newLines.filter(l => l.text).length} lines`);
+                page.lines = newLines;
+            }
+        }
     }
 
     const digitalCount = pages.filter(p => p.extractionMethod === 'digital').length;
@@ -2155,6 +2600,25 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                 const body = JSON.parse(Buffer.concat(chunks).toString());
                 const { pages, firstPrintedPage, useAI = true, enableTopics = true } = body;
                 
+                // DEBUG: Check what data we received
+                console.log(`\n[DEBUG PARSE-QA] Received request:`);
+                console.log(`  Total pages: ${pages?.length || 0}`);
+                if (pages && pages.length > 0) {
+                    console.log(`  Page 1 lines: ${pages[0].lines?.length || 0}`);
+                    if (pages[0].lines && pages[0].lines[0]) {
+                        console.log(`  Page 1 first line: LineNum=${pages[0].lines[0].lineNumber}, Text="${pages[0].lines[0].text?.substring(0, 60)}"`);
+                    }
+                    if (pages.length >= 7) {
+                        console.log(`  Page 7 lines: ${pages[6].lines?.length || 0}`);
+                        if (pages[6].lines && pages[6].lines[0]) {
+                            console.log(`  Page 7 first line: LineNum=${pages[6].lines[0].lineNumber}, Text="${pages[6].lines[0].text?.substring(0, 60)}"`);
+                        }
+                        if (pages[6].lines && pages[6].lines.length > 12) {
+                            console.log(`  Page 7 line 13 (where Q should be): LineNum=${pages[6].lines[12].lineNumber}, Text="${pages[6].lines[12].text?.substring(0, 80)}"`);
+                        }
+                    }
+                }
+                
                 const CHUNK_SIZE = 25; // Process 25 pages at a time
                 const totalPages = pages.length;
                 const numChunks = Math.ceil(totalPages / CHUNK_SIZE);
@@ -2216,15 +2680,35 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     console.log(`  [1/3] Parsing Q&A from ${chunkPages.length} pages...`);
                     sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 1, message: 'Parsing Q&A...' });
                     const parseStart = Date.now();
-                    let chunkQA = await parseExamination(chunkPages, chunkFirstPrintedPage);
+                    let parseResults = await parseExamination(chunkPages, chunkFirstPrintedPage);
+                    
+                    // Extract results (handle both old and new return format)
+                    let chunkQA = parseResults.qaItems || parseResults;
+                    const formatInfo = parseResults.formatInfo;
+                    const detectionStats = parseResults.detectionStats;
+                    
                     const parseTime = Date.now() - parseStart;
                     timings.parsing.total += parseTime;
                     timings.parsing.chunks.push({ chunk: chunkIdx + 1, pages: chunkPages.length, qaFound: chunkQA.length, timeMs: parseTime });
                     console.log(`  Found ${chunkQA.length} Q&A pairs (${(parseTime/1000).toFixed(1)}s)`);
                     
+                    // Send format analysis on first chunk
+                    if (chunkIdx === 0 && (formatInfo || detectionStats)) {
+                        sendProgress({ 
+                            type: 'format-analysis', 
+                            formatInfo,
+                            detectionStats
+                        });
+                    }
+                    
                     if (chunkQA.length === 0) {
                         console.log(`  No Q&A found in this chunk, skipping...`);
-                        sendProgress({ type: 'chunk-complete', chunk: chunkIdx + 1, qaFound: 0 });
+                        sendProgress({ 
+                            type: 'chunk-complete', 
+                            chunk: chunkIdx + 1, 
+                            qaFound: 0,
+                            detectionStats: chunkIdx === 0 ? detectionStats : undefined
+                        });
                         continue;
                     }
                     

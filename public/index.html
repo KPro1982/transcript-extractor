@@ -4249,6 +4249,38 @@
                                         progressText.textContent = `Processing ${data.totalPages} pages in ${totalChunks} chunks...`;
                                         progressChunks.textContent = `Chunk 0/${totalChunks} complete`;
                                         break;
+                                    
+                                    case 'format-analysis':
+                                        // Display format analysis info
+                                        const formatInfo = data.formatInfo;
+                                        const detectionStats = data.detectionStats;
+                                        
+                                        let formatMsg = '';
+                                        if (formatInfo) {
+                                            const qPatterns = formatInfo.questionPatterns?.map(p => p.pattern).join(', ') || 'default';
+                                            const aPatterns = formatInfo.answerPatterns?.map(p => p.pattern).join(', ') || 'default';
+                                            formatMsg = `<span style="color: var(--info);">📋 Format detected:</span> Q: ${qPatterns} | A: ${aPatterns}`;
+                                            if (formatInfo.confidence) {
+                                                const confidenceColor = formatInfo.confidence === 'high' ? 'var(--success)' : 
+                                                                       formatInfo.confidence === 'medium' ? 'var(--warning)' : 'var(--text-muted)';
+                                                formatMsg += ` <span style="color: ${confidenceColor};">(${formatInfo.confidence} confidence)</span>`;
+                                            }
+                                        }
+                                        
+                                        if (detectionStats) {
+                                            const statusColor = detectionStats.success ? 'var(--success)' : 'var(--warning)';
+                                            const statusIcon = detectionStats.success ? '✓' : '⚠';
+                                            formatMsg += `<br><span style="color: ${statusColor};">${statusIcon} ${detectionStats.method === 'ai' ? 'AI' : 'Pattern'} detection: ${detectionStats.qaFound} Q&A pairs found</span>`;
+                                            
+                                            if (!detectionStats.examinationFound) {
+                                                formatMsg += `<br><span style="color: var(--warning);">⚠ Examination section not clearly marked — scanning entire document</span>`;
+                                            }
+                                        }
+                                        
+                                        if (formatMsg) {
+                                            progressChunks.innerHTML = formatMsg;
+                                        }
+                                        break;
                                         
                                     case 'chunk-start':
                                         progressText.innerHTML = `<strong>Chunk ${data.chunk}/${data.totalChunks}</strong>: Pages ${data.startPage}-${data.endPage}`;
@@ -4263,16 +4295,39 @@
                                         completedChunks = data.chunk;
                                         const pct = Math.round((completedChunks / totalChunks) * 90) + 5;
                                         progressFill.style.width = pct + '%';
-                                        progressChunks.innerHTML = `<span style="color: var(--success);">✓ Chunk ${data.chunk}/${data.totalChunks} complete</span> — ${data.totalQA} Q&A pairs found`;
+                                        
+                                        if (data.qaFound === 0) {
+                                            // Show warning if no Q&A found
+                                            const detectionInfo = data.detectionStats;
+                                            let warningMsg = `<span style="color: var(--warning);">⚠ Chunk ${data.chunk}/${data.totalChunks} complete</span> — No Q&A pairs found`;
+                                            if (detectionInfo && !detectionInfo.examinationFound) {
+                                                warningMsg += ` <span style="color: var(--text-muted);">(examination section not detected)</span>`;
+                                            }
+                                            progressChunks.innerHTML = warningMsg;
+                                        } else {
+                                            progressChunks.innerHTML = `<span style="color: var(--success);">✓ Chunk ${data.chunk}/${data.totalChunks} complete</span> — ${data.totalQA} Q&A pairs found`;
+                                        }
                                         break;
                                         
                                     case 'complete':
                                         qaItems = data.qaItems || [];
                                         
                                         if (qaItems.length === 0) {
-                                            alert('No Q&A pairs found. The examination section may not have been detected.');
-                                            startSummarizeBtn.disabled = false;
-                                            summarizeProgress.classList.remove('active');
+                                            progressFill.style.width = '100%';
+                                            progressText.innerHTML = `<span style="color: var(--error);">❌ No Q&A pairs detected</span>`;
+                                            progressChunks.innerHTML = `
+                                                <span style="color: var(--warning);">The transcript format may not be recognized.</span><br>
+                                                <span style="color: var(--text-muted); font-size: 0.8rem;">
+                                                    • Ensure the PDF contains a deposition transcript<br>
+                                                    • Check that questions (Q.) and answers (A.) are clearly marked<br>
+                                                    • The examination section should be present in the document
+                                                </span>
+                                            `;
+                                            
+                                            setTimeout(() => {
+                                                startSummarizeBtn.disabled = false;
+                                                summarizeProgress.classList.remove('active');
+                                            }, 5000);
                                             return;
                                         }
 
@@ -5366,19 +5421,93 @@
 
         // ===== Start Over =====
         startOverBtn.addEventListener('click', () => {
+            // Clear all data
             pages = [];
             qaItems = [];
+            currentFile = null;
+            currentAnalysis = null;
             currentPreviewPage = 0;
-            firstPrintedPage = 3;
+            currentDigitalPageForMapping = 1;
+            currentPrintedPageForMapping = null;
+            firstPrintedPage = 1;
+            printedPageOffset = 0;
             currentDetailIndex = 0;
             analysisComplete = false;
+            selectedRowIndex = 0;
+            
+            // Reset magnifier state
+            magnifierEnabled = false;
+            isDraggingMagnifier = false;
+            const magnifier = document.getElementById('magnifier');
+            const magnifierToggle = document.getElementById('magnifierToggle');
+            if (magnifier) {
+                magnifier.classList.remove('active');
+            }
+            if (magnifierToggle) {
+                magnifierToggle.classList.remove('active');
+            }
+            
+            // Reset form inputs
             fileInput.value = '';
-            pageOneInput.value = 3;
+            const printedPageInput = document.getElementById('printedPageInput');
+            if (printedPageInput) printedPageInput.value = '';
+            
+            // Clear summary table
+            if (summaryTableBody) summaryTableBody.innerHTML = '';
+            
+            // Reset UI state
             startSummarizeBtn.disabled = false;
             summarizeProgress.classList.remove('active');
             detailPanel.classList.remove('open');
+            
+            // Reset progress bar
+            if (progressFill) progressFill.style.width = '0%';
+            if (progressText) progressText.textContent = '';
+            
+            // Clear any displayed images
+            if (previewImage) previewImage.src = '';
+            if (sideImage) sideImage.src = '';
+            
+            // Clear analysis screen
+            const analysisLoading = document.getElementById('analysisLoading');
+            const analysisResults = document.getElementById('analysisResults');
+            if (analysisLoading) analysisLoading.style.display = 'none';
+            if (analysisResults) analysisResults.style.display = 'none';
+            
+            // Close all modals
+            const allModals = document.querySelectorAll('.report-modal, .position-preview-modal');
+            allModals.forEach(modal => modal.classList.remove('active'));
+            
+            // Hide loading overlay
+            if (loadingOverlay) loadingOverlay.classList.remove('active');
+            
+            // Reset currentStep variable first
+            currentStep = 1;
+            
+            // Manually hide all screens and show upload screen
+            const analysisScreen = document.getElementById('analysisScreen');
+            [uploadScreen, analysisScreen, pageSelectScreen, summarizeScreen, summaryScreen, reportsScreen].forEach(s => {
+                if (s) s.classList.remove('active');
+            });
+            if (uploadScreen) uploadScreen.classList.add('active');
+            
+            // Reset step indicators
             updateQuickSelectButtons();
-            goToStep(1);
+            document.querySelectorAll('.step-item').forEach((item, idx) => {
+                item.classList.remove('active', 'complete');
+                if (idx === 0) item.classList.add('active');
+            });
+            document.querySelectorAll('.step-connector').forEach(conn => {
+                conn.classList.remove('active', 'complete');
+            });
+            
+            // Hide start over button
+            startOverBtn.style.visibility = 'hidden';
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+            
+            console.log('✓ All data cleared - ready for fresh upload');
         });
 
         // ===== Reports Navigation =====
