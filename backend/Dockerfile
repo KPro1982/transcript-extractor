@@ -30,6 +30,8 @@ COPY --from=builder /root/.local /root/.local
 
 # Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
+# Ensure project root is on Python path for app and worker imports
+ENV PYTHONPATH=/app
 
 # Copy application code
 COPY . .
