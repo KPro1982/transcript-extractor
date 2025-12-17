@@ -48,12 +48,16 @@ app = FastAPI(
 )
 
 # CORS configuration
+cors_origins = settings.allowed_origins + [settings.frontend_url]
+logger.info(f"Configuring CORS with origins: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins + [settings.frontend_url],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -82,4 +86,5 @@ if __name__ == "__main__":
         reload=True,
         log_level=settings.log_level.lower()
     )
+
 

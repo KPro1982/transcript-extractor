@@ -31,7 +31,12 @@ class Settings(BaseSettings):
     
     # CORS
     frontend_url: str = "http://localhost:3000"
-    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "https://frontend-production-e051f.up.railway.app"]
+    allowed_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://frontend-production-e051f.up.railway.app",
+        "https://backend-production-e4c7.up.railway.app"  # Allow backend itself for health checks
+    ]
     
     # Monitoring
     sentry_dsn: Optional[str] = None
