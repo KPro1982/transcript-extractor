@@ -13,7 +13,8 @@
     "hybrid": "ts-node src/index-hybrid.ts",
     "hybrid:build": "npm run build && node dist/index-hybrid.js",
     "diagnostic": "ts-node src/diagnostic-tool.ts",
-    "test-ocr": "ts-node src/test-ocr-direct.ts"
+    "test-ocr": "ts-node src/test-ocr-direct.ts",
+    "test-summarization": "node test-deposition-summarization.js"
   },
   "keywords": [
     "deposition",
@@ -25,6 +26,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "pdf-ts": "^0.0.2",
     "pdf2pic": "^3.2.0",
     "pdfjs-dist": "^3.11.174",

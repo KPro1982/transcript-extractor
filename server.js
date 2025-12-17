@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -19,10 +22,21 @@ if (!OPENAI_API_KEY) {
     console.warn('Warning: OPENAI_API_KEY not found. AI summarization will fall back to rule-based summaries.');
 }
 
+// HTTP agent with keep-alive for connection pooling
+const httpsAgent = new https.Agent({ 
+    keepAlive: true,
+    keepAliveMsecs: 1000,
+    maxSockets: 50,
+    maxFreeSockets: 10
+});
+
+// Request timeout (60 seconds)
+const API_TIMEOUT_MS = 60000;
+
 /**
- * Call OpenAI API for summarization
+ * Call OpenAI API for summarization with timeout, retry, and rate limit handling
  */
-async function callOpenAI(messages, options = {}) {
+async function callOpenAI(messages, options = {}, retryCount = 0) {
     if (!OPENAI_API_KEY) {
         throw new Error('OpenAI API key not configured');
     }
@@ -36,6 +50,7 @@ async function callOpenAI(messages, options = {}) {
 
     return new Promise((resolve, reject) => {
         const req = https.request({
+            agent: httpsAgent,
             hostname: 'api.openai.com',
             path: '/v1/chat/completions',
             method: 'POST',
@@ -43,13 +58,35 @@ async function callOpenAI(messages, options = {}) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${OPENAI_API_KEY}`,
                 'Content-Length': Buffer.byteLength(payload)
-            }
+            },
+            timeout: API_TIMEOUT_MS
         }, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 try {
                     const parsed = JSON.parse(data);
+                    
+                    // Handle rate limit (429) with exponential backoff
+                    if (res.statusCode === 429) {
+                        const retryAfter = parseInt(res.headers['retry-after']) || Math.pow(2, retryCount);
+                        const delay = retryAfter * 1000; // Convert to milliseconds
+                        
+                        console.warn(`Rate limit hit (429). Retrying after ${delay}ms (attempt ${retryCount + 1}/3)`);
+                        
+                        if (retryCount < 3) {
+                            setTimeout(() => {
+                                callOpenAI(messages, options, retryCount + 1)
+                                    .then(resolve)
+                                    .catch(reject);
+                            }, delay);
+                            return;
+                        } else {
+                            reject(new Error('Rate limit exceeded. Maximum retries reached.'));
+                            return;
+                        }
+                    }
+                    
                     if (parsed.error) {
                         reject(new Error(parsed.error.message || 'OpenAI API error'));
                     } else {
@@ -61,7 +98,36 @@ async function callOpenAI(messages, options = {}) {
             });
         });
 
-        req.on('error', reject);
+        req.on('error', (error) => {
+            // Retry on network errors
+            if (retryCount < 2 && (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT')) {
+                const delay = Math.pow(2, retryCount) * 1000;
+                console.warn(`Network error (${error.code}). Retrying after ${delay}ms`);
+                setTimeout(() => {
+                    callOpenAI(messages, options, retryCount + 1)
+                        .then(resolve)
+                        .catch(reject);
+                }, delay);
+            } else {
+                reject(error);
+            }
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            if (retryCount < 2) {
+                const delay = Math.pow(2, retryCount) * 1000;
+                console.warn(`Request timeout. Retrying after ${delay}ms`);
+                setTimeout(() => {
+                    callOpenAI(messages, options, retryCount + 1)
+                        .then(resolve)
+                        .catch(reject);
+                }, delay);
+            } else {
+                reject(new Error('Request timeout after maximum retries'));
+            }
+        });
+
         req.write(payload);
         req.end();
     });
@@ -159,12 +225,12 @@ Respond in JSON format: {"summary": "...", "topic": "..."}`;
 }
 
 /**
- * COMBINED: Summarize AND classify topics - TRUE BATCHING
- * Sends multiple Q&A items per API call for ~15-20x faster processing
+ * COMBINED: Summarize AND classify topics - TRUE BATCHING WITH CONCURRENT PROCESSING
+ * Sends multiple Q&A items per API call with concurrent execution for maximum speed
  * Previous: 1 API call per Q&A item (1182 calls for large transcript)
- * New: 15-20 Q&A items per API call (~60-80 calls for large transcript)
+ * New: 20 Q&A items per API call with 5-10 concurrent requests (~3-4x faster)
  */
-async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 15, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
+async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 20, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => {
@@ -195,8 +261,10 @@ async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 15, sendProg
 
     const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
     const totalPairs = totalQA !== null ? totalQA : (startIndex + qaItems.length);
+    const CONCURRENT_BATCHES = 8; // Process 8 batches concurrently
+    
     console.log(`Combined AI summarization + topic classification for ${qaItems.length} Q&A pairs...`);
-    console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls (was ${qaItems.length} calls)`);
+    console.log(`  Using concurrent batching: ${itemsPerRequest} items/request, ${CONCURRENT_BATCHES} concurrent batches = ~${totalBatches} API calls (was ${qaItems.length} calls)`);
 
     // Build system prompt with deposition date context
     let systemPrompt = `You are a legal assistant analyzing deposition testimony.
@@ -234,48 +302,58 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
 
     const results = [];
     
-    // Process items in true batches (multiple items per API call)
+    // Create batches
+    const batches = [];
     for (let i = 0; i < qaItems.length; i += itemsPerRequest) {
-        const batch = qaItems.slice(i, i + itemsPerRequest);
-        const batchNum = Math.floor(i / itemsPerRequest) + 1;
+        batches.push({
+            items: qaItems.slice(i, i + itemsPerRequest),
+            batchNum: Math.floor(i / itemsPerRequest) + 1,
+            startIndex: i
+        });
+    }
+    
+    // Process batches concurrently in chunks
+    for (let chunkStart = 0; chunkStart < batches.length; chunkStart += CONCURRENT_BATCHES) {
+        const chunkBatches = batches.slice(chunkStart, chunkStart + CONCURRENT_BATCHES);
         
-        try {
-            // Build user prompt with all Q&A items in this batch
-            const userPrompt = batch.map((qa, idx) => {
-                const qaText = qa.colloquy 
-                    ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
-                    : `Q: ${qa.question}\nA: ${qa.answer}`;
-                return `[${idx + 1}]\n${qaText}`;
-            }).join('\n\n---\n\n');
-            
-            // Calculate max_tokens based on batch size (roughly 100 tokens per item for response)
-            const maxTokens = Math.min(4000, batch.length * 150);
-            
-            const response = await callOpenAI([
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Analyze these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
-            ], { max_tokens: maxTokens, temperature: 0.2 });
-            
-            // Parse the JSON array response
-            let parsed;
+        // Process this chunk of batches concurrently
+        const chunkPromises = chunkBatches.map(async ({ items: batch, batchNum, startIndex }) => {
             try {
-                // Clean response - remove markdown code blocks if present
-                let cleanResponse = response.trim();
-                if (cleanResponse.startsWith('```json')) {
-                    cleanResponse = cleanResponse.slice(7);
-                }
-                if (cleanResponse.startsWith('```')) {
-                    cleanResponse = cleanResponse.slice(3);
-                }
-                if (cleanResponse.endsWith('```')) {
-                    cleanResponse = cleanResponse.slice(0, -3);
-                }
-                parsed = JSON.parse(cleanResponse.trim());
-            } catch (parseError) {
-                console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
-                // Fall back to rule-based for this batch
-                batch.forEach(qa => {
-                    results.push({
+                // Build user prompt with all Q&A items in this batch
+                const userPrompt = batch.map((qa, idx) => {
+                    const qaText = qa.colloquy 
+                        ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
+                        : `Q: ${qa.question}\nA: ${qa.answer}`;
+                    return `[${idx + 1}]\n${qaText}`;
+                }).join('\n\n---\n\n');
+                
+                // Calculate max_tokens based on batch size (roughly 150 tokens per item for response)
+                const maxTokens = Math.min(4000, batch.length * 150);
+                
+                const response = await callOpenAI([
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Analyze these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
+                ], { max_tokens: maxTokens, temperature: 0.2 });
+                
+                // Parse the JSON array response
+                let parsed;
+                try {
+                    // Clean response - remove markdown code blocks if present
+                    let cleanResponse = response.trim();
+                    if (cleanResponse.startsWith('```json')) {
+                        cleanResponse = cleanResponse.slice(7);
+                    }
+                    if (cleanResponse.startsWith('```')) {
+                        cleanResponse = cleanResponse.slice(3);
+                    }
+                    if (cleanResponse.endsWith('```')) {
+                        cleanResponse = cleanResponse.slice(0, -3);
+                    }
+                    parsed = JSON.parse(cleanResponse.trim());
+                } catch (parseError) {
+                    console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
+                    // Fall back to rule-based for this batch
+                    return batch.map(qa => ({
                         ...qa,
                         summary: generateSummary(qa.question, qa.answer),
                         topic: 'Uncategorized',
@@ -284,82 +362,85 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
                         date: null,
                         crossPoint: false,
                         aiSummarized: false,
-                        notes: qa.notes || ''
+                        notes: qa.notes || '',
+                        batchNum: batchNum
+                    }));
+                }
+                
+                // Map results back to Q&A items
+                const batchResults = [];
+                if (Array.isArray(parsed) && parsed.length === batch.length) {
+                    batch.forEach((qa, idx) => {
+                        const aiResult = parsed[idx] || {};
+                        let extractedDate = aiResult.date || null;
+                        
+                        // If AI didn't extract a date but hasDates is true, try to extract it ourselves
+                        if (!extractedDate && aiResult.hasDates) {
+                            const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
+                            // Try relative date calculation first
+                            if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
+                                fullText.includes('last month') || fullText.includes('ago'))) {
+                                extractedDate = calculateRelativeDate(fullText, depositionDate);
+                            }
+                            // Fall back to explicit date extraction
+                            if (!extractedDate) {
+                                extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
+                            }
+                        }
+                        
+                        batchResults.push({
+                            ...qa,
+                            summary: aiResult.summary || generateSummary(qa.question, qa.answer),
+                            topic: aiResult.topic || 'Uncategorized',
+                            peopleMentioned: aiResult.peopleMentioned || [],
+                            hasDates: aiResult.hasDates || false,
+                            date: extractedDate,
+                            crossPoint: false,
+                            aiSummarized: true,
+                            notes: qa.notes || '',
+                            batchNum: batchNum
+                        });
                     });
-                });
-                continue;
-            }
-            
-            // Map results back to Q&A items
-            if (Array.isArray(parsed) && parsed.length === batch.length) {
-                batch.forEach((qa, idx) => {
-                    const aiResult = parsed[idx] || {};
-                    let extractedDate = aiResult.date || null;
-                    
-                    // If AI didn't extract a date but hasDates is true, try to extract it ourselves
-                    if (!extractedDate && aiResult.hasDates) {
-                        const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
-                        // Try relative date calculation first
-                        if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
-                            fullText.includes('last month') || fullText.includes('ago'))) {
-                            extractedDate = calculateRelativeDate(fullText, depositionDate);
+                } else {
+                    // Response length mismatch - try to salvage what we can
+                    console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
+                    batch.forEach((qa, idx) => {
+                        const aiResult = (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : {};
+                        let extractedDate = aiResult.date || null;
+                        
+                        // Try to extract date if hasDates is true
+                        if (!extractedDate && aiResult.hasDates) {
+                            const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
+                            if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
+                                fullText.includes('last month') || fullText.includes('ago'))) {
+                                extractedDate = calculateRelativeDate(fullText, depositionDate);
+                            }
+                            if (!extractedDate) {
+                                extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
+                            }
                         }
-                        // Fall back to explicit date extraction
-                        if (!extractedDate) {
-                            extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
-                        }
-                    }
-                    
-                    results.push({
-                        ...qa,
-                        summary: aiResult.summary || generateSummary(qa.question, qa.answer),
-                        topic: aiResult.topic || 'Uncategorized',
-                        peopleMentioned: aiResult.peopleMentioned || [],
-                        hasDates: aiResult.hasDates || false,
-                        date: extractedDate,
-                        crossPoint: false,
-                        aiSummarized: true,
-                        notes: qa.notes || ''
+                        
+                        batchResults.push({
+                            ...qa,
+                            summary: aiResult.summary || generateSummary(qa.question, qa.answer),
+                            topic: aiResult.topic || 'Uncategorized',
+                            peopleMentioned: aiResult.peopleMentioned || [],
+                            hasDates: aiResult.hasDates || false,
+                            date: extractedDate,
+                            crossPoint: false,
+                            aiSummarized: !!aiResult.summary,
+                            notes: qa.notes || '',
+                            batchNum: batchNum
+                        });
                     });
-                });
-            } else {
-                // Response length mismatch - try to salvage what we can
-                console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
-                batch.forEach((qa, idx) => {
-                    const aiResult = (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : {};
-                    let extractedDate = aiResult.date || null;
-                    
-                    // Try to extract date if hasDates is true
-                    if (!extractedDate && aiResult.hasDates) {
-                        const fullText = (qa.question + ' ' + qa.answer).toLowerCase();
-                        if (depositionDate && (fullText.includes('last week') || fullText.includes('yesterday') || 
-                            fullText.includes('last month') || fullText.includes('ago'))) {
-                            extractedDate = calculateRelativeDate(fullText, depositionDate);
-                        }
-                        if (!extractedDate) {
-                            extractedDate = extractDateFromText(qa.question + ' ' + qa.answer);
-                        }
-                    }
-                    
-                    results.push({
-                        ...qa,
-                        summary: aiResult.summary || generateSummary(qa.question, qa.answer),
-                        topic: aiResult.topic || 'Uncategorized',
-                        peopleMentioned: aiResult.peopleMentioned || [],
-                        hasDates: aiResult.hasDates || false,
-                        date: extractedDate,
-                        crossPoint: false,
-                        aiSummarized: !!aiResult.summary,
-                        notes: qa.notes || ''
-                    });
-                });
-            }
-            
-        } catch (error) {
-            console.error(`  Batch ${batchNum} failed: ${error.message}`);
-            // Fall back to rule-based for this batch
-            batch.forEach(qa => {
-                results.push({
+                }
+                
+                return batchResults;
+                
+            } catch (error) {
+                console.error(`  Batch ${batchNum} failed: ${error.message}`);
+                // Fall back to rule-based for this batch
+                return batch.map(qa => ({
                     ...qa,
                     summary: generateSummary(qa.question, qa.answer),
                     topic: 'Uncategorized',
@@ -368,32 +449,48 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
                     date: null,
                     crossPoint: false,
                     aiSummarized: false,
-                    notes: qa.notes || ''
+                    notes: qa.notes || '',
+                    batchNum: batchNum
+                }));
+            }
+        });
+        
+        // Wait for all batches in this chunk to complete
+        const chunkResults = await Promise.all(chunkPromises);
+        
+        // Flatten and sort results by batch number to maintain order
+        const flatResults = chunkResults.flat();
+        flatResults.sort((a, b) => (a.batchNum || 0) - (b.batchNum || 0));
+        
+        // Remove batchNum property before adding to results
+        flatResults.forEach(result => {
+            const { batchNum, ...cleanResult } = result;
+            results.push(cleanResult);
+        });
+        
+        // Send progress updates for completed batches
+        const completedBatches = Math.min(chunkStart + CONCURRENT_BATCHES, batches.length);
+        const processedCount = Math.min(completedBatches * itemsPerRequest, qaItems.length);
+        
+        console.log(`  Processed ${processedCount}/${qaItems.length} pairs (${completedBatches}/${totalBatches} batches)`);
+        
+        // Send progress update for each completed batch
+        if (sendProgress) {
+            chunkBatches.forEach(({ batchNum, startIndex: batchStartIndex }) => {
+                const batchStart = startIndex + batchStartIndex + 1;
+                const batchEnd = Math.min(startIndex + batchStartIndex + itemsPerRequest, startIndex + qaItems.length);
+                
+                sendProgress({
+                    type: 'batch-progress',
+                    currentStart: batchStart,
+                    currentEnd: batchEnd,
+                    total: totalPairs,
+                    batchNum: batchNum,
+                    totalBatches: totalBatches,
+                    itemsPerBatch: Math.min(itemsPerRequest, qaItems.length - batchStartIndex),
+                    batchSize: itemsPerRequest
                 });
             });
-        }
-        
-        // Progress update
-        const processedCount = Math.min(i + itemsPerRequest, qaItems.length);
-        const currentStart = startIndex + i + 1;
-        const currentEnd = startIndex + processedCount;
-        console.log(`  Processed ${processedCount}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
-        
-        // Send progress update to frontend
-        if (sendProgress) {
-            sendProgress({
-                type: 'batch-progress',
-                currentStart: currentStart,
-                currentEnd: currentEnd,
-                total: totalPairs,
-                batchNum: batchNum,
-                totalBatches: totalBatches
-            });
-        }
-        
-        // Small delay between batches to avoid rate limiting
-        if (i + itemsPerRequest < qaItems.length) {
-            await new Promise(r => setTimeout(r, 100));
         }
     }
     
@@ -401,10 +498,10 @@ Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":
 }
 
 /**
- * Batch summarize multiple Q&A pairs using AI - TRUE BATCHING
- * Sends multiple Q&A items per API call for faster processing
+ * Batch summarize multiple Q&A pairs using AI - TRUE BATCHING WITH CONCURRENT PROCESSING
+ * Sends multiple Q&A items per API call with concurrent execution for maximum speed
  */
-async function batchSummarizeQA(qaItems, itemsPerRequest = 15, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
+async function batchSummarizeQA(qaItems, itemsPerRequest = 20, sendProgress = null, startIndex = 0, totalQA = null, depositionDate = null) {
     if (!OPENAI_API_KEY) {
         console.log('No API key - using rule-based summaries');
         return qaItems.map(qa => ({
@@ -418,8 +515,10 @@ async function batchSummarizeQA(qaItems, itemsPerRequest = 15, sendProgress = nu
 
     const totalBatches = Math.ceil(qaItems.length / itemsPerRequest);
     const totalPairs = totalQA !== null ? totalQA : (startIndex + qaItems.length);
+    const CONCURRENT_BATCHES = 8; // Process 8 batches concurrently
+    
     console.log(`Generating AI summaries for all ${qaItems.length} Q&A pairs...`);
-    console.log(`  Using true batching: ${itemsPerRequest} items/request = ~${totalBatches} API calls`);
+    console.log(`  Using concurrent batching: ${itemsPerRequest} items/request, ${CONCURRENT_BATCHES} concurrent batches = ~${totalBatches} API calls`);
 
     const systemPrompt = `You are a legal assistant summarizing deposition testimony.
 You will receive multiple Q&A exchanges. For EACH one, provide a concise summary (1-2 sentences).
@@ -434,109 +533,140 @@ Example format: ["The witness testified...", "Witness stated...", ...]`;
 
     const results = [];
     
+    // Create batches
+    const batches = [];
     for (let i = 0; i < qaItems.length; i += itemsPerRequest) {
-        const batch = qaItems.slice(i, i + itemsPerRequest);
-        const batchNum = Math.floor(i / itemsPerRequest) + 1;
+        batches.push({
+            items: qaItems.slice(i, i + itemsPerRequest),
+            batchNum: Math.floor(i / itemsPerRequest) + 1,
+            startIndex: i
+        });
+    }
+    
+    // Process batches concurrently in chunks
+    for (let chunkStart = 0; chunkStart < batches.length; chunkStart += CONCURRENT_BATCHES) {
+        const chunkBatches = batches.slice(chunkStart, chunkStart + CONCURRENT_BATCHES);
         
-        try {
-            // Build user prompt with all Q&A items
-            const userPrompt = batch.map((qa, idx) => {
-                const qaText = qa.colloquy 
-                    ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
-                    : `Q: ${qa.question}\nA: ${qa.answer}`;
-                return `[${idx + 1}]\n${qaText}`;
-            }).join('\n\n---\n\n');
-            
-            const maxTokens = Math.min(3000, batch.length * 80);
-            
-            const response = await callOpenAI([
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Summarize these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
-            ], { max_tokens: maxTokens, temperature: 0.2 });
-            
-            // Parse response
-            let parsed;
+        // Process this chunk of batches concurrently
+        const chunkPromises = chunkBatches.map(async ({ items: batch, batchNum, startIndex }) => {
             try {
-                let cleanResponse = response.trim();
-                if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.slice(7);
-                if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.slice(3);
-                if (cleanResponse.endsWith('```')) cleanResponse = cleanResponse.slice(0, -3);
-                parsed = JSON.parse(cleanResponse.trim());
-            } catch (parseError) {
-                console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
-                batch.forEach(qa => {
-                    results.push({
+                // Build user prompt with all Q&A items
+                const userPrompt = batch.map((qa, idx) => {
+                    const qaText = qa.colloquy 
+                        ? `Q: ${qa.question}\n[Colloquy: ${qa.colloquy}]\nA: ${qa.answer}`
+                        : `Q: ${qa.question}\nA: ${qa.answer}`;
+                    return `[${idx + 1}]\n${qaText}`;
+                }).join('\n\n---\n\n');
+                
+                const maxTokens = Math.min(3000, batch.length * 80);
+                
+                const response = await callOpenAI([
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Summarize these ${batch.length} Q&A exchanges:\n\n${userPrompt}` }
+                ], { max_tokens: maxTokens, temperature: 0.2 });
+                
+                // Parse response
+                let parsed;
+                try {
+                    let cleanResponse = response.trim();
+                    if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.slice(7);
+                    if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.slice(3);
+                    if (cleanResponse.endsWith('```')) cleanResponse = cleanResponse.slice(0, -3);
+                    parsed = JSON.parse(cleanResponse.trim());
+                } catch (parseError) {
+                    console.error(`  Batch ${batchNum}: JSON parse error, falling back to rule-based`);
+                    return batch.map(qa => ({
                         ...qa,
                         summary: generateSummary(qa.question, qa.answer),
                         topic: 'Uncategorized',
                         crossPoint: false,
                         aiSummarized: false,
-                        notes: qa.notes || ''
+                        notes: qa.notes || '',
+                        batchNum: batchNum
+                    }));
+                }
+                
+                // Map results back
+                const batchResults = [];
+                if (Array.isArray(parsed) && parsed.length === batch.length) {
+                    batch.forEach((qa, idx) => {
+                        batchResults.push({
+                            ...qa,
+                            summary: parsed[idx] || generateSummary(qa.question, qa.answer),
+                            topic: 'Uncategorized',
+                            crossPoint: false,
+                            aiSummarized: true,
+                            notes: qa.notes || '',
+                            batchNum: batchNum
+                        });
                     });
-                });
-                continue;
-            }
-            
-            // Map results back
-            if (Array.isArray(parsed) && parsed.length === batch.length) {
-                batch.forEach((qa, idx) => {
-                    results.push({
-                        ...qa,
-                        summary: parsed[idx] || generateSummary(qa.question, qa.answer),
-                        topic: 'Uncategorized',
-                        crossPoint: false,
-                        aiSummarized: true,
-                        notes: qa.notes || ''
+                } else {
+                    console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
+                    batch.forEach((qa, idx) => {
+                        batchResults.push({
+                            ...qa,
+                            summary: (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : generateSummary(qa.question, qa.answer),
+                            topic: 'Uncategorized',
+                            crossPoint: false,
+                            aiSummarized: Array.isArray(parsed) && !!parsed[idx],
+                            notes: qa.notes || '',
+                            batchNum: batchNum
+                        });
                     });
-                });
-            } else {
-                console.warn(`  Batch ${batchNum}: Got ${Array.isArray(parsed) ? parsed.length : 'non-array'} results, expected ${batch.length}`);
-                batch.forEach((qa, idx) => {
-                    results.push({
-                        ...qa,
-                        summary: (Array.isArray(parsed) && parsed[idx]) ? parsed[idx] : generateSummary(qa.question, qa.answer),
-                        topic: 'Uncategorized',
-                        crossPoint: false,
-                        aiSummarized: Array.isArray(parsed) && !!parsed[idx],
-                        notes: qa.notes || ''
-                    });
-                });
-            }
-            
-        } catch (error) {
-            console.error(`  Batch ${batchNum} failed: ${error.message}`);
-            batch.forEach(qa => {
-                results.push({
+                }
+                
+                return batchResults;
+                
+            } catch (error) {
+                console.error(`  Batch ${batchNum} failed: ${error.message}`);
+                return batch.map(qa => ({
                     ...qa,
                     summary: generateSummary(qa.question, qa.answer),
                     topic: 'Uncategorized',
                     crossPoint: false,
                     aiSummarized: false,
-                    notes: qa.notes || ''
+                    notes: qa.notes || '',
+                    batchNum: batchNum
+                }));
+            }
+        });
+        
+        // Wait for all batches in this chunk to complete
+        const chunkResults = await Promise.all(chunkPromises);
+        
+        // Flatten and sort results by batch number to maintain order
+        const flatResults = chunkResults.flat();
+        flatResults.sort((a, b) => (a.batchNum || 0) - (b.batchNum || 0));
+        
+        // Remove batchNum property before adding to results
+        flatResults.forEach(result => {
+            const { batchNum, ...cleanResult } = result;
+            results.push(cleanResult);
+        });
+        
+        // Send progress updates for completed batches
+        const completedBatches = Math.min(chunkStart + CONCURRENT_BATCHES, batches.length);
+        const processedCount = Math.min(completedBatches * itemsPerRequest, qaItems.length);
+        
+        console.log(`  Summarized ${processedCount}/${qaItems.length} pairs (${completedBatches}/${totalBatches} batches)`);
+        
+        // Send progress update for each completed batch
+        if (sendProgress) {
+            chunkBatches.forEach(({ batchNum, startIndex: batchStartIndex }) => {
+                const batchStart = startIndex + batchStartIndex + 1;
+                const batchEnd = Math.min(startIndex + batchStartIndex + itemsPerRequest, startIndex + qaItems.length);
+                
+                sendProgress({
+                    type: 'batch-progress',
+                    currentStart: batchStart,
+                    currentEnd: batchEnd,
+                    total: totalPairs,
+                    batchNum: batchNum,
+                    totalBatches: totalBatches,
+                    itemsPerBatch: Math.min(itemsPerRequest, qaItems.length - batchStartIndex),
+                    batchSize: itemsPerRequest
                 });
             });
-        }
-        
-        // Progress update
-        const processedCount = Math.min(i + itemsPerRequest, qaItems.length);
-        const currentStart = startIndex + i + 1;
-        const currentEnd = startIndex + processedCount;
-        console.log(`  Summarized ${processedCount}/${qaItems.length} pairs (batch ${batchNum}/${totalBatches})`);
-        
-        // Send progress update to frontend
-        if (sendProgress) {
-            sendProgress({
-                type: 'batch-progress',
-                currentStart: currentStart,
-                currentEnd: currentEnd,
-                total: totalPairs,
-                batchNum: batchNum,
-                totalBatches: totalBatches
-            });
-        }
-        
-        if (i + itemsPerRequest < qaItems.length) {
-            await new Promise(r => setTimeout(r, 100));
         }
     }
     
@@ -1198,7 +1328,10 @@ Only include complete Q&A pairs. If a question spans pages, use the starting pag
                         answerLocation: formatLocationFromAI(qa.answerPage, qa.answerStartLine, qa.answerEndLine),
                         location: formatFullLocationFromAI(qa),
                         colloquy: qa.colloquy || '',
-                        colloquyLocation: ''
+                        colloquyLocation: '',
+                        pageNumber: qa.questionPage || qa.answerPage || null,
+                        questionStartLine: qa.questionStartLine || null,
+                        answerStartLine: qa.answerStartLine || null
                     });
                 }
                 
@@ -1536,7 +1669,10 @@ function parseExaminationWithPatterns(pages, firstPrintedPage, formatInfo = null
                     location: formatFullLocation(currentQ, currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
                     colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
-                    summary: generateSummary(currentQ.text, currentA.text)
+                    summary: generateSummary(currentQ.text, currentA.text),
+                    pageNumber: currentQ.startPage || null,
+                    questionStartLine: currentQ.startLine || null,
+                    answerStartLine: currentA.startLine || null
                 });
             }
             break;
@@ -1553,7 +1689,10 @@ function parseExaminationWithPatterns(pages, firstPrintedPage, formatInfo = null
                     location: formatFullLocation(currentQ, currentA),
                     colloquy: currentColloquy ? currentColloquy.text : '',
                     colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
-                    summary: generateSummary(currentQ.text, currentA.text)
+                    summary: generateSummary(currentQ.text, currentA.text),
+                    pageNumber: currentQ.startPage || null,
+                    questionStartLine: currentQ.startLine || null,
+                    answerStartLine: currentA.startLine || null
                 });
             }
             
@@ -1644,7 +1783,10 @@ function parseExaminationWithPatterns(pages, firstPrintedPage, formatInfo = null
             location: formatFullLocation(currentQ, currentA),
             colloquy: currentColloquy ? currentColloquy.text : '',
             colloquyLocation: currentColloquy ? formatLocation(currentColloquy) : '',
-            summary: generateSummary(currentQ.text, currentA.text)
+            summary: generateSummary(currentQ.text, currentA.text),
+            pageNumber: currentQ.startPage || null,
+            questionStartLine: currentQ.startLine || null,
+            answerStartLine: currentA.startLine || null
         });
     }
     
@@ -3167,7 +3309,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                             console.log(`  [2/2] Combined summarization + topics for ${chunkQA.length} items...`);
                             sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `AI processing ${chunkQA.length} items...` });
                             const combinedStart = Date.now();
-                            chunkQA = await batchSummarizeAndClassify(chunkQA, 15, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
+                            chunkQA = await batchSummarizeAndClassify(chunkQA, 20, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
                             const combinedTime = Date.now() - combinedStart;
                             // Split time roughly 50/50 for backward compatibility with timing display
                             timings.summarization.total += Math.floor(combinedTime * 0.4);
@@ -3180,7 +3322,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                             console.log(`  [2/2] AI summarizing ${chunkQA.length} items...`);
                             sendProgress({ type: 'step', chunk: chunkIdx + 1, step: 2, message: `Summarizing ${chunkQA.length} items...` });
                             const sumStart = Date.now();
-                            chunkQA = await batchSummarizeQA(chunkQA, 15, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
+                            chunkQA = await batchSummarizeQA(chunkQA, 20, sendProgress, allQAItems.length, totalQAPairs, depositionDate);
                             const sumTime = Date.now() - sumStart;
                             timings.summarization.total += sumTime;
                             timings.summarization.chunks.push({ chunk: chunkIdx + 1, items: chunkQA.length, timeMs: sumTime });
@@ -3492,6 +3634,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
         const chunks = [];
         req.on('data', chunk => chunks.push(chunk));
         req.on('end', async () => {
+            let tempPath = null;
             try {
                 const buffer = Buffer.concat(chunks);
                 const boundary = req.headers['content-type'].split('boundary=')[1];
@@ -3504,7 +3647,7 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                     return;
                 }
 
-                const tempPath = path.join(UPLOAD_DIR, `upload_${Date.now()}.pdf`);
+                tempPath = path.join(UPLOAD_DIR, `upload_${Date.now()}.pdf`);
                 fs.writeFileSync(tempPath, filePart.data);
 
                 console.log(`\n${'='.repeat(50)}`);
@@ -3535,9 +3678,15 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                 const result = await extractPDFWithImages(tempPath);
 
                 // Clean up uploaded file
-                fs.unlinkSync(tempPath);
+                if (fs.existsSync(tempPath)) {
+                    fs.unlinkSync(tempPath);
+                }
 
                 console.log(`\n✓ Extraction complete: ${result.totalPages} pages\n`);
+
+                if (!result || !result.pages || result.pages.length === 0) {
+                    throw new Error('No pages extracted from PDF');
+                }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
@@ -3548,10 +3697,28 @@ Respond in JSON: {"topic": "...", "peopleMentioned": [{"name": "...", "role": ".
                 }));
 
             } catch (error) {
-                console.error('Extraction error:', error);
-                console.error('Error stack:', error.stack);
+                console.error('\n' + '='.repeat(60));
+                console.error('EXTRACTION ERROR:');
+                console.error('='.repeat(60));
+                console.error('Message:', error.message);
+                console.error('Stack:', error.stack);
+                console.error('='.repeat(60) + '\n');
+                
+                // Clean up uploaded file on error
+                if (tempPath && fs.existsSync(tempPath)) {
+                    try {
+                        fs.unlinkSync(tempPath);
+                    } catch (cleanupError) {
+                        console.error('Failed to cleanup temp file:', cleanupError.message);
+                    }
+                }
+                
                 res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Failed to extract: ' + error.message }));
+                res.end(JSON.stringify({ 
+                    success: false,
+                    error: 'Failed to extract PDF: ' + error.message,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }));
             }
         });
         return;

@@ -1,19 +1,52 @@
-node_modules
-npm-debug.log
-.git
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+out/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
 .gitignore
-*.md
+
+# Env files (use docker-compose env vars instead)
 .env
-.env.*
+.env.local
+.env.*.local
+
+# Test files
+*.test.js
+*.spec.js
+__tests__/
+
+# Documentation
+*.md
+docs/
+
+# Uploads and temp files
 temp/
-output/
-Transcripts/
-*.pdf
-*.png
-*.jpg
-
-
-
-
-
-
+uploads/
+*.log

@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-12-16T21:11:02.928385",
+  "test_pdf": "Transcripts/Buksh - Deposition Transcript of Charlene Wilson Domingues 9-18-25 (Abridged).pdf",
+  "system": "Node.js (Old)",
+  "port": 3001,
+  "result": {
+    "elapsed_time": 21.125251293182373,
+    "elapsed_minutes": 0.3520875215530396,
+    "qa_pairs_extracted": 0,
+    "pages_extracted": 75,
+    "resources": {
+      "cpu_avg": 0,
+      "cpu_max": 0,
+      "memory_avg": 0,
+      "memory_max": 0
+    }
+  }
+}

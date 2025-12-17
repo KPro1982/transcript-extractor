@@ -1,0 +1,69 @@
+# Railway Environment Variables Template
+# Copy these to your Railway service settings
+
+# ===========================================
+# BACKEND SERVICE ENVIRONMENT VARIABLES
+# ===========================================
+
+# Database (Automatically set by Railway when you add PostgreSQL)
+DATABASE_URL=postgresql://postgres:password@host:5432/railway
+
+# Redis (Automatically set by Railway when you add Redis)
+REDIS_URL=redis://default:password@host:6379
+
+# API Keys (REQUIRED - Get from respective providers)
+OPENAI_API_KEY=sk-proj-your-key-here
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+GOOGLE_API_KEY=your-google-key-here
+
+# Server Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+WORKERS_COUNT=4
+
+# Frontend URL (Set this AFTER deploying frontend)
+FRONTEND_URL=https://your-frontend-url.up.railway.app
+
+# Performance Tuning
+MAX_CONCURRENT_AI_REQUESTS=50
+CACHE_TTL_DAYS=30
+LOG_LEVEL=INFO
+
+# Rate Limiting
+OPENAI_RPM=500
+OPENAI_TPM=200000
+
+# AWS S3 Configuration (RECOMMENDED for production)
+S3_BUCKET=depodigest-uploads
+S3_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+
+# Monitoring (Optional)
+SENTRY_DSN=your-sentry-dsn-here
+
+# ===========================================
+# WORKER SERVICE ENVIRONMENT VARIABLES
+# ===========================================
+# Copy all BACKEND variables above, PLUS:
+
+BACKEND_URL=https://your-backend-url.up.railway.app
+
+# ===========================================
+# FRONTEND SERVICE ENVIRONMENT VARIABLES
+# ===========================================
+
+# API URLs (Set AFTER deploying backend)
+NEXT_PUBLIC_API_URL=https://your-backend-url.up.railway.app
+NEXT_PUBLIC_WS_URL=wss://your-backend-url.up.railway.app
+
+# ===========================================
+# NOTES
+# ===========================================
+# 1. Never commit this file with actual values to git
+# 2. DATABASE_URL and REDIS_URL are automatically set by Railway
+# 3. Replace all 'your-*-here' placeholders with actual values
+# 4. Frontend variables MUST start with NEXT_PUBLIC_ to be exposed to browser
+# 5. Deploy order: PostgreSQL → Redis → Backend → Worker → Frontend
+# 6. After deploying each service, update URLs in other services
+

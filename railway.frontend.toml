@@ -1,0 +1,18 @@
+# Railway Configuration for Frontend Service
+# Service name: frontend
+# Root directory: frontend
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "frontend/Dockerfile"
+
+[deploy]
+numReplicas = 1
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+startCommand = "node server.js"
+
+# Health check for frontend
+healthcheckPath = "/"
+healthcheckTimeout = 100
+

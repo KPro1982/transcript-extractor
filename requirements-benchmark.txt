@@ -1,0 +1,15 @@
+# Requirements for benchmark_systems.py
+# Performance monitoring and benchmarking tools
+
+# HTTP client for API calls
+requests>=2.31.0
+
+# System resource monitoring
+psutil>=5.9.0
+
+# WebSocket client for real-time updates
+websocket-client>=1.6.0
+
+# Async HTTP client (optional, for advanced features)
+aiohttp>=3.9.0
+

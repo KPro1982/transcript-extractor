@@ -1,0 +1,61 @@
+# Cursor AI Access Configuration
+# This file controls what Cursor AI can access
+# Lines starting with ! are explicitly ALLOWED (override gitignore)
+
+# ALLOW environment files for configuration
+!.env
+!.env.example
+!backend/.env
+!backend/.env.example
+!frontend/.env.local
+!frontend/.env.example
+
+# ALLOW all project configuration files
+!*.json
+!*.toml
+!*.yml
+!*.yaml
+!*.config.js
+!*.config.ts
+
+# ALLOW all source code
+!*.py
+!*.ts
+!*.tsx
+!*.js
+!*.jsx
+
+# ALLOW documentation
+!*.md
+
+# ALLOW shell scripts
+!*.sh
+!*.ps1
+
+# DENY large binary files
+node_modules/
+.next/
+dist/
+build/
+*.pyc
+__pycache__/
+*.so
+*.dylib
+*.dll
+*.exe
+
+# DENY temporary files
+*.log
+.DS_Store
+Thumbs.db
+temp/
+tmp/
+uploads/
+
+# DENY git internals
+.git/
+
+# DENY IDE specific (keep workspace clean)
+.vscode/settings.json
+.idea/workspace.xml
+

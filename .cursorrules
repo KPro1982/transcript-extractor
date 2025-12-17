@@ -1,0 +1,30 @@
+# Cursor AI Rules for DepoDigest Project
+
+## File Access Permissions
+- AI can read and modify all .env files
+- AI can read and modify all configuration files
+- AI can read and modify all source code
+- AI can create new files as needed for implementation
+
+## Project Context
+- This is a FastAPI + Next.js project
+- Backend is Python (FastAPI, Celery, Redis, PostgreSQL)
+- Frontend is TypeScript (Next.js, React, Tailwind)
+- Environment variables are CRITICAL for API keys and configuration
+
+## Autonomous Operations Allowed
+- Read .env files to check configuration
+- Copy API keys between old and new structure
+- Create missing .env files with proper values
+- Run migration scripts
+- Start/stop Docker services
+- Check service health
+- Run tests and benchmarks
+- Deploy configuration changes
+
+## Safety Rules
+- Never commit .env files to git (they're in .gitignore)
+- Always validate API keys before using
+- Keep backups of working configurations
+- Test changes in Docker before production
+

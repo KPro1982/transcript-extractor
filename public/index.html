@@ -1432,19 +1432,7 @@
                 </div>
             </div>
             
-            <form id="loginForm">
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="loginEmail" placeholder="Enter your email" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-input" id="loginPassword" placeholder="Enter your password" required>
-                </div>
-                <button type="submit" class="btn btn-primary login-btn">Sign In</button>
-            </form>
-            
-            <div class="login-error" id="loginError">Invalid email or password. Please try again.</div>
+            <button type="button" class="btn btn-primary login-btn" id="startBtn" style="margin-top: 40px;" onclick="startApp()">Start</button>
             
             <div class="login-version">Version 0.31 • Dec 2024</div>
         </div>
@@ -1867,6 +1855,24 @@
     </div>
 
     <script>
+        // ===== START APP FUNCTION =====
+        function startApp() {
+            console.log('START APP CALLED!');
+            const loginScreen = document.getElementById('loginScreen');
+            const appContainer = document.getElementById('appContainer');
+            
+            if (loginScreen && appContainer) {
+                console.log('Hiding login screen...');
+                loginScreen.classList.remove('active');
+                console.log('Showing app container...');
+                appContainer.classList.add('active');
+                console.log('App started successfully!');
+            } else {
+                console.error('ERROR: Missing loginScreen or appContainer');
+                alert('Error starting app. Please refresh the page.');
+            }
+        }
+
         // ===== STATE =====
         let currentStep = 1;
         let selectedFile = null;
@@ -1876,33 +1882,6 @@
         let currentPreviewPage = 0;
         let firstPage = 1;
         let lastPage = 1;
-
-        // ===== DOM ELEMENTS =====
-        const loginScreen = document.getElementById('loginScreen');
-        const appContainer = document.getElementById('appContainer');
-        const loginForm = document.getElementById('loginForm');
-        const loginError = document.getElementById('loginError');
-
-        // ===== LOGIN =====
-        const VALID_CREDENTIALS = {
-            'dan@depodigest.net': 'depodigest',
-            'demo@depodigest.com': 'depodigest2024'
-        };
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            
-            if (VALID_CREDENTIALS[email] === password) {
-                loginScreen.classList.remove('active');
-                appContainer.classList.add('active');
-                loginError.classList.remove('show');
-            } else {
-                loginError.classList.add('show');
-                document.getElementById('loginPassword').value = '';
-            }
-        });
 
         // ===== STEP NAVIGATION =====
         function goToStep(step) {
@@ -1995,6 +1974,15 @@
                 });
                 
                 const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.status}`);
+                }
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Extraction failed');
+                }
+                
                 pages = data.pages || [];
                 
                 if (pages.length > 0) {
@@ -2008,10 +1996,13 @@
                     
                     renderPreviewPage(0);
                     goToStep(2);
+                } else {
+                    throw new Error('No pages extracted from PDF');
                 }
             } catch (err) {
                 console.error('Upload error:', err);
-                alert('Error processing PDF. Please try again.');
+                const errorMsg = err.message || 'Error processing PDF. Please try again.';
+                alert(`Error processing PDF: ${errorMsg}\n\nCheck the server console for more details.`);
             }
             
             uploadContinue.disabled = false;
@@ -2154,6 +2145,25 @@
             let targetPercent = 0;
             let animationInterval = null;
             
+            // Track progress based on actual Q&A counts
+            let totalQA = 0;              // Total Q&A pairs identified
+            let processedQA = 0;          // Q&A pairs processed by AI
+            let currentChunk = 0;
+            let totalChunks = 1;
+            let processedChunks = 0;
+            let itemsPerBatch = 20;       // Default batch size (matches server)
+            
+            // Progress ranges:
+            // 0-10%: Initial setup
+            // 10-40%: Parsing Q&A pairs (30% of progress)
+            // 40-90%: AI summarization (50% of progress, based on Q&A processed)
+            // 90-100%: Completion
+            
+            const PROGRESS_PARSING_START = 10;
+            const PROGRESS_PARSING_RANGE = 30;  // 10-40%
+            const PROGRESS_AI_START = 40;
+            const PROGRESS_AI_RANGE = 50;        // 40-90%
+            
             // Smooth animation function - interpolates toward target with creeping progress
             function animateProgress() {
                 // Creep forward slowly even without updates (max 90% to leave room for completion)
@@ -2183,6 +2193,28 @@
                 progressQA.textContent = qaCount;
             }
             
+            /**
+             * Calculate progress based on Q&A items processed
+             * Adjusts increment size based on total Q&A count
+             */
+            function calculateProgressFromQA(processed, total) {
+                if (total === 0) return PROGRESS_AI_START;
+                
+                // Calculate progress: 40% + (processed / total) * 50%
+                const progress = PROGRESS_AI_START + (processed / total) * PROGRESS_AI_RANGE;
+                return Math.min(90, progress); // Cap at 90% until completion
+            }
+            
+            /**
+             * Calculate progress increment per API call based on batch size
+             */
+            function getProgressIncrementPerBatch(totalQA) {
+                if (totalQA === 0) return 0;
+                // Each batch processes itemsPerBatch items
+                // Increment = (itemsPerBatch / totalQA) * PROGRESS_AI_RANGE
+                return (itemsPerBatch / totalQA) * PROGRESS_AI_RANGE;
+            }
+            
             try {
                 updateProgress(5, 'Preparing pages...', 0, 0);
                 
@@ -2206,9 +2238,7 @@
                 const decoder = new TextDecoder();
                 
                 let buffer = '';
-                let totalQA = 0;
                 let processedChunks = 0;
-                let totalChunks = 1;
                 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -2225,23 +2255,83 @@
                                 
                                 if (data.type === 'start') {
                                     totalChunks = data.totalChunks || 1;
-                                    updateProgress(10, 'Extracting Q&A pairs...', 0, 0);
+                                    updateProgress(PROGRESS_PARSING_START, 'Extracting Q&A pairs...', 0, 0);
                                 } else if (data.type === 'chunk-start') {
-                                    updateProgress(10 + (data.chunk / totalChunks) * 30, `Processing chunk ${data.chunk}/${totalChunks}...`, 0, totalQA);
-                                } else if (data.type === 'chunk-parsed') {
-                                    totalQA = data.totalQA || totalQA;
-                                    updateProgress(10 + (data.chunk / totalChunks) * 40, `Found ${totalQA} Q&A pairs...`, 0, totalQA);
+                                    currentChunk = data.chunk || 0;
+                                    // Progress based on chunks processed: 10% + (chunk/total) * 30%
+                                    const chunkProgress = PROGRESS_PARSING_START + ((currentChunk - 1) / totalChunks) * PROGRESS_PARSING_RANGE;
+                                    updateProgress(chunkProgress, `Processing chunk ${currentChunk}/${totalChunks}...`, currentChunk - 1, totalQA);
+                                } else if (data.type === 'chunk-parsed' || data.type === 'total-estimate') {
+                                    // Update total Q&A count when we know it
+                                    const newTotalQA = data.totalQA || totalQA;
+                                    if (newTotalQA > totalQA) {
+                                        totalQA = newTotalQA;
+                                    }
+                                    // Progress based on chunks: 10% + (chunk/total) * 30%
+                                    const chunkProgress = PROGRESS_PARSING_START + (currentChunk / totalChunks) * PROGRESS_PARSING_RANGE;
+                                    updateProgress(chunkProgress, `Found ${totalQA} Q&A pairs...`, currentChunk, totalQA);
+                                } else if (data.type === 'step' && data.step === 2) {
+                                    // AI processing started - initialize progress at 40%
+                                    processedQA = 0; // Reset for this chunk's processing
+                                    updateProgress(PROGRESS_AI_START, data.message || 'AI processing...', currentChunk, totalQA);
+                                } else if (data.type === 'batch-progress') {
+                                    // This fires after EVERY API call - advance progress based on Q&A items processed
+                                    const itemsProcessed = data.currentEnd || processedQA;
+                                    const itemsTotal = data.total || totalQA || 1;
+                                    
+                                    // Update batch size from server if provided
+                                    if (data.batchSize) {
+                                        itemsPerBatch = data.batchSize;
+                                    }
+                                    
+                                    // Update total QA if we get a better estimate
+                                    if (itemsTotal > totalQA) {
+                                        totalQA = itemsTotal;
+                                    }
+                                    
+                                    // Update processed count
+                                    processedQA = Math.max(processedQA, itemsProcessed);
+                                    
+                                    // Calculate progress based on actual Q&A items processed
+                                    const progress = calculateProgressFromQA(processedQA, totalQA);
+                                    
+                                    // Calculate increment per batch for display
+                                    const incrementPerBatch = getProgressIncrementPerBatch(totalQA);
+                                    const batchesCompleted = data.batchNum || 0;
+                                    const totalBatches = data.totalBatches || Math.ceil(totalQA / itemsPerBatch);
+                                    
+                                    // Show progress with actual items and batch info
+                                    const percentComplete = totalQA > 0 ? ((processedQA / totalQA) * 100).toFixed(1) : 0;
+                                    updateProgress(
+                                        progress, 
+                                        `AI summarizing... (${processedQA}/${totalQA} items, ${percentComplete}%, Batch ${batchesCompleted}/${totalBatches})`, 
+                                        currentChunk, 
+                                        processedQA
+                                    );
                                 } else if (data.type === 'batch') {
-                                    const percent = 50 + (data.processed / (data.total || totalQA)) * 40;
-                                    updateProgress(percent, 'AI summarizing...', data.processed, totalQA);
+                                    // Legacy batch event - fallback
+                                    const itemsProcessed = data.processed || processedQA;
+                                    const itemsTotal = data.total || totalQA || 1;
+                                    if (itemsTotal > totalQA) totalQA = itemsTotal;
+                                    processedQA = Math.max(processedQA, itemsProcessed);
+                                    const progress = calculateProgressFromQA(processedQA, totalQA);
+                                    updateProgress(progress, 'AI summarizing...', currentChunk, processedQA);
                                 } else if (data.type === 'chunk-complete') {
                                     processedChunks++;
                                     if (data.qaItems) {
                                         qaItems = qaItems.concat(data.qaItems);
+                                        // Update total QA from actual items received
+                                        if (qaItems.length > totalQA) {
+                                            totalQA = qaItems.length;
+                                        }
                                     }
+                                    // Update progress after chunk completes parsing
+                                    const chunkCompleteProgress = PROGRESS_PARSING_START + (processedChunks / totalChunks) * PROGRESS_PARSING_RANGE;
+                                    updateProgress(chunkCompleteProgress, `Chunk ${processedChunks}/${totalChunks} complete`, processedChunks, totalQA);
                                 } else if (data.type === 'complete') {
                                     qaItems = data.qaItems || qaItems;
                                     totalQA = qaItems.length;
+                                    processedQA = totalQA; // All items processed
                                     updateProgress(100, 'Complete!', lastPage - firstPage + 1, totalQA);
                                     
                                     // Stop animation and ensure 100%
@@ -2276,6 +2366,28 @@
         }
 
         // ===== SUMMARY TABLE =====
+        function parsePageLine(location) {
+            if (!location) return { page: '?', line: '?' };
+            // Parse formats like "5:12" or "5:12-15"
+            const match = location.match(/^(\d+):(\d+)/);
+            if (match) {
+                return { page: match[1], line: match[2] };
+            }
+            return { page: '?', line: '?' };
+        }
+        
+        function getPageNumber(qa) {
+            if (qa.pageNumber) return qa.pageNumber;
+            const parsed = parsePageLine(qa.questionLocation);
+            return parsed.page !== '?' ? parsed.page : '?';
+        }
+        
+        function getLineNumber(qa) {
+            if (qa.questionStartLine) return qa.questionStartLine;
+            const parsed = parsePageLine(qa.questionLocation);
+            return parsed.line !== '?' ? parsed.line : '?';
+        }
+        
         function renderSummaryTable() {
             const tbody = document.getElementById('summaryTableBody');
             document.getElementById('summaryDocName').textContent = selectedFile?.name || 'Document.pdf';
@@ -2285,9 +2397,10 @@
             // Collect all topics
             const allTopics = [...new Set([...userTopics, ...qaItems.map(q => q.topic).filter(Boolean)])];
             
-            tbody.innerHTML = qaItems.map((qa, index) => `
+            tbody.innerHTML = qaItems.map((qa, index) => {
+                return `
                 <tr data-index="${index}">
-                    <td class="col-ref">${qa.pageNumber || '?'}:${qa.questionStartLine || '?'}</td>
+                    <td class="col-ref">${getPageNumber(qa)}:${getLineNumber(qa)}</td>
                     <td class="col-qa">
                         <div class="qa-toggle" onclick="toggleQA(${index})">
                             <div class="qa-question" id="question-${index}">${escapeHtml(qa.question || '')}</div>
@@ -2302,11 +2415,12 @@
                     <td class="col-topic">
                         <select class="topic-select" onchange="updateTopic(${index}, this.value)">
                             <option value="">Select topic...</option>
-                            ${allTopics.map(t => `<option value="${t}" ${qa.topic === t ? 'selected' : ''}>${t}</option>`).join('')}
+                            ${allTopics.map(t => '<option value="' + t + '" ' + (qa.topic === t ? 'selected' : '') + '>' + t + '</option>').join('')}
                         </select>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function toggleQA(index) {
@@ -2344,10 +2458,13 @@
             if (row) {
                 const index = parseInt(row.dataset.index);
                 const qa = qaItems[index];
-                if (qa && qa.pageNumber) {
-                    const pageIndex = qa.pageNumber - 1;
-                    if (pages[pageIndex]) {
-                        document.getElementById('pdfSideImage').src = pages[pageIndex].imageUrl;
+                if (qa) {
+                    const pageNum = getPageNumber(qa);
+                    if (pageNum && pageNum !== '?') {
+                        const pageIndex = parseInt(pageNum) - 1;
+                        if (pages[pageIndex]) {
+                            document.getElementById('pdfSideImage').src = pages[pageIndex].imageUrl;
+                        }
                     }
                 }
                 
@@ -2401,7 +2518,7 @@
                         <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border);">
                             <div style="color: var(--accent); font-weight: 600; margin-bottom: 8px;">${qa.date || 'Date mentioned'}</div>
                             <div style="color: var(--text-primary);">${qa.summary || qa.question}</div>
-                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">Page ${qa.pageNumber}:${qa.questionStartLine}</div>
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">Page ${getPageNumber(qa)}:${getLineNumber(qa)}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -2430,7 +2547,7 @@
                             <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 12px;">${person}</div>
                             <div style="color: var(--text-secondary); font-size: 0.9rem;">
                                 Mentioned ${refs.length} time${refs.length > 1 ? 's' : ''}: 
-                                ${refs.slice(0, 5).map(r => `p.${r.pageNumber}`).join(', ')}${refs.length > 5 ? '...' : ''}
+                                ${refs.slice(0, 5).map(r => `p.${getPageNumber(r)}`).join(', ')}${refs.length > 5 ? '...' : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -2454,7 +2571,7 @@
                             ${items.map(qa => `
                                 <div style="margin-bottom: 16px; padding-left: 16px; border-left: 2px solid var(--border);">
                                     <div style="color: var(--text-primary); margin-bottom: 4px;">${qa.summary || 'No summary'}</div>
-                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Page ${qa.pageNumber}:${qa.questionStartLine}</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Page ${getPageNumber(qa)}:${getLineNumber(qa)}</div>
                                 </div>
                             `).join('')}
                         </div>
@@ -2478,7 +2595,7 @@
                         ...qaItems.flatMap(qa => [
                             new Paragraph({
                                 children: [
-                                    new TextRun({ text: `Page ${qa.pageNumber}:${qa.questionStartLine}`, bold: true }),
+                                    new TextRun({ text: `Page ${getPageNumber(qa)}:${getLineNumber(qa)}`, bold: true }),
                                     new TextRun({ text: qa.topic ? ` [${qa.topic}]` : '' })
                                 ]
                             }),
