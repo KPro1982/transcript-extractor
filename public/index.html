@@ -876,7 +876,7 @@
             stroke-linecap: round;
             transform: rotate(-90deg);
             transform-origin: center;
-            transition: stroke-dashoffset 0.3s ease;
+            transition: stroke-dashoffset 0.5s ease-out;
         }
 
         .progress-circle-text {
@@ -2148,11 +2148,34 @@
             const progressQA = document.getElementById('progressQA');
             
             const circumference = 2 * Math.PI * 88;
+            let currentDisplayPercent = 0;
+            let targetPercent = 0;
+            let animationInterval = null;
+            
+            // Smooth animation function - interpolates toward target with creeping progress
+            function animateProgress() {
+                // Creep forward slowly even without updates (max 90% to leave room for completion)
+                if (currentDisplayPercent < 90 && currentDisplayPercent >= targetPercent - 1) {
+                    targetPercent = Math.min(90, targetPercent + 0.3);
+                }
+                
+                if (currentDisplayPercent < targetPercent) {
+                    // Smoothly increment toward target
+                    const diff = targetPercent - currentDisplayPercent;
+                    const increment = Math.max(0.3, diff * 0.08); // Smooth ease toward target
+                    currentDisplayPercent = Math.min(targetPercent, currentDisplayPercent + increment);
+                    
+                    const offset = circumference - (currentDisplayPercent / 100) * circumference;
+                    progressCircle.style.strokeDashoffset = offset;
+                    progressPercent.textContent = Math.round(currentDisplayPercent) + '%';
+                }
+            }
+            
+            // Start animation loop
+            animationInterval = setInterval(animateProgress, 50);
             
             function updateProgress(percent, status, pagesProcessed, qaCount) {
-                const offset = circumference - (percent / 100) * circumference;
-                progressCircle.style.strokeDashoffset = offset;
-                progressPercent.textContent = Math.round(percent) + '%';
+                targetPercent = percent;
                 progressStatus.textContent = status;
                 progressPages.textContent = `${pagesProcessed} / ${lastPage - firstPage + 1}`;
                 progressQA.textContent = qaCount;
@@ -2219,10 +2242,20 @@
                                     totalQA = qaItems.length;
                                     updateProgress(100, 'Complete!', lastPage - firstPage + 1, totalQA);
                                     
+                                    // Stop animation and ensure 100%
+                                    if (animationInterval) {
+                                        clearInterval(animationInterval);
+                                        animationInterval = null;
+                                    }
+                                    currentDisplayPercent = 100;
+                                    const offset = circumference - (100 / 100) * circumference;
+                                    progressCircle.style.strokeDashoffset = offset;
+                                    progressPercent.textContent = '100%';
+                                    
                                     setTimeout(() => {
                                         renderSummaryTable();
                                         goToStep(5);
-                                    }, 500);
+                                    }, 800);
                                 }
                             } catch (e) {
                                 console.error('Parse error:', e);
@@ -2233,6 +2266,10 @@
             } catch (err) {
                 console.error('Summarization error:', err);
                 progressStatus.textContent = 'Error occurred. Please try again.';
+                if (animationInterval) {
+                    clearInterval(animationInterval);
+                    animationInterval = null;
+                }
             }
         }
 
