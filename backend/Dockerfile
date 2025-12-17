@@ -39,10 +39,10 @@ COPY . .
 # Create temp directory for file uploads
 RUN mkdir -p /tmp/uploads
 
-# Expose port
-EXPOSE 8000
+# Expose port (Railway uses dynamic PORT env var)
+EXPOSE ${PORT:-8000}
 
-# Default command (can be overridden for workers)
-# Note: Railway handles health checks via railway.backend.toml
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command - Railway overrides via startCommand in railway.backend.toml
+# For local Docker: PORT defaults to 8000
+CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
 

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     
     # Server Configuration
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_port: int = int(os.environ.get("PORT", 8000))  # Railway sets PORT dynamically
     workers_count: int = 4
     
     # CORS
