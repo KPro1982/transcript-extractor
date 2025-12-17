@@ -43,11 +43,11 @@ Include specific names, dates, and numbers when mentioned."""
                         "temperature": self.temperature,
                         "max_tokens": self.max_tokens
                     }
-                )
-                
-                if response.status_code == 429:
-                    raise RateLimitError("OpenAI rate limit exceeded")
-                
+            )
+            
+            if response.status_code == 429:
+                raise RateLimitError("OpenAI rate limit exceeded")
+            
             response.raise_for_status()
             result = response.json()
             return result["choices"][0]["message"]["content"].strip()
