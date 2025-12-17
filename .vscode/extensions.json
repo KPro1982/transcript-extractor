@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-typescript-next",
+    "ms-azuretools.vscode-docker"
+  ],
+  "unwantedRecommendations": []
+}
+

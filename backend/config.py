@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     
     # CORS
     frontend_url: str = "http://localhost:3000"
-    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "https://frontend-production-e051f.up.railway.app"]
     
     # Monitoring
     sentry_dsn: Optional[str] = None

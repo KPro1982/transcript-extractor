@@ -56,6 +56,6 @@ uploads/
 .git/
 
 # DENY IDE specific (keep workspace clean)
-.vscode/settings.json
+# Allow .vscode/settings.json for Cursor AI optimization
 .idea/workspace.xml
 

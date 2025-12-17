@@ -1,0 +1,97 @@
+{
+  // Cursor AI Model Selection - COST OPTIMIZED (Opus costs 50x more than Haiku!)
+  // Default to cheapest models - Opus only when explicitly selected
+  "cursor.aiModel": "claude-haiku-3", // Default: Haiku (~$0.25/1M tokens)
+  "cursor.chatModel": "claude-haiku-3", // Chat: Haiku by default
+  "cursor.composerModel": "claude-sonnet-4", // Composer: Sonnet (~$3/1M tokens, NOT Opus!)
+  
+  // Prevent auto-selection of expensive models
+  "cursor.preferFasterModels": true,
+  "cursor.warnOnExpensiveModel": true,
+  "cursor.defaultToCheapestModel": true,
+  
+  // Autocomplete Settings - DISABLED to save costs (user doesn't use it)
+  "cursor.autocomplete.enabled": false, // Disabled - user doesn't use autocomplete
+  
+  // Context Window Optimization
+  "cursor.maxContextLength": 200000, // Reasonable limit (default is often higher)
+  "cursor.includeWorkspaceFiles": true, // Include workspace files in context
+  "cursor.excludePatterns": [
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.pyc",
+    "**/.pytest_cache/**"
+  ],
+  
+  // Code Actions - Use AI selectively
+  "cursor.codeActions.enabled": true,
+  "cursor.codeActions.autoApply": false, // Review before applying
+  
+  // File Watching - Reduce unnecessary processing
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/__pycache__/**": true,
+    "**/dist/**": true,
+    "**/build/**": true
+  },
+  
+  // Language-Specific Optimizations
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  
+  // Python-specific settings
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  
+  // TypeScript/Next.js settings
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  
+  // Editor Performance
+  "editor.suggestSelection": "first",
+  "editor.wordBasedSuggestions": "off", // Reduce AI suggestions for simple words
+  "editor.quickSuggestions": {
+    "other": "on",
+    "comments": "off",
+    "strings": "off"
+  },
+  
+  // Terminal Integration
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  
+  // Git Integration
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+  
+  // File Explorer
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${capture}.js",
+    "*.tsx": "${capture}.js",
+    "*.py": "${capture}.pyc, ${capture}.pyi",
+    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml",
+    "tsconfig.json": "tsconfig.*.json",
+    "docker-compose.yml": "docker-compose.*.yml, Dockerfile, .dockerignore"
+  }
+}
+

@@ -1,0 +1,56 @@
+{
+  // Cursor-specific AI settings - COST OPTIMIZED
+  "cursor.ai": {
+    // Model selection strategy - DEFAULT TO CHEAPEST
+    // Cost comparison: Haiku ($0.25/1M) << Sonnet ($3/1M) << Opus ($15/1M)
+    "defaultModel": "claude-haiku-3", // Use Haiku for 90% of tasks
+    "composerModel": "claude-sonnet-4", // Use Sonnet for complex edits (NOT Opus!)
+    "chatModel": "claude-haiku-3", // Use Haiku for chat
+    
+    // Cost optimization - PREVENT EXPENSIVE MODEL USAGE
+    "useFasterModelWhenAvailable": true,
+    "autoSwitchToFasterModel": true,
+    "preventOpusAutoSelect": true, // Never auto-select Opus
+    "warnBeforeOpus": true, // Warn before using Opus
+    "requireExplicitOpusSelection": true, // Force manual Opus selection
+    
+    // Context management
+    "maxContextFiles": 50,
+    "prioritizeRecentFiles": true,
+    "excludeLargeFiles": true,
+    "maxFileSize": 100000, // 100KB
+    
+    // Autocomplete settings - DISABLED to save costs
+    "autocomplete": {
+      "enabled": false // Disabled - user doesn't use autocomplete
+    },
+    
+    // Code actions
+    "codeActions": {
+      "enabled": true,
+      "requireConfirmation": true,
+      "batchRelatedEdits": true
+    }
+  },
+  
+  // Workspace-specific preferences - COST OPTIMIZED
+  "workspace": {
+    "preferredModels": {
+      "simple": "claude-haiku-3", // Use Haiku for simple tasks
+      "complex": "claude-sonnet-4", // Use Sonnet for complex tasks (NOT Opus!)
+      "debugging": "claude-sonnet-4", // Sonnet is sufficient for debugging
+      "refactoring": "claude-sonnet-4", // Sonnet handles refactoring well
+      "architecture": "claude-sonnet-4", // Sonnet for architecture decisions
+      "onlyUseOpusFor": ["critical-reasoning", "research", "explicit-request"] // Opus only for these
+    },
+    "costSavings": {
+      "estimatedMonthlySavings": "80-95%", // By using Haiku/Sonnet instead of Opus
+      "targetModelDistribution": {
+        "haiku": "70%", // Most tasks use Haiku
+        "sonnet": "25%", // Complex tasks use Sonnet
+        "opus": "5%" // Opus only when absolutely necessary
+      }
+    }
+  }
+}
+
