@@ -25,25 +25,25 @@ class AnthropicProvider(BaseAIProvider):
         
         try:
             response = await self.client.post(
-                    f"{self.base_url}/messages",
-                    headers={
-                        "x-api-key": self.api_key,
-                        "anthropic-version": "2023-06-01",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "max_tokens": self.max_tokens,
-                        "system": system_prompt,
-                        "messages": [
-                            {"role": "user", "content": f"Summarize this testimony:\n\n{qa_text}"}
-                        ]
-                    }
-                )
-                
-                if response.status_code == 429:
-                    raise RateLimitError("Anthropic rate limit exceeded")
-                
+                f"{self.base_url}/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": self.max_tokens,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": f"Summarize this testimony:\n\n{qa_text}"}
+                    ]
+                }
+            )
+            
+            if response.status_code == 429:
+                raise RateLimitError("Anthropic rate limit exceeded")
+            
             response.raise_for_status()
             result = response.json()
             return result["content"][0]["text"].strip()
@@ -63,32 +63,32 @@ Format: ["Summary 1", "Summary 2", ...]"""
         
         try:
             response = await self.client.post(
-                    f"{self.base_url}/messages",
-                    headers={
-                        "x-api-key": self.api_key,
-                        "anthropic-version": "2023-06-01",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "max_tokens": len(qa_items) * 80,
-                        "system": system_prompt,
-                        "messages": [
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    }
-                )
-                
-                if response.status_code == 429:
-                    raise RateLimitError("Anthropic rate limit exceeded")
-                
-                response.raise_for_status()
-                result = response.json()
-                content = result["content"][0]["text"].strip()
-                
+                f"{self.base_url}/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": len(qa_items) * 80,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_prompt}
+                    ]
+                }
+            )
+            
+            if response.status_code == 429:
+                raise RateLimitError("Anthropic rate limit exceeded")
+            
+            response.raise_for_status()
+            result = response.json()
+            content = result["content"][0]["text"].strip()
+            
             summaries = json.loads(content)
             return [{"summary": s, "topic": None} for s in summaries]
-            
+        
         except Exception as e:
             self.logger.error(f"Anthropic batch error: {e}")
             raise

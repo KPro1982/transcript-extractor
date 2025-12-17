@@ -79,41 +79,41 @@ Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
         
         try:
             response = await self.client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "temperature": self.temperature,
-                        "max_tokens": len(qa_items) * 80
-                    }
-                )
-                
-                if response.status_code == 429:
-                    raise RateLimitError("OpenAI rate limit exceeded")
-                
-                response.raise_for_status()
-                result = response.json()
-                content = result["choices"][0]["message"]["content"].strip()
-                
-                # Parse JSON array
-                try:
-                    summaries = json.loads(content)
-                    if isinstance(summaries, list) and len(summaries) == len(qa_items):
-                        return [{"summary": s, "topic": None} for s in summaries]
-                except json.JSONDecodeError:
-                    self.logger.warning("Failed to parse JSON, falling back to text parsing")
-                
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": self.temperature,
+                    "max_tokens": len(qa_items) * 80
+                }
+            )
+            
+            if response.status_code == 429:
+                raise RateLimitError("OpenAI rate limit exceeded")
+            
+            response.raise_for_status()
+            result = response.json()
+            content = result["choices"][0]["message"]["content"].strip()
+            
+            # Parse JSON array
+            try:
+                summaries = json.loads(content)
+                if isinstance(summaries, list) and len(summaries) == len(qa_items):
+                    return [{"summary": s, "topic": None} for s in summaries]
+            except json.JSONDecodeError:
+                self.logger.warning("Failed to parse JSON, falling back to text parsing")
+            
             # Fallback: split by newlines
             summaries = [s.strip() for s in content.split('\n') if s.strip()]
             return [{"summary": s, "topic": None} for s in summaries[:len(qa_items)]]
-            
+        
         except Exception as e:
             self.logger.error(f"OpenAI batch API error: {e}")
             raise
@@ -141,32 +141,32 @@ Return a JSON array of topic strings in the EXACT same order as input."""
         
         try:
             response = await self.client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "temperature": 0.2,
-                        "max_tokens": len(qa_items) * 20
-                    }
-                )
-                
-                if response.status_code == 429:
-                    raise RateLimitError("OpenAI rate limit exceeded")
-                
-                response.raise_for_status()
-                result = response.json()
-                content = result["choices"][0]["message"]["content"].strip()
-                
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": len(qa_items) * 20
+                }
+            )
+            
+            if response.status_code == 429:
+                raise RateLimitError("OpenAI rate limit exceeded")
+            
+            response.raise_for_status()
+            result = response.json()
+            content = result["choices"][0]["message"]["content"].strip()
+            
             topics = json.loads(content)
             return topics if isinstance(topics, list) else ["Other"] * len(qa_items)
-            
+        
         except Exception as e:
             self.logger.error(f"OpenAI classify error: {e}")
             return ["Other"] * len(qa_items)

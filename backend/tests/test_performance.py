@@ -1,14 +1,15 @@
 """Performance benchmarking tests for the new system."""
-import asyncio
+import os
 import time
-import statistics
-from typing import List
 
 import pytest
 
 from services.pdf_service import pdf_service
 from services.ai_service import ai_service
 from services.cache_service import cache_service
+
+RUN_PERF = os.getenv("RUN_PERF_TESTS", "0") == "1"
+TEST_PDF = os.path.join(os.path.dirname(__file__), "test_files", "sample_deposition.pdf")
 
 
 @pytest.fixture
@@ -20,6 +21,8 @@ async def setup_services():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not RUN_PERF, reason="Performance tests disabled (set RUN_PERF_TESTS=1 to enable)")
+@pytest.mark.skipif(not os.path.exists(TEST_PDF), reason="Missing test PDF fixture")
 async def test_pdf_extraction_speed(setup_services):
     """Test PDF extraction speed (should be ~10x faster than pdfjs)."""
     test_pdf = "test_files/sample_deposition.pdf"
@@ -38,6 +41,7 @@ async def test_pdf_extraction_speed(setup_services):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not RUN_PERF, reason="Performance tests disabled (set RUN_PERF_TESTS=1 to enable)")
 async def test_ai_summarization_speed(setup_services):
     """Test AI summarization speed with parallelization."""
     # Generate test Q&A items
@@ -66,6 +70,7 @@ async def test_ai_summarization_speed(setup_services):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not RUN_PERF, reason="Performance tests disabled (set RUN_PERF_TESTS=1 to enable)")
 async def test_cache_hit_rate(setup_services):
     """Test cache hit rate after first run."""
     test_qa = {
