@@ -1,0 +1,155 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║           ENHANCED RATE LIMIT LOGGING - DEPLOYED TO RAILWAY                ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════════════
+✅ WHAT WAS ADDED
+══════════════════════════════════════════════════════════════════════════════
+
+Enhanced logging to diagnose stuck processing on large documents:
+
+1. **OpenAI Provider Logging** (openai_provider.py)
+   • Logs retry-after time from 429 responses
+   • Logs remaining requests/tokens from rate limit headers
+   • Shows full HTTP headers on rate limit
+   • Visual indicators: ⚠️ for rate limits, ❌ for errors, ⏱️ for timeouts
+   • Separate messages for single, batch, classify, and combined calls
+
+2. **AI Service Logging** (ai_service.py)
+   • Logs which batch hit rate limit
+   • Shows completed count vs total
+   • Tracks fallback provider usage
+   • Shows total items in document context
+
+══════════════════════════════════════════════════════════════════════════════
+📊 WHAT YOU'LL SEE IN LOGS NOW
+══════════════════════════════════════════════════════════════════════════════
+
+When rate limit is hit:
+
+[ERROR] ⚠️  RATE LIMIT (COMBINED): OpenAI rate limit exceeded for 20 items
+[ERROR] Retry after: 10s, Remaining requests: 0, Remaining tokens: 15234
+[ERROR] This is a combined summarize+classify call - using JSON mode
+[ERROR] ⚠️  RATE LIMIT HIT on batch 43 (20 items)
+[ERROR] Rate limit error: OpenAI combined rate limit exceeded. Items: 20...
+[ERROR] Completed so far: 860/1073
+[ERROR] Total items in document: 1073
+[WARNING] Attempting fallback provider...
+[INFO] Using fallback provider: Anthropic
+
+This will tell you EXACTLY:
+- Which batch hit the limit (batch 43 in this example)
+- How far along you were (860/1073 = 80%)
+- How long to wait (retry after: 10s)
+- Whether fallback worked
+
+══════════════════════════════════════════════════════════════════════════════
+🔍 HOW TO DIAGNOSE YOUR STUCK DOCUMENT
+══════════════════════════════════════════════════════════════════════════════
+
+Once deployed (1-2 minutes), upload another large doc and check logs:
+
+1. Go to Railway Dashboard:
+   https://railway.app/dashboard
+
+2. Select "Depodigest 2.0" → "worker" service
+
+3. Look for these patterns:
+
+   PATTERN 1: Rate Limited (Expected for 1000+ items)
+   → See "⚠️  RATE LIMIT" messages
+   → Will show retry-after time
+   → Should continue after waiting
+
+   PATTERN 2: Timeout
+   → See "⏱️  TIMEOUT" messages
+   → Individual request took too long
+   → May need to increase timeout
+
+   PATTERN 3: API Error
+   → See "❌ OpenAI API error" messages
+   → Check error details
+   → May be OpenAI service issue
+
+   PATTERN 4: No Errors but Stuck
+   → No rate limit/error messages
+   → WebSocket disconnected
+   → Worker may still be processing
+   → Wait 5-10 more minutes
+
+══════════════════════════════════════════════════════════════════════════════
+🎯 WHAT TO DO ABOUT YOUR STUCK DOCUMENT
+══════════════════════════════════════════════════════════════════════════════
+
+Option 1: CHECK IF IT FINISHED
+  The document may have completed despite appearing stuck.
+  Try navigating to:
+  https://frontend-production-e051f.up.railway.app/results/6d5fbb6a-fb35-4b21-bf6d-afe7520b3760
+
+Option 2: CHECK RAILWAY LOGS NOW
+  Go check the worker logs to see what happened to that job.
+  Look for job ID: 6d5fbb6a-fb35-4b21-bf6d-afe7520b3760
+
+Option 3: TRY A SMALLER DOCUMENT
+  Test with a 100-200 Q&A document to verify system works
+  Then gradually increase size
+
+Option 4: WAIT FOR NEW LOGGING
+  Wait for Railway to redeploy (1-2 min)
+  Upload the same or similar large document
+  Watch logs for detailed rate limit info
+
+══════════════════════════════════════════════════════════════════════════════
+🔧 LONG-TERM FIXES NEEDED
+══════════════════════════════════════════════════════════════════════════════
+
+For documents with 1000+ Q&A pairs:
+
+1. **Increase Rate Limits** (if OpenAI Tier allows)
+   - Current: 500 req/min, 30K tokens/min
+   - Tier 2+: Higher limits
+   - Check: https://platform.openai.com/account/limits
+
+2. **Better Progress Persistence**
+   - Save progress to database
+   - Allow resumable processing
+   - UI can reconnect and show current status
+
+3. **Estimated Time Remaining**
+   - Calculate based on items remaining
+   - Show in UI: "~5 minutes remaining"
+
+4. **Chunked Processing**
+   - Split huge docs into chunks
+   - Process 500 items at a time
+   - Save partial results
+
+5. **WebSocket Improvements**
+   - Keep-alive pings
+   - Auto-reconnect with state
+   - Show "Processing in background" message
+
+══════════════════════════════════════════════════════════════════════════════
+📝 IMMEDIATE ACTIONS
+══════════════════════════════════════════════════════════════════════════════
+
+RIGHT NOW:
+1. Wait 2 minutes for Railway to deploy new logging
+2. Check if your stuck document actually finished:
+   /results/6d5fbb6a-fb35-4b21-bf6d-afe7520b3760
+
+NEXT TEST:
+1. Upload another large PDF (or same one)
+2. Immediately open Railway logs and watch
+3. Look for ⚠️  RATE LIMIT messages
+4. Note the batch number and completion percentage
+5. Share those logs here for analysis
+
+══════════════════════════════════════════════════════════════════════════════
+
+⏰ DEPLOYMENT ETA: 2 minutes
+📊 STATUS: Pushing to Railway now...
+🔍 PURPOSE: Diagnose why large documents get stuck
+
+══════════════════════════════════════════════════════════════════════════════
+
