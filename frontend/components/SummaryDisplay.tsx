@@ -119,23 +119,27 @@ export default function SummaryDisplay({
         </div>
 
         {/* Summary Card */}
-        {item.summary && (
-          <div className="bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 rounded-xl p-6">
-            <div className="text-xs text-accent font-semibold uppercase tracking-wider mb-3">
+        <div className="bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 rounded-xl p-6">
+          {/* Citation Badge at Top */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-xs text-accent font-semibold uppercase tracking-wider">
               AI Summary
             </div>
-            <p className="text-gray-100 text-lg leading-relaxed mb-4">
+            <span className="font-mono text-xs text-accent/80 bg-accent/10 px-3 py-1.5 rounded-lg border border-accent/20">
+              {citation}
+            </span>
+          </div>
+          
+          {item.summary ? (
+            <p className="text-gray-100 text-lg leading-relaxed">
               {item.summary}
             </p>
-            
-            {/* Citation Badge */}
-            <div className="flex justify-end">
-              <span className="font-mono text-sm text-accent/80 bg-accent/10 px-3 py-1 rounded-lg">
-                {citation}
-              </span>
-            </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-gray-400 text-sm italic">
+              No summary available for this Q&A pair.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Keyboard Hints Footer */}

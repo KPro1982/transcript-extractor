@@ -249,15 +249,22 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         
         # Save to database (90% -> 95% progress)
         saved_count = 0
-        for item in summarized_items:
+        for idx, item in enumerate(summarized_items):
+            page_num = item.get('page', 1)
+            line_num = item.get('line', 1)
+            
+            # Log first few items to debug page/line data
+            if idx < 3:
+                logger.info(f"Saving Q&A {idx+1}: page={page_num}, line={line_num}, question={item['question'][:50]}...")
+            
             await db_service.execute(
                 """
                 INSERT INTO qa_items (document_id, page_number, line_number, question, answer, summary, topic)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
                 document_id,
-                item.get('page', 1),
-                item.get('line', 1),
+                page_num,
+                line_num,
                 item['question'],
                 item['answer'],
                 item.get('summary', ''),
