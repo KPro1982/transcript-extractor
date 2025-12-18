@@ -58,7 +58,7 @@ export default function ResultsPage() {
         setQAItems(response.qa_items || [])
         
         // Auto-expand first topic
-        const topics = [...new Set(response.qa_items?.map((item: QAItem) => item.topic) || [])]
+        const topics = Array.from(new Set(response.qa_items?.map((item: QAItem) => item.topic) || []))
         if (topics.length > 0) {
           setExpandedTopics(new Set([topics[0]]))
         }
