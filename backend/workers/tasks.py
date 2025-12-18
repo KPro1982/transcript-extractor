@@ -282,7 +282,7 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         result = {
             "document_id": document_id,
             "total_qa_pairs": len(summarized_items),
-            "pages_processed": len(pages),
+            "pages_processed": total_pages_extracted,
             "filename": doc['filename']
         }
         
