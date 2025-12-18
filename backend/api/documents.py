@@ -80,6 +80,10 @@ async def upload_document(file: UploadFile = File(...)):
         # Extract basic PDF info
         pdf_info = await pdf_service.get_pdf_info(temp_path)
         
+        # Store PDF content in Redis for worker access (24hr TTL)
+        # This allows workers in different containers to access the file
+        await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
+        
         # Store in database
         doc_id = await db_service.fetchval(
             """
@@ -171,4 +175,5 @@ async def get_qa_items(document_id: UUID):
             for item in items
         ]
     }
+
 

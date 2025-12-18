@@ -17,6 +17,7 @@ class CacheService:
     
     def __init__(self):
         self.redis: Optional[redis.Redis] = None
+        self.redis_binary: Optional[redis.Redis] = None  # For binary data (PDFs)
         self.ttl_days = settings.cache_ttl_days
     
     async def connect(self):
@@ -26,12 +27,19 @@ class CacheService:
             encoding="utf-8",
             decode_responses=True
         )
+        # Separate connection for binary data (no decode)
+        self.redis_binary = await redis.from_url(
+            settings.redis_url,
+            decode_responses=False
+        )
         logger.info("Redis cache connected")
     
     async def disconnect(self):
         """Disconnect from Redis."""
         if self.redis:
             await self.redis.close()
+        if self.redis_binary:
+            await self.redis_binary.close()
             logger.info("Redis cache disconnected")
     
     def _get_summary_key(self, qa_text: str) -> str:
@@ -46,6 +54,10 @@ class CacheService:
     def _get_job_key(self, job_id: str) -> str:
         """Generate cache key for job status."""
         return f"job:{job_id}"
+    
+    def _get_pdf_content_key(self, file_hash: str) -> str:
+        """Generate cache key for PDF binary content."""
+        return f"pdf:{file_hash}"
     
     async def get_summary(self, question: str, answer: str) -> Optional[dict]:
         """Get cached summary for Q&A pair."""
@@ -219,6 +231,43 @@ class CacheService:
         except Exception as e:
             logger.error(f"Failed to get cache stats: {e}")
             return {}
+    
+    async def set_pdf_content(self, file_hash: str, content: bytes, ttl_hours: int = 24):
+        """Store PDF binary content in Redis for worker access.
+        
+        This allows workers in separate containers to access uploaded files.
+        TTL prevents Redis from filling with stale PDFs.
+        """
+        key = self._get_pdf_content_key(file_hash)
+        
+        try:
+            await self.redis_binary.setex(
+                key,
+                timedelta(hours=ttl_hours),
+                content
+            )
+            logger.info(f"Stored PDF in Redis: {file_hash[:8]}... ({len(content)} bytes, TTL: {ttl_hours}h)")
+        except Exception as e:
+            logger.error(f"Failed to store PDF content: {e}")
+            raise
+    
+    async def get_pdf_content(self, file_hash: str) -> Optional[bytes]:
+        """Retrieve PDF binary content from Redis.
+        
+        Returns None if not found (expired or never stored).
+        """
+        key = self._get_pdf_content_key(file_hash)
+        
+        try:
+            content = await self.redis_binary.get(key)
+            if content:
+                logger.info(f"Retrieved PDF from Redis: {file_hash[:8]}... ({len(content)} bytes)")
+                # Extend TTL on access
+                await self.redis_binary.expire(key, timedelta(hours=24))
+            return content
+        except Exception as e:
+            logger.error(f"Failed to retrieve PDF content: {e}")
+            return None
 
 
 # Global cache service instance

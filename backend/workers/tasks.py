@@ -3,6 +3,8 @@ import asyncio
 import logging
 from typing import Optional
 
+import aiofiles
+
 from workers.celery_app import celery_app
 from services.pdf_service import pdf_service
 from services.ai_service import ai_service
@@ -61,8 +63,17 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         
         logger.info(f"Processing document with pipeline: {doc['filename']}")
         
+        # Retrieve PDF from Redis (cross-container access)
+        pdf_content = await cache_service.get_pdf_content(doc['file_hash'])
+        if not pdf_content:
+            raise Exception(f"PDF content not found in cache for {doc['file_hash'][:8]}. Upload may have expired.")
+        
+        # Write to local temp file for processing
         pdf_path = f"/tmp/{doc['file_hash']}.pdf"
-        # In production, download from S3 here
+        async with aiofiles.open(pdf_path, 'wb') as f:
+            await f.write(pdf_content)
+        
+        logger.info(f"Retrieved PDF from Redis: {len(pdf_content)} bytes")
         
         # Pipeline: Extract and process in parallel
         processing_queue = asyncio.Queue(maxsize=10)
