@@ -30,11 +30,13 @@ async def send_job_update(job_id: str, status: str, progress: int, **kwargs):
 
 async def send_job_error(job_id: str, error_message: str):
     """Send job error via Redis pub/sub."""
+    logger.info(f"Sending error for job {job_id[:8]}...: {error_message[:100]}")
     await cache_service.publish_job_update(
         job_id,
         "error",
         {"error_message": error_message}
     )
+    logger.info(f"Error sent for job {job_id[:8]}...")
 
 
 async def send_job_complete(job_id: str, result: dict):
@@ -235,7 +237,12 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         )
         
         if not all_qa_pairs:
-            raise Exception("No Q&A pairs found in document")
+            error_msg = (
+                "No Q&A pairs found in document. "
+                "This PDF parser expects deposition transcripts with 'Q:' and 'A:' markers. "
+                f"Extracted {total_pages_extracted} pages successfully, but found no Q&A format content."
+            )
+            raise Exception(error_msg)
         
         await send_job_update(job_id, "processing", 90, message="Saving results to database...")
         
