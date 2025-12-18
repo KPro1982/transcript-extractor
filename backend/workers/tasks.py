@@ -1,4 +1,5 @@
 """Celery tasks for document processing."""
+# Deploy trigger: Dec 17, 2025 - Force rebuild with pages fix
 import asyncio
 import logging
 from typing import Optional
