@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import aiofiles
 
 from services.db_service import db_service
@@ -153,7 +153,11 @@ async def get_document(document_id: UUID):
 
 @router.get("/{document_id}/qa-items")
 async def get_qa_items(document_id: UUID):
-    """Get all Q&A items for a document."""
+    """Get all Q&A items for a document with line range information.
+    
+    Each item includes start and end positions for citation formatting.
+    End positions are calculated based on the next Q&A item's start position.
+    """
     items = await db_service.fetch(
         """
         SELECT id, page_number, line_number, question, answer, summary, topic
@@ -164,20 +168,107 @@ async def get_qa_items(document_id: UUID):
         document_id
     )
     
+    # Convert to list for range calculation
+    items_list = list(items)
+    qa_items_with_ranges = []
+    
+    for i, item in enumerate(items_list):
+        # Calculate end line/page based on next item's position
+        if i + 1 < len(items_list):
+            next_item = items_list[i + 1]
+            if next_item["page_number"] == item["page_number"]:
+                # Same page: end line is one before next item's start
+                end_page = item["page_number"]
+                end_line = max(item["line_number"], next_item["line_number"] - 1)
+            else:
+                # Different page: current item goes to end of its page
+                end_page = item["page_number"]
+                end_line = 25  # Legal transcript standard lines per page
+        else:
+            # Last item: goes to end of page
+            end_page = item["page_number"]
+            end_line = 25
+        
+        qa_items_with_ranges.append({
+            "id": str(item["id"]),
+            "page_number": item["page_number"],
+            "line_number": item["line_number"],
+            "end_page": end_page,
+            "end_line": end_line,
+            "question": item["question"],
+            "answer": item["answer"],
+            "summary": item["summary"],
+            "topic": item["topic"]
+        })
+    
     return {
         "document_id": str(document_id),
-        "qa_items": [
-            {
-                "id": str(item["id"]),
-                "page_number": item["page_number"],
-                "line_number": item["line_number"],
-                "question": item["question"],
-                "answer": item["answer"],
-                "summary": item["summary"],
-                "topic": item["topic"]
-            }
-            for item in items
-        ]
+        "qa_items": qa_items_with_ranges
     }
+
+
+@router.get("/{document_id}/page/{page_number}")
+async def get_pdf_page(document_id: UUID, page_number: int):
+    """Render a specific PDF page as an image for reading mode.
+    
+    Returns the page as a PNG image with appropriate headers.
+    """
+    # Get document to find file hash
+    doc = await db_service.fetchrow(
+        "SELECT file_hash, total_pages FROM documents WHERE id = $1",
+        document_id
+    )
+    
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    if page_number < 1 or page_number > doc["total_pages"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Page {page_number} out of range (1-{doc['total_pages']})"
+        )
+    
+    # Get PDF content from cache
+    pdf_content = await cache_service.get_pdf_content(doc["file_hash"])
+    
+    if not pdf_content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF content not found in cache. Document may need to be re-uploaded."
+        )
+    
+    try:
+        # Write to temp file for rendering
+        temp_path = f"/tmp/render_{doc['file_hash'][:16]}.pdf"
+        async with aiofiles.open(temp_path, 'wb') as f:
+            await f.write(pdf_content)
+        
+        # Render page
+        result = await pdf_service.render_page_as_image(temp_path, page_number, scale=2.0)
+        
+        # Return image with metadata headers
+        return Response(
+            content=result["image"],
+            media_type="image/png",
+            headers={
+                "X-Page-Number": str(result["page_number"]),
+                "X-Total-Pages": str(result["total_pages"]),
+                "X-Image-Width": str(result["width"]),
+                "X-Image-Height": str(result["height"]),
+                "X-Original-Width": str(result["original_width"]),
+                "X-Original-Height": str(result["original_height"]),
+                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to render page {page_number}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to render page: {str(e)}"
+        )
 
 

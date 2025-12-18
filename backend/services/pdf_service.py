@@ -393,6 +393,84 @@ class PDFService:
         
         closest = min(line_numbers, key=lambda ln: abs(ln["y"] - y_position))
         return closest["number"]
+    
+    async def render_page_as_image(
+        self, 
+        pdf_path: str, 
+        page_num: int, 
+        scale: float = 2.0
+    ) -> Dict:
+        """Render PDF page as PNG image for reading mode display.
+        
+        Args:
+            pdf_path: Path to PDF file
+            page_num: 1-indexed page number to render
+            scale: Render scale (2.0 = 2x resolution for retina displays)
+        
+        Returns:
+            Dict with 'image' (bytes), 'width', 'height', 'page_number'
+        """
+        try:
+            doc = fitz.open(pdf_path)
+            total_pages = len(doc)
+            
+            if page_num < 1 or page_num > total_pages:
+                raise ValueError(f"Page {page_num} out of range (1-{total_pages})")
+            
+            page = doc[page_num - 1]
+            
+            # Render at specified scale
+            mat = fitz.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            
+            # Convert to PNG bytes
+            png_bytes = pix.tobytes("png")
+            
+            result = {
+                "image": png_bytes,
+                "width": pix.width,
+                "height": pix.height,
+                "page_number": page_num,
+                "total_pages": total_pages,
+                "scale": scale,
+                "original_width": page.rect.width,
+                "original_height": page.rect.height
+            }
+            
+            doc.close()
+            logger.info(f"Rendered page {page_num}/{total_pages} at {scale}x scale ({pix.width}x{pix.height})")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to render page {page_num}: {e}", exc_info=True)
+            raise
+    
+    async def get_page_text_with_positions(
+        self, 
+        pdf_path: str, 
+        page_num: int
+    ) -> Dict:
+        """Get text with line positions for a specific page.
+        
+        Used for reading mode to map line numbers to pixel coordinates.
+        """
+        try:
+            doc = fitz.open(pdf_path)
+            
+            if page_num < 1 or page_num > len(doc):
+                raise ValueError(f"Page {page_num} out of range")
+            
+            page = doc[page_num - 1]
+            page_data = await self._extract_page(page, page_num)
+            
+            doc.close()
+            
+            return page_data
+            
+        except Exception as e:
+            logger.error(f"Failed to get page text: {e}", exc_info=True)
+            raise
 
 
 # Global PDF service instance
