@@ -38,6 +38,8 @@ async def upload_document(file: UploadFile = File(...)):
         cached_doc = await cache_service.get_document(file_hash)
         if cached_doc:
             logger.info(f"Document already processed: {file_hash[:8]}...")
+            # Still store PDF content for worker access (may have expired)
+            await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
@@ -63,6 +65,8 @@ async def upload_document(file: UploadFile = File(...)):
                 "created_at": existing["created_at"].isoformat()
             }
             await cache_service.set_document(file_hash, doc_data)
+            # Store PDF content for worker access (may have expired)
+            await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
