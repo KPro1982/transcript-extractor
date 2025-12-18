@@ -189,7 +189,16 @@ class PDFService:
         page_height: float,
         line_numbers: List[Dict]
     ) -> List[Dict]:
-        """Parse Q&A pairs from text items."""
+        """Parse Q&A pairs from text items using multiple patterns.
+        
+        Supports various deposition transcript formats:
+        - Q. / A. format
+        - Q: / A: format  
+        - QUESTION: / ANSWER: format
+        - BY MR./MS. NAME: format
+        - THE WITNESS: for answers
+        - Handles middle dots like "· · ·Q.· text"
+        """
         # Filter out line numbers from left margin
         left_margin = page_width * 0.15
         content_items = [
@@ -226,46 +235,154 @@ class PDFService:
                 "items": current_line
             })
         
-        # Find Q&A patterns
+        # Question patterns - expanded to match working implementation
+        question_patterns = [
+            re.compile(r'^[·\s]*Q\.[·\s]*', re.IGNORECASE),  # Q. with optional middle dots
+            re.compile(r'^\s*Q\.\s*', re.IGNORECASE),        # Standard Q.
+            re.compile(r'^\s*Q:\s*', re.IGNORECASE),         # Q: format
+            re.compile(r'^Q\s+[A-Z]', re.IGNORECASE),        # Q followed by space and capital
+            re.compile(r'^\s*QUESTION[:\s]+', re.IGNORECASE), # QUESTION: format
+            re.compile(r'^BY\s+M[RS]\.\s+\w+:', re.IGNORECASE), # BY MR./MS. NAME: format
+        ]
+        
+        # Answer patterns - expanded to match working implementation  
+        answer_patterns = [
+            re.compile(r'^[·\s]*A\.[·\s]*', re.IGNORECASE),  # A. with optional middle dots
+            re.compile(r'^\s*A\.\s*', re.IGNORECASE),        # Standard A.
+            re.compile(r'^\s*A:\s*', re.IGNORECASE),         # A: format
+            re.compile(r'^A\s+[A-Z]', re.IGNORECASE),        # A followed by space and capital
+            re.compile(r'^\s*ANSWER[:\s]+', re.IGNORECASE),  # ANSWER: format
+            re.compile(r'^[·\s]*THE\s+WITNESS:[·\s]*', re.IGNORECASE), # THE WITNESS: format
+        ]
+        
+        # Colloquy patterns (not Q&A, but attorney/court speaking)
+        colloquy_patterns = [
+            re.compile(r'^M[RS]\.\s+\w+:', re.IGNORECASE),   # MR./MS. NAME:
+            re.compile(r'^THE\s+(REPORTER|COURT):', re.IGNORECASE), # THE REPORTER/COURT:
+            re.compile(r'^\(.*\)$'),                          # Parenthetical notes
+        ]
+        
+        # End markers (stop parsing here)
+        end_patterns = [
+            re.compile(r'^CERTIFICATE OF REPORTER', re.IGNORECASE),
+            re.compile(r'^PENALTY OF PERJURY', re.IGNORECASE),
+            re.compile(r'^CHANGES AND SIGNATURE', re.IGNORECASE),
+        ]
+        
+        def is_question(text: str) -> bool:
+            return any(p.match(text) for p in question_patterns)
+        
+        def is_answer(text: str) -> bool:
+            return any(p.match(text) for p in answer_patterns)
+        
+        def is_colloquy(text: str) -> bool:
+            # Colloquy but NOT "THE WITNESS:" which is an answer
+            if re.match(r'^[·\s]*THE\s+WITNESS:', text, re.IGNORECASE):
+                return False
+            return any(p.match(text) for p in colloquy_patterns)
+        
+        def is_end_marker(text: str) -> bool:
+            return any(p.match(text) for p in end_patterns)
+        
+        def clean_qa_text(text: str) -> str:
+            """Remove Q/A prefixes and clean up middle dots."""
+            cleaned = text
+            # Remove Q/A prefixes with various formats
+            cleaned = re.sub(r'^[·\s]*Q\.[·\s]*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^[·\s]*A\.[·\s]*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^\s*Q:\s*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^\s*A:\s*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^Q\s+', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^A\s+', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^\s*QUESTION[:\s]*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^\s*ANSWER[:\s]*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^[·\s]*THE\s+WITNESS:[·\s]*', '', cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^BY\s+M[RS]\.\s+\w+:\s*', '', cleaned, flags=re.IGNORECASE)
+            # Clean middle dots
+            cleaned = cleaned.replace('·', ' ')
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+            return cleaned.strip()
+        
+        # Find Q&A pairs using state machine
         qa_pairs = []
         current_question = None
+        current_question_y = None
         current_answer = []
-        q_pattern = re.compile(r'^\s*Q[\.:]\s*', re.IGNORECASE)
-        a_pattern = re.compile(r'^\s*A[\.:]\s*', re.IGNORECASE)
+        state = 'searching'  # searching, in_question, in_answer
         
         for i, line in enumerate(lines):
-            text = line["text"].strip()
+            text = line["text"]
+            trimmed = text.strip()
             
-            if q_pattern.match(text):
-                # Save previous Q&A if exists
+            # Skip empty lines
+            if not trimmed:
+                continue
+            
+            # Check for end markers
+            if is_end_marker(trimmed):
+                # Save current Q&A if complete
                 if current_question and current_answer:
                     qa_pairs.append({
                         "question": current_question,
                         "answer": " ".join(current_answer),
                         "page": page_number,
-                        "line": self._find_closest_line_number(line["y"], line_numbers)
+                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                    })
+                break
+            
+            if is_question(trimmed) or is_question(text):
+                # Save previous Q&A if complete
+                if current_question and current_answer:
+                    qa_pairs.append({
+                        "question": current_question,
+                        "answer": " ".join(current_answer),
+                        "page": page_number,
+                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
                     })
                 
                 # Start new question
-                current_question = q_pattern.sub('', text).strip()
+                current_question = clean_qa_text(text)
+                current_question_y = line["y"]
                 current_answer = []
+                state = 'in_question'
                 
-            elif a_pattern.match(text):
-                # Start answer
-                current_answer = [a_pattern.sub('', text).strip()]
+            elif is_answer(trimmed) or is_answer(text):
+                if current_question:
+                    # Start or continue answer
+                    answer_text = clean_qa_text(text)
+                    if state == 'in_answer':
+                        # Another answer line (like another THE WITNESS:)
+                        current_answer.append(answer_text)
+                    else:
+                        current_answer = [answer_text]
+                    state = 'in_answer'
+                    
+            elif is_colloquy(trimmed):
+                # Skip colloquy (objections, attorney statements, etc.)
+                pass
                 
-            elif current_answer is not None:
-                # Continue answer
-                current_answer.append(text)
+            else:
+                # Continuation of current element
+                if state == 'in_question' and current_question:
+                    current_question += ' ' + trimmed
+                elif state == 'in_answer' and current_answer:
+                    current_answer.append(trimmed)
         
-        # Save last Q&A
+        # Save last Q&A pair
         if current_question and current_answer:
             qa_pairs.append({
                 "question": current_question,
                 "answer": " ".join(current_answer),
                 "page": page_number,
-                "line": self._find_closest_line_number(lines[-1]["y"], line_numbers) if lines else 1
+                "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
             })
+        
+        # Debug logging for first page
+        if page_number == 1 and len(lines) > 0:
+            logger.info(f"Page {page_number}: {len(lines)} lines, {len(qa_pairs)} Q&A pairs found")
+            # Show first few lines to help debug parsing issues
+            sample_lines = [l["text"][:80] for l in lines[:10]]
+            logger.debug(f"Sample lines from page 1: {sample_lines}")
         
         return qa_pairs
     
