@@ -1,0 +1,41 @@
+This document appears to be stuck at 76% (870/1073 Q&A pairs).
+
+LIKELY CAUSES:
+1. OpenAI rate limits (processing 1000+ items hits limits)
+2. Long processing time causing WebSocket timeouts
+3. Worker still processing but UI lost connection
+
+WHAT TO DO:
+
+Option 1: WAIT (10-15 minutes)
+- Worker may still be processing in background
+- WebSocket reconnects are normal for long jobs
+- Just leave it and check back
+
+Option 2: CHECK IF COMPLETED
+- Navigate away and come back
+- Or manually check: /results/6d5fbb6a-fb35-4b21-bf6d-afe7520b3760
+- Processing may have finished despite stuck UI
+
+Option 3: RELOAD PAGE
+- Refresh the browser
+- WebSocket will reconnect
+- You'll see current progress
+
+Option 4: CHECK RAILWAY LOGS
+1. Go to: https://railway.app/dashboard
+2. Select "Depodigest 2.0"
+3. Click "worker" service
+4. Check logs for:
+   - "Document processing complete" = Done!
+   - Rate limit errors = Throttled
+   - Still logging batches = Still working
+
+LONG-TERM FIX NEEDED:
+- Add progress persistence (so UI can reconnect)
+- Better rate limit handling for large docs
+- Show "still processing" indicator
+- Allow resumable processing
+
+FOR NOW: Just wait 10-15 minutes, then refresh or navigate to results page directly.
+

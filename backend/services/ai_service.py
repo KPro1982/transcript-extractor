@@ -381,19 +381,25 @@ class AIService:
                 
                 return batch_results
                 
-            except RateLimitError:
-                logger.warning(f"Rate limit on batch {batch_idx}, using fallback provider")
+            except RateLimitError as e:
+                logger.error(f"⚠️  RATE LIMIT HIT on batch {batch_idx} ({len(batch)} items)")
+                logger.error(f"Rate limit error: {str(e)}")
+                logger.error(f"Completed so far: {completed_count}/{len(uncached_items)}")
+                logger.error(f"Total items in document: {len(qa_items)}")
+                logger.warning(f"Attempting fallback provider...")
                 
                 # Fallback to next provider
                 if len(self.providers) > 1:
                     fallback_provider = self.providers[1]
+                    logger.info(f"Using fallback provider: {fallback_provider.name}")
                     batch_results = await fallback_provider.summarize_and_classify_batch(batch)
                     return batch_results
                 else:
+                    logger.error("No fallback provider available - returning empty summaries")
                     return [{"summary": "", "topic": "Other"} for _ in batch]
             
             except Exception as e:
-                logger.error(f"Batch {batch_idx} failed: {e}")
+                logger.error(f"❌ Batch {batch_idx} failed with exception: {e}")
                 self.metrics["api_errors"] += 1
                 return [{"summary": "", "topic": "Other"} for _ in batch]
             

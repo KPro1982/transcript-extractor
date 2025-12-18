@@ -46,17 +46,22 @@ Include specific names, dates, and numbers when mentioned."""
             )
             
             if response.status_code == 429:
-                raise RateLimitError("OpenAI rate limit exceeded")
+                retry_after = response.headers.get('retry-after', 'unknown')
+                self.logger.error(f"⚠️  RATE LIMIT: OpenAI API rate limit exceeded. Retry after: {retry_after}s")
+                self.logger.error(f"Rate limit headers: {dict(response.headers)}")
+                raise RateLimitError(f"OpenAI rate limit exceeded. Retry after: {retry_after}s")
             
             response.raise_for_status()
             result = response.json()
             return result["choices"][0]["message"]["content"].strip()
             
         except httpx.TimeoutException:
-            self.logger.error(f"OpenAI request timed out after {timeout}s")
+            self.logger.error(f"⏱️  TIMEOUT: OpenAI request timed out after {timeout}s")
+            raise
+        except RateLimitError:
             raise
         except Exception as e:
-            self.logger.error(f"OpenAI API error: {e}")
+            self.logger.error(f"❌ OpenAI API error: {e}")
             raise
     
     async def summarize_batch(self, qa_items: List[Dict], timeout: int = 60) -> List[Dict]:
@@ -96,7 +101,14 @@ Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
             )
             
             if response.status_code == 429:
-                raise RateLimitError("OpenAI rate limit exceeded")
+                retry_after = response.headers.get('retry-after', 'unknown')
+                remaining_requests = response.headers.get('x-ratelimit-remaining-requests', 'unknown')
+                remaining_tokens = response.headers.get('x-ratelimit-remaining-tokens', 'unknown')
+                self.logger.error(f"⚠️  RATE LIMIT (BATCH): OpenAI rate limit exceeded for batch of {len(qa_items)} items")
+                self.logger.error(f"Retry after: {retry_after}s")
+                self.logger.error(f"Remaining requests: {remaining_requests}, Remaining tokens: {remaining_tokens}")
+                self.logger.error(f"Full headers: {dict(response.headers)}")
+                raise RateLimitError(f"OpenAI batch rate limit exceeded. Items: {len(qa_items)}, Retry after: {retry_after}s")
             
             response.raise_for_status()
             result = response.json()
@@ -114,8 +126,10 @@ Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
             summaries = [s.strip() for s in content.split('\n') if s.strip()]
             return [{"summary": s, "topic": None} for s in summaries[:len(qa_items)]]
         
+        except RateLimitError:
+            raise
         except Exception as e:
-            self.logger.error(f"OpenAI batch API error: {e}")
+            self.logger.error(f"❌ OpenAI batch API error: {e}")
             raise
     
     async def classify_topics(self, qa_items: List[Dict], timeout: int = 60) -> List[str]:
@@ -158,7 +172,12 @@ Return a JSON array of topic strings in the EXACT same order as input."""
             )
             
             if response.status_code == 429:
-                raise RateLimitError("OpenAI rate limit exceeded")
+                retry_after = response.headers.get('retry-after', 'unknown')
+                remaining_requests = response.headers.get('x-ratelimit-remaining-requests', 'unknown')
+                remaining_tokens = response.headers.get('x-ratelimit-remaining-tokens', 'unknown')
+                self.logger.error(f"⚠️  RATE LIMIT (CLASSIFY): OpenAI rate limit exceeded for classification of {len(qa_items)} items")
+                self.logger.error(f"Retry after: {retry_after}s, Remaining requests: {remaining_requests}, Remaining tokens: {remaining_tokens}")
+                raise RateLimitError(f"OpenAI classify rate limit exceeded. Items: {len(qa_items)}, Retry after: {retry_after}s")
             
             response.raise_for_status()
             result = response.json()
@@ -167,8 +186,10 @@ Return a JSON array of topic strings in the EXACT same order as input."""
             topics = json.loads(content)
             return topics if isinstance(topics, list) else ["Other"] * len(qa_items)
         
+        except RateLimitError:
+            raise
         except Exception as e:
-            self.logger.error(f"OpenAI classify error: {e}")
+            self.logger.error(f"❌ OpenAI classify error: {e}")
             return ["Other"] * len(qa_items)
     
     async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60) -> List[Dict]:
@@ -211,7 +232,13 @@ Documents & Evidence, Witness Statements, Expert Opinions, Other"""
             )
             
             if response.status_code == 429:
-                raise RateLimitError("OpenAI rate limit exceeded")
+                retry_after = response.headers.get('retry-after', 'unknown')
+                remaining_requests = response.headers.get('x-ratelimit-remaining-requests', 'unknown')
+                remaining_tokens = response.headers.get('x-ratelimit-remaining-tokens', 'unknown')
+                self.logger.error(f"⚠️  RATE LIMIT (COMBINED): OpenAI rate limit exceeded for {len(qa_items)} items")
+                self.logger.error(f"Retry after: {retry_after}s, Remaining requests: {remaining_requests}, Remaining tokens: {remaining_tokens}")
+                self.logger.error(f"This is a combined summarize+classify call - using JSON mode")
+                raise RateLimitError(f"OpenAI combined rate limit exceeded. Items: {len(qa_items)}, Retry after: {retry_after}s")
             
             response.raise_for_status()
             result = response.json()
@@ -235,7 +262,9 @@ Documents & Evidence, Witness Statements, Expert Opinions, Other"""
             self.logger.warning(f"Result count mismatch: got {len(results)}, expected {len(qa_items)}")
             return [{"summary": "", "topic": "Other"} for _ in qa_items]
             
+        except RateLimitError:
+            raise
         except Exception as e:
-            self.logger.error(f"OpenAI combined API error: {e}")
+            self.logger.error(f"❌ OpenAI combined API error: {e}")
             raise
 
