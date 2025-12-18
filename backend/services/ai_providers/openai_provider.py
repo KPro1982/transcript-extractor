@@ -2,6 +2,7 @@
 import asyncio
 import json
 from typing import List, Dict
+import httpx
 
 from .base_provider import BaseAIProvider, RateLimitError
 
@@ -24,8 +25,19 @@ class OpenAIProvider(BaseAIProvider):
         qa_text += f"A: {answer}"
         
         system_prompt = """You are a legal assistant summarizing deposition testimony.
-Provide a concise 1-2 sentence summary in third person.
-Include specific names, dates, and numbers when mentioned."""
+Convert the Q&A exchange into a factual statement about what the witness testified.
+
+CRITICAL: Do NOT repeat the question. Transform into a narrative statement.
+
+Example:
+Q: Where did you work in 2019?
+A: I worked at ABC Corporation.
+Summary: "The witness testified that they worked at ABC Corporation in 2019."
+
+Rules:
+- Write in third person ("The witness testified that...")
+- Be concise (1-2 sentences)
+- Include specific names, dates, numbers"""
         
         try:
             response = await self.client.post(
@@ -67,20 +79,38 @@ Include specific names, dates, and numbers when mentioned."""
     async def summarize_batch(self, qa_items: List[Dict], timeout: int = 60) -> List[Dict]:
         """Summarize multiple Q&A pairs in one API call."""
         system_prompt = """You are a legal assistant summarizing deposition testimony.
-For EACH Q&A exchange provided, create a concise 1-2 sentence summary in third person.
-Include specific names, dates, and numbers when mentioned.
 
-IMPORTANT: Return a JSON array of summary strings in the EXACT same order as input.
-Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
+You will receive NUMBERED Q&A exchanges. For EACH one, create a summary.
+
+CRITICAL RULES:
+1. Return a JSON array with EXACTLY one summary per input Q&A
+2. The array length MUST match the number of inputs
+3. Transform Q&A into narrative statements (DO NOT repeat the question)
+4. Use third person ("The witness testified that...")
+5. Be concise (1-2 sentences per summary)
+
+Example input:
+1. Q: Where did you work?
+A: ABC Corp.
+
+2. Q: When did you start?
+A: January 2020.
+
+Example output:
+["The witness testified that they worked at ABC Corp.", "The witness stated they started in January 2020."]
+
+IMPORTANT: Return ONLY a JSON array of strings. One string per input Q&A."""
         
         # Build user prompt with all Q&A items
-        user_prompt = "Summarize these Q&A exchanges:\n\n"
+        user_prompt = f"Summarize these {len(qa_items)} Q&A exchanges:\n\n"
         for i, qa in enumerate(qa_items, 1):
-            qa_text = f"[{i}]\nQ: {qa.get('question', '')}\n"
+            qa_text = f"{i}. Q: {qa.get('question', '')}\n"
             if qa.get('colloquy'):
                 qa_text += f"[Colloquy: {qa['colloquy']}]\n"
             qa_text += f"A: {qa.get('answer', '')}\n"
-            user_prompt += qa_text + "\n---\n\n"
+            user_prompt += qa_text + "\n"
+        
+        user_prompt += f"\nReturn a JSON array with EXACTLY {len(qa_items)} summary strings."
         
         try:
             response = await self.client.post(
@@ -91,12 +121,13 @@ Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
                 },
                 json={
                     "model": self.model,
+                    "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
                     "temperature": self.temperature,
-                    "max_tokens": len(qa_items) * 80
+                    "max_tokens": len(qa_items) * 100
                 }
             )
             
@@ -114,17 +145,44 @@ Example format: ["Summary 1...", "Summary 2...", "Summary 3..."]"""
             result = response.json()
             content = result["choices"][0]["message"]["content"].strip()
             
-            # Parse JSON array
+            # Parse JSON - try multiple formats
             try:
-                summaries = json.loads(content)
-                if isinstance(summaries, list) and len(summaries) == len(qa_items):
+                parsed = json.loads(content)
+                
+                # Handle different response formats
+                if isinstance(parsed, list):
+                    summaries = parsed
+                elif isinstance(parsed, dict):
+                    # Try common keys
+                    summaries = parsed.get("summaries") or parsed.get("results") or parsed.get("data") or []
+                    if not summaries and len(parsed) == 1:
+                        # Single key with array value
+                        summaries = list(parsed.values())[0]
+                else:
+                    summaries = []
+                
+                # Ensure we have strings
+                if summaries and isinstance(summaries[0], dict):
+                    summaries = [s.get("summary", str(s)) for s in summaries]
+                
+                if len(summaries) == len(qa_items):
                     return [{"summary": s, "topic": None} for s in summaries]
+                else:
+                    self.logger.warning(f"Result count mismatch: got {len(summaries)}, expected {len(qa_items)}")
+                    # Pad or truncate
+                    if len(summaries) < len(qa_items):
+                        # Use what we have, fill rest with empty
+                        results = [{"summary": s, "topic": None} for s in summaries]
+                        results.extend([{"summary": "", "topic": None} for _ in range(len(qa_items) - len(summaries))])
+                        return results
+                    else:
+                        return [{"summary": s, "topic": None} for s in summaries[:len(qa_items)]]
+                        
             except json.JSONDecodeError:
                 self.logger.warning("Failed to parse JSON, falling back to text parsing")
-            
-            # Fallback: split by newlines
-            summaries = [s.strip() for s in content.split('\n') if s.strip()]
-            return [{"summary": s, "topic": None} for s in summaries[:len(qa_items)]]
+                # Fallback: split by newlines
+                summaries = [s.strip() for s in content.split('\n') if s.strip()]
+                return [{"summary": s, "topic": None} for s in summaries[:len(qa_items)]]
         
         except RateLimitError:
             raise
@@ -195,22 +253,38 @@ Return a JSON array of topic strings in the EXACT same order as input."""
     async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60) -> List[Dict]:
         """Optimized batch processing with JSON mode.
         
-        Uses OpenAI's JSON mode for guaranteed structured output and shorter prompts.
-        This provides 20-30% faster generation and 100% reliable parsing.
+        Uses OpenAI's JSON mode for guaranteed structured output.
         """
-        # Shorter, more efficient prompt (reduces input tokens by ~15%)
-        system_prompt = """Summarize deposition Q&A. Return JSON with "results" array:
-{"results":[{"summary":"2 sentence third-person summary","topic":"category"}]}
+        num_items = len(qa_items)
+        
+        system_prompt = f"""You are a legal assistant analyzing deposition testimony.
 
-Topics: Background & Education, Employment History, Incident Description, 
-Medical Treatment, Damages & Injuries, Timeline & Chronology, 
-Documents & Evidence, Witness Statements, Expert Opinions, Other"""
+You will receive {num_items} Q&A exchanges. For EACH one, provide a summary and topic.
+
+CRITICAL REQUIREMENTS:
+1. Return a JSON object with a "results" array
+2. The array MUST contain EXACTLY {num_items} objects (one per input)
+3. Each object has: {{"summary": "...", "topic": "..."}}
+
+Summary rules:
+- Transform Q&A into a narrative statement (DO NOT repeat the question)
+- Use third person: "The witness testified that..."
+- Be concise: 1-2 sentences
+
+Topics (pick one): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
+
+EXAMPLE for 2 inputs:
+{{"results": [
+  {{"summary": "The witness testified they worked at ABC Corp since 2019.", "topic": "Employment History"}},
+  {{"summary": "The witness stated the incident occurred on January 5th.", "topic": "Incident Description"}}
+]}}
+
+Return EXACTLY {num_items} results in the array."""
         
         # Compact user prompt
-        user_prompt = "\n\n".join([
-            f"{i+1}. Q: {qa['question']}\nA: {qa['answer']}"
-            for i, qa in enumerate(qa_items)
-        ])
+        user_prompt = f"Analyze these {num_items} Q&A exchanges:\n\n"
+        for i, qa in enumerate(qa_items, 1):
+            user_prompt += f"{i}. Q: {qa['question']}\nA: {qa['answer']}\n\n"
         
         try:
             response = await self.client.post(
@@ -221,50 +295,77 @@ Documents & Evidence, Witness Statements, Expert Opinions, Other"""
                 },
                 json={
                     "model": self.model,
-                    "response_format": {"type": "json_object"},  # JSON mode - guaranteed valid JSON
+                    "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    "temperature": 0.3,  # Lower temperature for faster, more deterministic output
-                    "max_tokens": len(qa_items) * 100
+                    "temperature": 0.3,
+                    "max_tokens": num_items * 120  # More tokens per item
                 }
             )
             
             if response.status_code == 429:
                 retry_after = response.headers.get('retry-after', 'unknown')
-                remaining_requests = response.headers.get('x-ratelimit-remaining-requests', 'unknown')
-                remaining_tokens = response.headers.get('x-ratelimit-remaining-tokens', 'unknown')
-                self.logger.error(f"⚠️  RATE LIMIT (COMBINED): OpenAI rate limit exceeded for {len(qa_items)} items")
-                self.logger.error(f"Retry after: {retry_after}s, Remaining requests: {remaining_requests}, Remaining tokens: {remaining_tokens}")
-                self.logger.error(f"This is a combined summarize+classify call - using JSON mode")
-                raise RateLimitError(f"OpenAI combined rate limit exceeded. Items: {len(qa_items)}, Retry after: {retry_after}s")
+                self.logger.error(f"⚠️  RATE LIMIT (COMBINED): OpenAI rate limit exceeded for {num_items} items")
+                raise RateLimitError(f"OpenAI combined rate limit exceeded. Items: {num_items}, Retry after: {retry_after}s")
             
             response.raise_for_status()
             result = response.json()
             content = result["choices"][0]["message"]["content"].strip()
             
-            # Parse JSON - guaranteed valid with json_object mode
+            # Parse JSON
             parsed = json.loads(content)
             
-            # Handle both direct array and wrapped format
+            # Handle different response formats
             if isinstance(parsed, dict) and "results" in parsed:
                 results = parsed["results"]
             elif isinstance(parsed, list):
                 results = parsed
+            elif isinstance(parsed, dict):
+                # Try other common keys
+                results = parsed.get("summaries") or parsed.get("data") or []
+                if not results and len(parsed) == 1:
+                    results = list(parsed.values())[0]
             else:
                 results = []
             
-            if len(results) == len(qa_items):
-                return results
+            # Validate and normalize results
+            normalized = []
+            for i, r in enumerate(results):
+                if isinstance(r, dict):
+                    normalized.append({
+                        "summary": r.get("summary", ""),
+                        "topic": r.get("topic", "Other")
+                    })
+                elif isinstance(r, str):
+                    normalized.append({"summary": r, "topic": "Other"})
             
-            # Fallback if count mismatch
-            self.logger.warning(f"Result count mismatch: got {len(results)}, expected {len(qa_items)}")
-            return [{"summary": "", "topic": "Other"} for _ in qa_items]
+            if len(normalized) == num_items:
+                self.logger.info(f"✅ Successfully got {num_items} summaries from OpenAI")
+                return normalized
+            
+            # Handle count mismatch - don't return empty!
+            self.logger.warning(f"Result count mismatch: got {len(normalized)}, expected {num_items}")
+            
+            if len(normalized) > 0:
+                # Use what we have
+                if len(normalized) < num_items:
+                    # Pad with empty
+                    self.logger.warning(f"Padding {num_items - len(normalized)} missing results")
+                    while len(normalized) < num_items:
+                        normalized.append({"summary": "", "topic": "Other"})
+                else:
+                    # Truncate
+                    normalized = normalized[:num_items]
+                return normalized
+            else:
+                # No results at all - return empty but log error
+                self.logger.error(f"❌ OpenAI returned no parseable results for {num_items} items")
+                return [{"summary": "", "topic": "Other"} for _ in qa_items]
             
         except RateLimitError:
             raise
         except Exception as e:
             self.logger.error(f"❌ OpenAI combined API error: {e}")
             raise
-
