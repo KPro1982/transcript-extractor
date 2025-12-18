@@ -140,13 +140,22 @@ async function generateAISummary(question, answer, colloquy = '') {
     const systemPrompt = `You are a legal assistant summarizing deposition testimony. 
 Your task is to convert a question-answer exchange into a single, clear, factual statement about what the witness testified.
 
+CRITICAL: DO NOT repeat the question in your summary. DO NOT use Q&A format. Transform the exchange into a narrative statement.
+
+GOOD EXAMPLE:
+Q: Where did you work in 2019?
+A: I worked at ABC Corporation as a sales manager.
+Summary: "The witness testified that they worked at ABC Corporation as a sales manager in 2019."
+
+BAD EXAMPLE (DO NOT DO THIS):
+Summary: "Q: Where did you work in 2019? A: I worked at ABC Corporation as a sales manager."
+
 Rules:
-- Write in third person ("The witness..." or "Witness testified that...")
-- Be concise but capture the key information
-- Use past tense for events, present tense for ongoing facts
+- Write in third person ("The witness testified that..." or "Witness stated that..." or "According to the witness...")
+- Be concise but capture the key information (1-2 sentences maximum)
+- Use past tense for events that happened
 - Include specific names, dates, numbers when mentioned
-- If the answer is unclear or the witness doesn't know, reflect that
-- Keep summaries to 1-2 sentences maximum
+- If the answer is unclear or the witness doesn't know, reflect that accurately
 - Do not include objections or colloquy in the summary unless it affected the answer`;
 
     const userPrompt = colloquy 
@@ -177,18 +186,22 @@ async function generateMergedAISummary(qaSequence) {
     const systemPrompt = `You are a legal assistant summarizing deposition testimony.
 You are given multiple related question-answer exchanges that have been grouped together because they form a coherent topic or line of questioning.
 
+CRITICAL: DO NOT just list out the questions and answers. Synthesize them into a narrative statement about what the witness testified.
+
 Your task is to:
-1. Synthesize these exchanges into a unified summary
+1. Synthesize these exchanges into a unified summary that tells a coherent story
 2. Classify the overall topic
 
 Common topics: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages
 
 Summary requirements:
-- Captures the key testimony from all Q&A pairs
-- Presents the information in a logical, flowing narrative
-- Uses third person ("The witness testified..." or "According to the witness...")
-- Remains factual and objective
-- Is 2-4 sentences maximum, depending on complexity
+- DO NOT repeat questions or use Q&A format
+- Synthesize the key testimony from all Q&A pairs into a flowing narrative
+- Write in third person ("The witness testified that..." or "According to the witness...")
+- Be concise (2-4 sentences maximum, depending on complexity)
+- Use past tense for events
+- Remain factual and objective
+- Include specific names, dates, and details mentioned
 
 Respond in JSON format: {"summary": "...", "topic": "..."}`;
 
@@ -269,7 +282,16 @@ async function batchSummarizeAndClassify(qaItems, itemsPerRequest = 20, sendProg
     // Build system prompt with deposition date context
     let systemPrompt = `You are a legal assistant analyzing deposition testimony.
 You will receive multiple Q&A exchanges. For EACH one, provide a JSON object with:
-1. "summary": A concise summary (1-2 sentences, third person, past tense)
+1. "summary": A SYNTHESIZED summary that converts the Q&A into a factual statement about what the witness testified. DO NOT just repeat the question and answer - instead, transform it into a narrative statement.
+   
+   GOOD EXAMPLE:
+   Q: Where did you work in 2019?
+   A: I worked at ABC Corporation as a sales manager.
+   Summary: "The witness testified that they worked at ABC Corporation as a sales manager in 2019."
+   
+   BAD EXAMPLE (DO NOT DO THIS):
+   Summary: "Q: Where did you work in 2019? A: I worked at ABC Corporation as a sales manager."
+
 2. "topic": Topic classification from this list: Admonitions, Background, Work History, Complaints, Harassment, Discrimination, Performance, Policies, Timeline, Witnesses, Documents, Medical, Damages, Uncategorized
 3. "peopleMentioned": Array of {name, role} objects for people mentioned
 4. "hasDates": true ONLY if any date or time reference is mentioned (even vague ones like "last summer", "last week", "yesterday")
@@ -292,13 +314,16 @@ You will receive multiple Q&A exchanges. For EACH one, provide a JSON object wit
 Calculate the actual date for relative references and return in YYYY-MM-DD format.`;
     }
 
-    systemPrompt += `\n\nRules for summaries:
-- Write in third person ("The witness testified..." or "Witness stated...")
-- Be concise but capture key information
-- Include specific names, dates, numbers when mentioned
+    systemPrompt += `\n\nCRITICAL RULES FOR SUMMARIES:
+- NEVER repeat the question in your summary
+- NEVER use Q&A format in the summary
+- ALWAYS convert to a factual statement in third person ("The witness testified that..." or "Witness stated that..." or "According to the witness...")
+- Be concise (1-2 sentences maximum) but capture the key factual information
+- Use past tense for events that happened ("testified that they worked...")
+- Include specific names, dates, numbers, and details when mentioned
 
 IMPORTANT: Return a JSON array with one object per Q&A in the EXACT same order as input.
-Example format: [{"summary":"...","topic":"...","peopleMentioned":[],"hasDates":false,"date":null}, ...]`;
+Example format: [{"summary":"The witness testified that...","topic":"Background","peopleMentioned":[],"hasDates":false,"date":null}, ...]`;
 
     const results = [];
     
@@ -521,15 +546,28 @@ async function batchSummarizeQA(qaItems, itemsPerRequest = 20, sendProgress = nu
     console.log(`  Using concurrent batching: ${itemsPerRequest} items/request, ${CONCURRENT_BATCHES} concurrent batches = ~${totalBatches} API calls`);
 
     const systemPrompt = `You are a legal assistant summarizing deposition testimony.
-You will receive multiple Q&A exchanges. For EACH one, provide a concise summary (1-2 sentences).
+You will receive multiple Q&A exchanges. For EACH one, provide a SYNTHESIZED summary that converts the Q&A into a factual statement.
+
+CRITICAL: DO NOT just repeat the question and answer. Transform them into a narrative statement.
+
+GOOD EXAMPLE:
+Q: Where did you work in 2019?
+A: I worked at ABC Corporation as a sales manager.
+Summary: "The witness testified that they worked at ABC Corporation as a sales manager in 2019."
+
+BAD EXAMPLE (DO NOT DO THIS):
+Summary: "Q: Where did you work in 2019? A: I worked at ABC Corporation as a sales manager."
 
 Rules for summaries:
-- Write in third person ("The witness testified..." or "Witness stated...")
-- Be concise but capture key information
+- NEVER repeat the question in your summary
+- NEVER use Q&A format in the summary  
+- ALWAYS convert to a factual statement in third person ("The witness testified that..." or "Witness stated that...")
+- Be concise (1-2 sentences maximum)
+- Use past tense for events
 - Include specific names, dates, numbers when mentioned
 
 IMPORTANT: Return a JSON array of summary strings in the EXACT same order as input.
-Example format: ["The witness testified...", "Witness stated...", ...]`;
+Example format: ["The witness testified that...", "Witness stated that...", ...]`;
 
     const results = [];
     
