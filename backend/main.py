@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
-from api import health, documents, jobs, websocket
+from api import health, documents, jobs, websocket, cache
 from services.cache_service import cache_service
 from services.db_service import init_db
 
@@ -62,6 +62,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, tags=["health"])
+app.include_router(cache.router, prefix="/api", tags=["cache"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
