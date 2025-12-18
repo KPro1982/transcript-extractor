@@ -17,7 +17,7 @@ const LINES_PER_PAGE = 25
 
 /**
  * PDF page viewer with line highlighting for reading mode.
- * Displays PDF pages as images with a left border indicator showing
+ * Displays PDF pages as images with a thick left border indicator showing
  * which lines correspond to the current summary.
  */
 export default function PDFViewer({
@@ -31,9 +31,10 @@ export default function PDFViewer({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 })
+  const [displayDimensions, setDisplayDimensions] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
 
   // Load the PDF page image
   useEffect(() => {
@@ -48,10 +49,12 @@ export default function PDFViewer({
 
   const handleImageLoad = useCallback(() => {
     setLoading(false)
+    // Use displayed dimensions, not natural dimensions
     if (imageRef.current) {
-      setImageDimensions({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight
+      const rect = imageRef.current.getBoundingClientRect()
+      setDisplayDimensions({
+        width: rect.width,
+        height: rect.height
       })
     }
   }, [])
@@ -63,16 +66,17 @@ export default function PDFViewer({
 
   // Calculate highlight position based on line numbers
   const calculateHighlightStyle = useCallback(() => {
-    if (!imageDimensions.height || highlightStartLine < 1) {
+    if (!displayDimensions.height || highlightStartLine < 1) {
       return { display: 'none' as const }
     }
 
     // Calculate line positions based on legal transcript standard (25 lines/page)
-    // Account for margins (approximately 10% top/bottom)
-    const marginPercent = 0.10
-    const contentHeight = imageDimensions.height * (1 - 2 * marginPercent)
+    // Account for margins (approximately 12% top, 8% bottom for legal transcripts)
+    const topMarginPercent = 0.12
+    const bottomMarginPercent = 0.08
+    const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
     const lineHeight = contentHeight / LINES_PER_PAGE
-    const topMargin = imageDimensions.height * marginPercent
+    const topMargin = displayDimensions.height * topMarginPercent
 
     const startY = topMargin + (highlightStartLine - 1) * lineHeight
     const endY = topMargin + highlightEndLine * lineHeight
@@ -80,37 +84,62 @@ export default function PDFViewer({
     return {
       position: 'absolute' as const,
       left: 0,
-      top: `${(startY / imageDimensions.height) * 100}%`,
-      height: `${((endY - startY) / imageDimensions.height) * 100}%`,
-      width: '4px',
+      top: startY,
+      height: Math.max(endY - startY, lineHeight), // Minimum one line height
+      width: '20px', // 5x thicker (was 4px)
       backgroundColor: '#c9a66b',
-      borderRadius: '0 2px 2px 0',
-      boxShadow: '0 0 10px rgba(201, 166, 107, 0.5)',
-      transition: 'all 0.3s ease-out'
+      borderRadius: '0 4px 4px 0',
+      boxShadow: '0 0 20px rgba(201, 166, 107, 0.6), 0 0 40px rgba(201, 166, 107, 0.3)',
+      transition: 'all 0.3s ease-out',
+      zIndex: 10
     }
-  }, [imageDimensions.height, highlightStartLine, highlightEndLine])
+  }, [displayDimensions.height, highlightStartLine, highlightEndLine])
 
-  // Scroll to highlight when it changes
+  // Scroll to highlight when it changes or image loads
   useEffect(() => {
-    if (!containerRef.current || !imageDimensions.height || highlightStartLine < 1) return
+    if (!containerRef.current || !displayDimensions.height || highlightStartLine < 1 || loading) return
 
-    const marginPercent = 0.10
-    const contentHeight = imageDimensions.height * (1 - 2 * marginPercent)
-    const lineHeight = contentHeight / LINES_PER_PAGE
-    const topMargin = imageDimensions.height * marginPercent
+    // Small delay to ensure DOM is updated
+    const timer = setTimeout(() => {
+      const topMarginPercent = 0.12
+      const bottomMarginPercent = 0.08
+      const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
+      const lineHeight = contentHeight / LINES_PER_PAGE
+      const topMargin = displayDimensions.height * topMarginPercent
 
-    const startY = topMargin + (highlightStartLine - 1) * lineHeight
-    
-    // Get the container's visible area
-    const container = containerRef.current
-    const containerRect = container.getBoundingClientRect()
-    const scrollTarget = startY - containerRect.height / 3 // Position highlight 1/3 from top
+      const startY = topMargin + (highlightStartLine - 1) * lineHeight
+      
+      // Scroll to position the highlight about 1/4 from the top of the visible area
+      const container = containerRef.current
+      if (container) {
+        const visibleHeight = container.clientHeight
+        const scrollTarget = startY - visibleHeight * 0.25
 
-    container.scrollTo({
-      top: Math.max(0, scrollTarget),
-      behavior: 'smooth'
-    })
-  }, [highlightStartLine, imageDimensions.height])
+        container.scrollTo({
+          top: Math.max(0, scrollTarget),
+          behavior: 'smooth'
+        })
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [highlightStartLine, displayDimensions.height, loading])
+
+  // Update dimensions on resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (imageRef.current && !loading) {
+        const rect = imageRef.current.getBoundingClientRect()
+        setDisplayDimensions({
+          width: rect.width,
+          height: rect.height
+        })
+      }
+    }
+
+    window.addEventListener('resize', updateDimensions)
+    return () => window.removeEventListener('resize', updateDimensions)
+  }, [loading])
 
   const goToPreviousPage = useCallback(() => {
     if (pageNumber > 1) {
@@ -123,6 +152,8 @@ export default function PDFViewer({
       onPageChange?.(pageNumber + 1)
     }
   }, [pageNumber, totalPages, onPageChange])
+
+  const highlightStyle = calculateHighlightStyle()
 
   return (
     <div className="flex flex-col h-full bg-bg-elevated rounded-xl overflow-hidden">
@@ -153,10 +184,9 @@ export default function PDFViewer({
       <div 
         ref={containerRef}
         className="flex-1 overflow-auto relative"
-        style={{ scrollBehavior: 'smooth' }}
       >
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated">
+          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated z-20">
             <div className="text-center">
               <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-400">Loading page {pageNumber}...</p>
@@ -165,7 +195,7 @@ export default function PDFViewer({
         )}
 
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated p-8">
+          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated p-8 z-20">
             <div className="text-center">
               <div className="text-red-400 mb-2">⚠️</div>
               <p className="text-sm text-red-400">{error}</p>
@@ -174,9 +204,14 @@ export default function PDFViewer({
         )}
 
         {imageUrl && (
-          <div className="relative inline-block min-w-full">
-            {/* Line Highlight Indicator */}
-            <div style={calculateHighlightStyle()} />
+          <div className="relative">
+            {/* Line Highlight Indicator - Thick gold bar */}
+            {highlightStyle.display !== 'none' && (
+              <div 
+                ref={highlightRef}
+                style={highlightStyle} 
+              />
+            )}
             
             {/* PDF Page Image */}
             <img
@@ -194,9 +229,8 @@ export default function PDFViewer({
 
       {/* Line Number Indicator Footer */}
       <div className="px-4 py-2 bg-bg-card border-t border-gray-800 text-xs text-gray-500 text-center">
-        Highlighting lines {highlightStartLine}-{highlightEndLine}
+        Lines {highlightStartLine}-{highlightEndLine}
       </div>
     </div>
   )
 }
-

@@ -32,16 +32,16 @@ function formatCitation(item: QAItem): string {
   
   if (page_number === end_page) {
     // Same page
-    return `[${page_number}:${line_number}-${end_line}]`
+    return `${page_number}:${line_number}-${end_line}`
   } else {
     // Cross-page
-    return `[${page_number}:${line_number}-${end_page}:${end_line}]`
+    return `${page_number}:${line_number}-${end_page}:${end_line}`
   }
 }
 
 /**
  * Summary display component for reading mode.
- * Shows the current Q&A summary with citation and navigation controls.
+ * Shows ONLY the summary with citation - no Q&A display.
  */
 export default function SummaryDisplay({
   item,
@@ -96,49 +96,36 @@ export default function SummaryDisplay({
         
         {/* Topic Badge */}
         <div className="px-3 py-1 bg-accent/10 border border-accent/30 rounded-full text-xs text-accent font-medium">
-          {item.topic || 'Uncategorized'}
+          {item.topic || 'Other'}
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-auto p-6">
-        {/* Question */}
-        <div className="mb-6">
-          <div className="flex items-start gap-3">
-            <span className="text-accent font-bold text-lg flex-shrink-0">Q:</span>
-            <p className="text-gray-200 text-lg leading-relaxed">{item.question}</p>
-          </div>
-        </div>
-
-        {/* Answer */}
-        <div className="mb-8">
-          <div className="flex items-start gap-3">
-            <span className="text-gray-400 font-bold text-lg flex-shrink-0">A:</span>
-            <p className="text-gray-400 leading-relaxed">{item.answer}</p>
-          </div>
-        </div>
-
-        {/* Summary Card */}
-        <div className="bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 rounded-xl p-6">
-          {/* Citation Badge at Top */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="text-xs text-accent font-semibold uppercase tracking-wider">
-              AI Summary
-            </div>
-            <span className="font-mono text-xs text-accent/80 bg-accent/10 px-3 py-1.5 rounded-lg border border-accent/20">
-              {citation}
-            </span>
-          </div>
-          
+      {/* Summary Content Area - Full Width */}
+      <div className="flex-1 overflow-auto p-6 flex flex-col">
+        {/* Summary Text - Takes up most of the space */}
+        <div className="flex-1">
           {item.summary ? (
-            <p className="text-gray-100 text-lg leading-relaxed">
+            <p className="text-gray-100 text-xl leading-relaxed">
               {item.summary}
             </p>
           ) : (
-            <p className="text-gray-400 text-sm italic">
-              No summary available for this Q&A pair.
-            </p>
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center text-gray-500">
+                <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                <p className="text-lg">Summary not available</p>
+                <p className="text-sm mt-2 text-gray-600">
+                  This Q&A pair was not summarized by AI.
+                </p>
+              </div>
+            </div>
           )}
+        </div>
+
+        {/* Citation at Bottom - Full Width */}
+        <div className="mt-6 pt-4 border-t border-gray-800">
+          <div className="font-mono text-sm text-accent bg-accent/10 px-4 py-2 rounded-lg text-center">
+            {citation}
+          </div>
         </div>
       </div>
 
@@ -166,4 +153,3 @@ export default function SummaryDisplay({
     </div>
   )
 }
-

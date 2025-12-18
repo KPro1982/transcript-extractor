@@ -124,15 +124,22 @@ class AIService:
     def _init_providers(self):
         """Initialize available AI providers."""
         if settings.openai_api_key:
+            # Mask key for logging (show first 8 and last 4 chars)
+            masked_key = f"{settings.openai_api_key[:8]}...{settings.openai_api_key[-4:]}" if len(settings.openai_api_key) > 12 else "***"
+            logger.info(f"✅ OpenAI provider initialized with key: {masked_key}")
             self.providers.append(OpenAIProvider(settings.openai_api_key))
-            logger.info("OpenAI provider initialized")
+        else:
+            logger.error("❌ OPENAI_API_KEY not set! AI summarization will NOT work.")
         
         if settings.anthropic_api_key:
             self.providers.append(AnthropicProvider(settings.anthropic_api_key))
-            logger.info("Anthropic provider initialized")
+            logger.info("✅ Anthropic provider initialized")
         
         if not self.providers:
-            logger.warning("No AI providers configured! AI summarization will not work.")
+            logger.error("="*60)
+            logger.error("❌ CRITICAL: No AI providers configured!")
+            logger.error("Set OPENAI_API_KEY environment variable in Railway.")
+            logger.error("="*60)
     
     def calculate_optimal_batch_size(self, qa_items: List[Dict]) -> int:
         """Calculate optimal batch size based on actual token count.
@@ -238,8 +245,14 @@ class AIService:
             return []
         
         if not self.providers:
-            logger.warning("No AI providers available")
-            return [{"summary": "", "topic": "Other", **qa} for qa in qa_items]
+            logger.error("❌ CRITICAL: No AI providers configured! Set OPENAI_API_KEY environment variable.")
+            logger.error("Summaries will be empty because no AI provider is available.")
+            # Return items with explicit error message in summary
+            return [{
+                "summary": "[AI summarization unavailable - OPENAI_API_KEY not configured]",
+                "topic": "Other",
+                **qa
+            } for qa in qa_items]
         
         # Update metrics
         self.metrics["total_requests"] += len(qa_items)
