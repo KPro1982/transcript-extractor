@@ -37,11 +37,15 @@ export function useJobProgress(jobId: string | null) {
       }
 
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        
-        if (data.type === 'connected') {
-          console.log('WebSocket handshake complete')
-        } else if (data.type === 'progress') {
+        try {
+          const data = JSON.parse(event.data)
+          
+          if (data.type === 'connected') {
+            console.log('WebSocket handshake complete')
+          } else if (data.type === 'pong') {
+            // Ignore pong responses
+            return
+          } else if (data.type === 'progress') {
           // Parse detailed progress from message
           // Format: "AI processing: 245/856 items (28.6%)"
           const message = data.data.message || ''
@@ -78,7 +82,10 @@ export function useJobProgress(jobId: string | null) {
             message: data.data.error_message,
           })
         }
+      } catch (err) {
+        console.error('Failed to parse WebSocket message:', err, event.data)
       }
+    }
 
       ws.onerror = (event) => {
         console.error('WebSocket error:', event)

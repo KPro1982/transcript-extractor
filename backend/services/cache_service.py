@@ -268,6 +268,25 @@ class CacheService:
         except Exception as e:
             logger.error(f"Failed to retrieve PDF content: {e}")
             return None
+    
+    async def publish_job_update(self, job_id: str, event_type: str, data: dict):
+        """Publish job update event to Redis for WebSocket broadcasting.
+        
+        This allows workers in separate containers to send updates to connected clients.
+        Backend WebSocket manager subscribes to these events.
+        """
+        channel = f"job_updates:{job_id}"
+        message = {
+            "type": event_type,
+            "job_id": job_id,
+            "data": data
+        }
+        
+        try:
+            await self.redis.publish(channel, json.dumps(message))
+            logger.debug(f"Published {event_type} update for job {job_id[:8]}...")
+        except Exception as e:
+            logger.error(f"Failed to publish job update: {e}")
 
 
 # Global cache service instance

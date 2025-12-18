@@ -1,4 +1,5 @@
 """WebSocket endpoints for real-time job progress updates."""
+import asyncio
 import logging
 import json
 from uuid import UUID
@@ -6,6 +7,9 @@ from typing import Dict, Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
+import redis.asyncio as redis
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +82,14 @@ manager = ConnectionManager()
 async def websocket_job_updates(websocket: WebSocket, job_id: str):
     """
     WebSocket endpoint for real-time job progress updates.
-    Clients connect here after starting a job.
+    Subscribes to Redis pub/sub to receive updates from workers.
     """
     await manager.connect(websocket, job_id)
+    
+    # Create Redis subscriber for this job
+    redis_client = await redis.from_url(settings.redis_url, decode_responses=True)
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe(f"job_updates:{job_id}")
     
     try:
         # Send initial connection confirmation
@@ -90,22 +99,46 @@ async def websocket_job_updates(websocket: WebSocket, job_id: str):
             "message": "WebSocket connected. Listening for updates..."
         })
         
-        # Keep connection alive and listen for pings
-        while True:
+        # Start Redis subscriber task
+        async def redis_listener():
+            """Listen for Redis pub/sub messages and forward to WebSocket."""
             try:
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        try:
+                            data = json.loads(message["data"])
+                            if websocket.client_state == WebSocketState.CONNECTED:
+                                await websocket.send_json(data)
+                        except json.JSONDecodeError:
+                            logger.error(f"Invalid JSON from Redis: {message['data']}")
+                        except Exception as e:
+                            logger.error(f"Error forwarding message: {e}")
+                            break
+            except Exception as e:
+                logger.error(f"Redis listener error: {e}")
+        
+        # Start listener in background
+        listener_task = asyncio.create_task(redis_listener())
+        
+        # Keep connection alive and handle ping/pong
+        try:
+            while True:
                 data = await websocket.receive_text()
                 
                 # Handle ping/pong
                 if data == "ping":
-                    await websocket.send_text("pong")
+                    await websocket.send_json({"type": "pong"})
                 
-            except WebSocketDisconnect:
-                break
-            except Exception as e:
-                logger.error(f"WebSocket error: {e}")
-                break
+        except WebSocketDisconnect:
+            pass
     
     finally:
+        # Cleanup
+        if 'listener_task' in locals():
+            listener_task.cancel()
+        await pubsub.unsubscribe(f"job_updates:{job_id}")
+        await pubsub.close()
+        await redis_client.close()
         manager.disconnect(websocket, job_id)
 
 
@@ -151,4 +184,6 @@ async def send_partial_result(job_id: str, result: dict):
         "partial_result",
         result
     )
+
+
 

@@ -10,9 +10,49 @@ from services.pdf_service import pdf_service
 from services.ai_service import ai_service
 from services.db_service import db_service
 from services.cache_service import cache_service
-from api.websocket import send_job_update, send_job_complete, send_job_error, send_partial_result
 
 logger = logging.getLogger(__name__)
+
+
+# Worker-specific job update functions using Redis pub/sub
+async def send_job_update(job_id: str, status: str, progress: int, **kwargs):
+    """Send job progress update via Redis pub/sub (worker → backend → WebSocket clients)."""
+    await cache_service.publish_job_update(
+        job_id,
+        "progress",
+        {
+            "status": status,
+            "progress": progress,
+            **kwargs
+        }
+    )
+
+
+async def send_job_error(job_id: str, error_message: str):
+    """Send job error via Redis pub/sub."""
+    await cache_service.publish_job_update(
+        job_id,
+        "error",
+        {"error_message": error_message}
+    )
+
+
+async def send_job_complete(job_id: str, result: dict):
+    """Send job completion notification via Redis pub/sub."""
+    await cache_service.publish_job_update(
+        job_id,
+        "complete",
+        result
+    )
+
+
+async def send_partial_result(job_id: str, result: dict):
+    """Send partial results via Redis pub/sub."""
+    await cache_service.publish_job_update(
+        job_id,
+        "partial_result",
+        result
+    )
 
 
 @celery_app.task(name="process_document")
