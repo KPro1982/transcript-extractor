@@ -37,14 +37,37 @@ async def upload_document(file: UploadFile = File(...)):
         # SECURITY: ALWAYS clear all existing data before processing ANY document upload
         # This ensures data isolation and fresh start for every upload, even if same file
         # Each transcript import should start completely fresh with zero data
-        logger.info("Clearing all existing data for document import (fresh start)...")
+        logger.info("="*80)
+        logger.info("CLEARING ALL DATA FOR NEW DOCUMENT IMPORT (FRESH START)")
+        logger.info("="*80)
+        
+        # Clear Redis cache (summaries, PDFs, documents, etc.)
+        try:
+            logger.info("Clearing Redis cache...")
+            await cache_service.redis.flushdb()
+            logger.info("✓ Redis cache cleared (all keys deleted)")
+        except Exception as cache_error:
+            logger.error(f"Error clearing Redis cache: {cache_error}")
+            # Continue anyway - cache clear failure shouldn't block upload
         
         # Clear database tables (in order to respect foreign key constraints)
-        await db_service.execute("DELETE FROM qa_items")
-        await db_service.execute("DELETE FROM processing_jobs")
-        await db_service.execute("DELETE FROM documents")
+        logger.info("Clearing database tables...")
+        try:
+            # Delete in order to respect foreign keys
+            deleted_qa = await db_service.execute("DELETE FROM qa_items")
+            deleted_final_qa = await db_service.execute("DELETE FROM final_qa_items")
+            deleted_jobs = await db_service.execute("DELETE FROM processing_jobs")
+            deleted_docs = await db_service.execute("DELETE FROM documents")
+            logger.info(f"✓ Database cleared: qa_items, final_qa_items, processing_jobs, documents")
+        except Exception as db_error:
+            logger.error(f"Error clearing database: {db_error}")
+            # If final_qa_items doesn't exist yet, that's ok
+            if "final_qa_items" not in str(db_error):
+                raise
         
-        logger.info("All existing documents, Q&A items, and jobs cleared - starting fresh")
+        logger.info("="*80)
+        logger.info("ALL DATA CLEARED - Starting fresh import")
+        logger.info("="*80)
         
         # Save to temporary location for processing
         temp_path = f"/tmp/upload_{file_hash[:16]}.pdf"
@@ -78,10 +101,14 @@ async def upload_document(file: UploadFile = File(...)):
             "total_pages": pdf_info["total_pages"]
         }
         
-        # Cache document metadata
+        # Cache document metadata (after clearing - this is the ONLY document now)
         await cache_service.set_document(file_hash, doc_data)
         
-        logger.info(f"Document uploaded and ready for processing: {file.filename} ({file_hash[:8]}...) - Fresh start with zero existing data")
+        logger.info(f"✓ Document uploaded and ready for processing")
+        logger.info(f"  Filename: {file.filename}")
+        logger.info(f"  Hash: {file_hash[:16]}...")
+        logger.info(f"  Total pages: {pdf_info['total_pages']}")
+        logger.info(f"  Status: Fresh start with zero existing data")
         
         return {
             "document_id": str(doc_id),
