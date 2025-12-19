@@ -678,13 +678,13 @@ class PDFService:
                     })
                 break
             
-            # Check if this is a question (only if we're not already in a question, or if it's a new question)
-            is_q = is_question(trimmed) or is_question(text)
-            is_a = is_answer(trimmed) or is_answer(text)
-            is_c = is_colloquy(trimmed)
+            # Check if this line starts a new question (question markers only match at start)
+            line_is_question = is_question(trimmed)
+            # Check if this line starts a new answer (answer markers only match at start)
+            line_is_answer = is_answer(trimmed)
             
-            if is_q:
-                # Save previous Q&A if complete
+            if line_is_question:
+                # Only save previous Q&A if it's complete (has both question and answer)
                 if current_question and current_answer:
                     qa_pairs.append({
                         "question": current_question,
@@ -694,45 +694,51 @@ class PDFService:
                         "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
                     })
                 
-                # Start new question (even if we were in a question state - this is a new Q)
+                # If we're already in a question state and encounter a new question,
+                # discard the incomplete previous question (it had no answer)
+                # Start new question
                 current_question = clean_qa_text(text)
                 current_question_y = line["y"]
                 current_answer = []
                 state = 'in_question'
                 
-            elif is_a:
+            elif line_is_answer:
                 if current_question:
                     # Start or continue answer
                     answer_text = clean_qa_text(text)
                     if state == 'in_answer':
-                        # Another answer line (like another THE WITNESS:)
+                        # Another answer marker (like another THE WITNESS:)
+                        # Append the new answer text
                         current_answer.append(answer_text)
                     else:
                         # Transition from question to answer
                         current_answer = [answer_text]
                     state = 'in_answer'
-                # If no current question, ignore standalone answers (might be from previous page)
+                else:
+                    # Answer without a question - skip it (might be continuation from previous page)
+                    pass
                     
-            elif is_c:
-                # Colloquy (objections, attorney statements, etc.) doesn't interrupt
-                # the current question or answer - it's just skipped
-                # The state remains unchanged so continuation continues on next line
-                pass
-                
-            else:
-                # Continuation of current element
-                # This handles multi-line questions and answers
+            elif is_colloquy(trimmed):
+                # Colloquy (objections, attorney statements, etc.) - include it if we're in Q&A
                 if state == 'in_question' and current_question:
-                    # Continue the question across multiple lines
-                    # Only append if we have a question started
+                    # Colloquy within question - include it as part of question
                     current_question += ' ' + trimmed
                 elif state == 'in_answer' and current_answer:
-                    # Continue the answer across multiple lines
+                    # Colloquy within answer - include it as part of answer
                     current_answer.append(trimmed)
-                # If state is 'searching', ignore text that doesn't match any pattern
-                # (might be headers, footers, or other non-Q&A content)
+                # Otherwise skip colloquy (not part of any Q&A yet)
+                
+            else:
+                # Continuation of current element (regular text, not a marker)
+                if state == 'in_question' and current_question:
+                    # Continue question across multiple lines
+                    current_question += ' ' + trimmed
+                elif state == 'in_answer' and current_answer:
+                    # Continue answer across multiple lines
+                    current_answer.append(trimmed)
+                # If state is 'searching', skip this line (not part of Q&A yet)
         
-        # Save last Q&A pair
+        # Save last Q&A pair if complete
         if current_question and current_answer:
             qa_pairs.append({
                 "question": current_question,
@@ -742,27 +748,12 @@ class PDFService:
                 "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
             })
         
-        # Debug logging for pages with Q&A pairs
-        if len(qa_pairs) > 0:
+        # Debug logging for first page
+        if page_number == 1 and len(lines) > 0:
             logger.info(f"Page {page_number}: {len(lines)} lines, {len(qa_pairs)} Q&A pairs found")
-            # Log first Q&A pair details for debugging
-            if qa_pairs:
-                first_qa = qa_pairs[0]
-                q_preview = first_qa["question"][:100] + "..." if len(first_qa["question"]) > 100 else first_qa["question"]
-                a_preview = first_qa["answer"][:100] + "..." if len(first_qa["answer"]) > 100 else first_qa["answer"]
-                logger.debug(f"Page {page_number} first Q&A: line={first_qa['line']}, Q='{q_preview}', A='{a_preview}'")
-        
-        # Debug logging for page 7 specifically (where the issue was reported)
-        if page_number == 7 and len(lines) > 0:
-            logger.debug(f"Page 7 debug: {len(lines)} lines processed")
-            # Show lines around where Q&A should be (lines 10-22)
-            sample_lines = []
-            for i, l in enumerate(lines[:25]):  # First 25 lines
-                line_num = self._find_closest_line_number(l["y"], line_numbers)
-                if 10 <= line_num <= 22:
-                    sample_lines.append(f"Line {line_num}: '{l['text'][:60]}'")
-            if sample_lines:
-                logger.debug(f"Page 7 lines 10-22: {sample_lines}")
+            # Show first few lines to help debug parsing issues
+            sample_lines = [l["text"][:80] for l in lines[:10]]
+            logger.debug(f"Sample lines from page 1: {sample_lines}")
         
         return qa_pairs
     
