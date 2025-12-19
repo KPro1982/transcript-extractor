@@ -658,13 +658,18 @@ class PDFService:
         current_question = None
         current_question_y = None
         current_answer = []
+        current_answer_end_line = None  # Track the last line number of the answer
+        current_answer_end_y = None  # Track Y position of answer end
         state = 'searching'  # searching, in_question, in_answer
         
-        def save_current_qa_if_complete():
+        def save_current_qa_if_complete(is_final: bool = True):
             """Helper to save current Q&A pair only if it's complete and not already saved.
             
             This ensures we only save once per complete Q&A pair.
             Uses a key based on question + answer + page + line to detect duplicates.
+            
+            Args:
+                is_final: True if this is a final Q&A pair (complete), False if interim
             """
             nonlocal qa_pairs, seen_qa_keys
             if current_question and current_answer:
@@ -679,12 +684,28 @@ class PDFService:
                 # Only save if we haven't seen this exact Q&A pair before
                 if qa_key not in seen_qa_keys:
                     seen_qa_keys.add(qa_key)
+                    
+                    # Calculate answer end line
+                    answer_end_line_num = None
+                    if current_answer_end_line is not None:
+                        answer_end_line_num = current_answer_end_line
+                    elif current_answer_end_y is not None:
+                        answer_end_line_num = self._find_closest_line_number(current_answer_end_y, line_numbers)
+                    
+                    # If answer end line not found, use question start line as fallback
+                    question_start_line = self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                    if answer_end_line_num is None:
+                        answer_end_line_num = question_start_line
+                    
                     qa_pairs.append({
                         "question": current_question,
                         "answer": " ".join(current_answer),
                         "page": page_number,
                         "pdf_page_index": _pdf_idx,
-                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                        "line": question_start_line,
+                        "answer_end_page": page_number,
+                        "answer_end_line": answer_end_line_num,
+                        "is_final": is_final
                     })
                 else:
                     logger.warning(f"Skipping duplicate Q&A pair at page {page_number}, line {self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1}")
@@ -710,14 +731,19 @@ class PDFService:
             # Check if this line starts a new answer (answer markers only match at start)
             line_is_answer = is_answer(trimmed)
             
+            # Get current line number for tracking
+            current_line_num = self._find_closest_line_number(line["y"], line_numbers)
+            
             if line_is_question:
-                # Save previous complete Q&A before starting new question
-                save_current_qa_if_complete()
+                # Save previous complete Q&A before starting new question (FINAL - new Q starts)
+                save_current_qa_if_complete(is_final=True)
                 
                 # Clear and start new question
                 current_question = clean_qa_text(text)
                 current_question_y = line["y"]
                 current_answer = []
+                current_answer_end_line = None
+                current_answer_end_y = None
                 state = 'in_question'
                 
             elif line_is_answer:
@@ -732,6 +758,9 @@ class PDFService:
                         # Transition from question to answer
                         current_answer = [answer_text]
                     state = 'in_answer'
+                    # Update answer end tracking
+                    current_answer_end_line = current_line_num
+                    current_answer_end_y = line["y"]
                 else:
                     # Answer without a question - skip it (might be continuation from previous page)
                     pass
@@ -744,6 +773,9 @@ class PDFService:
                 elif state == 'in_answer' and current_answer:
                     # Colloquy within answer - include it as part of answer
                     current_answer.append(trimmed)
+                    # Update answer end tracking
+                    current_answer_end_line = current_line_num
+                    current_answer_end_y = line["y"]
                 # Otherwise skip colloquy (not part of any Q&A yet)
                 
             else:
@@ -754,10 +786,13 @@ class PDFService:
                 elif state == 'in_answer' and current_answer:
                     # Continue answer across multiple lines
                     current_answer.append(trimmed)
+                    # Update answer end tracking
+                    current_answer_end_line = current_line_num
+                    current_answer_end_y = line["y"]
                 # If state is 'searching', skip this line (not part of Q&A yet)
         
-        # Save last Q&A pair if complete (only once at end of page)
-        save_current_qa_if_complete()
+        # Save last Q&A pair if complete (FINAL - end of page)
+        save_current_qa_if_complete(is_final=True)
         
         # Debug logging for first page
         if page_number == 1 and len(lines) > 0:

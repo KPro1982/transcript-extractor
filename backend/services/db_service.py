@@ -80,6 +80,9 @@ async def init_db():
                 page_number INT NOT NULL,
                 line_number INT NOT NULL,
                 pdf_page_index INT,
+                answer_end_page INT,
+                answer_end_line INT,
+                is_final BOOLEAN DEFAULT TRUE,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 summary TEXT,
@@ -88,6 +91,7 @@ async def init_db():
             );
             
             CREATE INDEX IF NOT EXISTS idx_qa_items_document_id ON qa_items(document_id);
+            CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
             
             -- Add pdf_page_index column if it doesn't exist (migration)
             DO $$ 
@@ -97,6 +101,39 @@ async def init_db():
                     WHERE table_name = 'qa_items' AND column_name = 'pdf_page_index'
                 ) THEN
                     ALTER TABLE qa_items ADD COLUMN pdf_page_index INT;
+                END IF;
+            END $$;
+            
+            -- Add answer_end_page column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'qa_items' AND column_name = 'answer_end_page'
+                ) THEN
+                    ALTER TABLE qa_items ADD COLUMN answer_end_page INT;
+                END IF;
+            END $$;
+            
+            -- Add answer_end_line column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'qa_items' AND column_name = 'answer_end_line'
+                ) THEN
+                    ALTER TABLE qa_items ADD COLUMN answer_end_line INT;
+                END IF;
+            END $$;
+            
+            -- Add is_final column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'qa_items' AND column_name = 'is_final'
+                ) THEN
+                    ALTER TABLE qa_items ADD COLUMN is_final BOOLEAN DEFAULT TRUE;
                 END IF;
             END $$;
             

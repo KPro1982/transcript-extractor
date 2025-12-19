@@ -123,45 +123,66 @@ async def get_document(document_id: UUID):
 
 @router.get("/{document_id}/qa-items")
 async def get_qa_items(document_id: UUID):
-    """Get all Q&A items for a document with line range information.
+    """Get all FINAL Q&A items for a document with line range information.
+    
+    Only returns Q&A items marked as final (is_final = TRUE), filtering out
+    any interim entries that were created during processing.
     
     Each item includes start and end positions for citation formatting.
-    End positions are calculated based on the next Q&A item's start position.
+    End positions use the stored answer_end_line/answer_end_page from parsing,
+    falling back to calculated values for backward compatibility.
     
     Returns:
         - page_number: The PRINTED transcript page number (for display/citation)
         - pdf_page_index: The 1-based index in the PDF file (for rendering)
+        - end_page/end_line: Where the answer ends (from stored data)
     """
     items = await db_service.fetch(
         """
-        SELECT id, page_number, line_number, pdf_page_index, question, answer, summary, topic
+        SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, is_final, question, answer, summary, topic
         FROM qa_items
-        WHERE document_id = $1
+        WHERE document_id = $1 AND is_final = TRUE
         ORDER BY page_number, line_number
         """,
         document_id
     )
     
-    # Convert to list for range calculation
+    # Convert to list
     items_list = list(items)
     qa_items_with_ranges = []
     
-    for i, item in enumerate(items_list):
-        # Calculate end line/page based on next item's position
-        if i + 1 < len(items_list):
-            next_item = items_list[i + 1]
-            if next_item["page_number"] == item["page_number"]:
-                # Same page: end line is one before next item's start
-                end_page = item["page_number"]
-                end_line = max(item["line_number"], next_item["line_number"] - 1)
-            else:
-                # Different page: current item goes to end of its page
-                end_page = item["page_number"]
-                end_line = 25  # Legal transcript standard lines per page
+    for item in items_list:
+        # Use stored answer_end_line/answer_end_page if available
+        # Fall back to calculated values for backward compatibility
+        if item.get("answer_end_page") is not None and item.get("answer_end_line") is not None:
+            end_page = item["answer_end_page"]
+            end_line = item["answer_end_line"]
         else:
-            # Last item: goes to end of page
+            # Fallback: Calculate based on next item's position (backward compatibility)
             end_page = item["page_number"]
-            end_line = 25
+            end_line = None
+            
+            # Look for the next item on the same page
+            item_index = items_list.index(item)
+            for j in range(item_index + 1, len(items_list)):
+                next_item = items_list[j]
+                if next_item["page_number"] == item["page_number"]:
+                    # Found next item on same page: end line is one before its start
+                    end_line = next_item["line_number"] - 1
+                    break
+            
+            # If no next item on same page found
+            if end_line is None:
+                if item_index + 1 < len(items_list):
+                    # Next item is on a different page: current item goes to end of its page
+                    end_line = 25  # Legal transcript standard lines per page
+                else:
+                    # Last item: goes to end of page
+                    end_line = 25
+            
+            # Ensure end_line is at least the start line (safety check)
+            if end_line < item["line_number"]:
+                end_line = item["line_number"]
         
         # Use pdf_page_index if available, fallback to page_number for old data
         pdf_idx = item.get("pdf_page_index") or item["page_number"]

@@ -274,19 +274,27 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             pdf_page_idx = item.get('pdf_page_index', printed_page_num)  # Fallback to page if not set
             line_num = item.get('line', 1)
             
+            # Get answer end line/page (stored during parsing)
+            answer_end_page = item.get('answer_end_page', printed_page_num)
+            answer_end_line = item.get('answer_end_line', line_num)
+            is_final = item.get('is_final', True)  # Default to True for backward compatibility
+            
             # Log first few items to debug page/line data
             if idx < 3:
-                logger.info(f"Saving Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, question={item['question'][:50]}...")
+                logger.info(f"Saving Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, is_final={is_final}, question={item['question'][:50]}...")
             
             await db_service.execute(
                 """
-                INSERT INTO qa_items (document_id, page_number, line_number, pdf_page_index, question, answer, summary, topic)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, is_final, question, answer, summary, topic)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 """,
                 document_id,
                 printed_page_num,
                 line_num,
                 pdf_page_idx,
+                answer_end_page,
+                answer_end_line,
+                is_final,
                 item['question'],
                 item['answer'],
                 item.get('summary', ''),
