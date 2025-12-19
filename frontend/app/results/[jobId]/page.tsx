@@ -88,8 +88,20 @@ export default function ResultsPage() {
         setFilename(docInfo.filename || 'Document')
         
         // Fetch Q&A items with line ranges
-        const response = await getQAItems(jobStatus.document_id)
-        setQAItems(response.qa_items || [])
+        try {
+          const response = await getQAItems(jobStatus.document_id)
+          console.log('Q&A items response:', response)
+          console.log('Number of items:', response?.qa_items?.length || 0)
+          if (response?.qa_items && response.qa_items.length > 0) {
+            console.log('First item summary:', response.qa_items[0]?.summary || 'MISSING')
+            console.log('First item:', response.qa_items[0])
+          }
+          setQAItems(response.qa_items || [])
+        } catch (err: any) {
+          console.error('Failed to fetch Q&A items:', err)
+          console.error('Error details:', err.response?.data || err.message)
+          setError(`Failed to load Q&A items: ${err.message}`)
+        }
         
       } catch (err: any) {
         console.error('Failed to fetch results:', err)
