@@ -979,21 +979,20 @@ class PDFService:
                         current_answer_end_y = line["y"]
         
         # At end of page, check if we have incomplete Q&A pairs
-        # If we're continuing from a previous page, don't save yet - continue on next page
+        # If complete (has both question and answer), save as final
         # If incomplete and NOT continuing, save as interim (will be merged with next page)
-        # If complete, save as final
+        # If incomplete and continuing, don't save yet - will continue on next page
+        has_complete_qa = current_question is not None and current_answer
         has_incomplete_qa = (current_question is not None) or (current_answer and not current_question)
         is_continuation = previous_incomplete_state is not None
         
-        if has_incomplete_qa and not is_continuation:
+        if has_complete_qa:
+            # Complete Q&A - save as final (whether continuing or not)
+            save_current_qa_if_complete(is_final=True)
+        elif has_incomplete_qa and not is_continuation:
             # New incomplete Q&A started on this page - save as interim
             save_current_qa_if_complete(is_final=False)
-        elif has_incomplete_qa and is_continuation:
-            # Continuing from previous page - don't save, will continue
-            pass
-        else:
-            # Complete Q&A - save as final
-            save_current_qa_if_complete(is_final=True)
+        # If incomplete and continuing, don't save - will continue on next page
         
         # Return incomplete state for continuation on next page
         incomplete_state = {
