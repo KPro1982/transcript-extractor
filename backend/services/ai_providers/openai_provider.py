@@ -259,27 +259,37 @@ Return a JSON array of topic strings in the EXACT same order as input."""
         
         system_prompt = f"""You are a legal assistant analyzing deposition testimony.
 
-You will receive {num_items} Q&A exchanges. For EACH one, provide a summary and topic.
+You will receive {num_items} NUMBERED Q&A exchanges. You MUST provide a SEPARATE summary for EACH one.
 
 CRITICAL REQUIREMENTS:
 1. Return a JSON object with a "results" array
-2. The array MUST contain EXACTLY {num_items} objects (one per input)
-3. Each object has: {{"summary": "...", "topic": "..."}}
+2. The array MUST contain EXACTLY {num_items} objects - ONE per input Q&A
+3. DO NOT combine multiple Q&A into one summary
+4. Each object must have: {{"summary": "...", "topic": "..."}}
 
 Summary rules:
-- Transform Q&A into a narrative statement (DO NOT repeat the question)
+- Transform each Q&A into a narrative statement (DO NOT repeat the question)
 - Use third person: "The witness testified that..."
-- Be concise: 1-2 sentences
+- Be concise: 1-2 sentences per summary
+- Each summary must be unique and specific to its Q&A pair
 
-Topics (pick one): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
+Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
 
 EXAMPLE for 2 inputs:
+Input:
+1. Q: Where did you work?
+A: ABC Corp.
+
+2. Q: When did you start?
+A: January 2020.
+
+Output:
 {{"results": [
-  {{"summary": "The witness testified they worked at ABC Corp since 2019.", "topic": "Employment History"}},
-  {{"summary": "The witness stated the incident occurred on January 5th.", "topic": "Incident Description"}}
+  {{"summary": "The witness testified they worked at ABC Corp.", "topic": "Employment History"}},
+  {{"summary": "The witness stated they started in January 2020.", "topic": "Employment History"}}
 ]}}
 
-Return EXACTLY {num_items} results in the array."""
+IMPORTANT: Return EXACTLY {num_items} separate summaries in the "results" array."""
         
         # Compact user prompt
         user_prompt = f"Analyze these {num_items} Q&A exchanges:\n\n"
@@ -314,51 +324,115 @@ Return EXACTLY {num_items} results in the array."""
             result = response.json()
             content = result["choices"][0]["message"]["content"].strip()
             
+            # Log raw response for debugging
+            self.logger.info(f"OpenAI raw response length: {len(content)} chars")
+            self.logger.debug(f"OpenAI raw response preview: {content[:200]}...")
+            
             # Parse JSON
-            parsed = json.loads(content)
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError as e:
+                self.logger.error(f"❌ Failed to parse OpenAI JSON response: {e}")
+                self.logger.error(f"Response content: {content[:500]}")
+                raise
             
             # Handle different response formats
             if isinstance(parsed, dict) and "results" in parsed:
                 results = parsed["results"]
+                self.logger.debug(f"Found 'results' key with {len(results)} items")
             elif isinstance(parsed, list):
                 results = parsed
+                self.logger.debug(f"Response is direct array with {len(results)} items")
             elif isinstance(parsed, dict):
                 # Try other common keys
                 results = parsed.get("summaries") or parsed.get("data") or []
                 if not results and len(parsed) == 1:
                     results = list(parsed.values())[0]
+                    self.logger.debug(f"Found single key with {len(results) if isinstance(results, list) else 'non-list'} value")
+                else:
+                    self.logger.warning(f"Unexpected dict format: keys={list(parsed.keys())}")
             else:
                 results = []
+                self.logger.error(f"Unexpected response type: {type(parsed)}")
             
             # Validate and normalize results
             normalized = []
             for i, r in enumerate(results):
                 if isinstance(r, dict):
+                    summary_text = r.get("summary", "")
+                    if not summary_text:
+                        self.logger.warning(f"Result {i} has empty summary: {r}")
                     normalized.append({
-                        "summary": r.get("summary", ""),
+                        "summary": summary_text,
                         "topic": r.get("topic", "Other")
                     })
                 elif isinstance(r, str):
+                    if not r.strip():
+                        self.logger.warning(f"Result {i} is empty string")
                     normalized.append({"summary": r, "topic": "Other"})
+                else:
+                    self.logger.warning(f"Result {i} has unexpected type {type(r)}: {r}")
+                    normalized.append({"summary": "", "topic": "Other"})
             
             if len(normalized) == num_items:
-                self.logger.info(f"✅ Successfully got {num_items} summaries from OpenAI")
+                # Check if any summaries are empty
+                empty_count = sum(1 for n in normalized if not n["summary"].strip())
+                if empty_count > 0:
+                    self.logger.warning(f"⚠️ Got {num_items} results but {empty_count} are empty!")
+                else:
+                    self.logger.info(f"✅ Successfully got {num_items} summaries from OpenAI")
                 return normalized
             
             # Handle count mismatch - don't return empty!
             self.logger.warning(f"Result count mismatch: got {len(normalized)}, expected {num_items}")
+            self.logger.warning(f"First result preview: {normalized[0] if normalized else 'NONE'}")
             
             if len(normalized) > 0:
-                # Use what we have
+                # Check if we got any valid summaries
+                valid_count = sum(1 for n in normalized if n["summary"].strip())
+                self.logger.warning(f"Got {len(normalized)} results, {valid_count} have non-empty summaries")
+                
+                if len(normalized) == 1 and num_items > 1:
+                    # OpenAI returned a single combined summary - try to split it
+                    self.logger.error(f"❌ OpenAI returned 1 combined summary instead of {num_items} individual summaries")
+                    self.logger.error(f"Combined summary: {normalized[0]['summary'][:200]}...")
+                    # Try to split by common patterns
+                    combined_text = normalized[0]["summary"]
+                    # Look for numbered patterns or sentence breaks
+                    import re
+                    # Try splitting by numbered items (1., 2., etc.)
+                    parts = re.split(r'\n\s*\d+[\.\)]\s*', combined_text)
+                    if len(parts) > 1:
+                        self.logger.info(f"Attempting to split combined summary into {len(parts)} parts")
+                        normalized = []
+                        for part in parts:
+                            part = part.strip()
+                            if part:
+                                normalized.append({"summary": part, "topic": "Other"})
+                        # If we got the right number, use it
+                        if len(normalized) == num_items:
+                            self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")
+                            return normalized
+                    
+                    # If splitting failed, return empty for all but log error
+                    self.logger.error(f"❌ Could not split combined summary. Returning empty summaries.")
+                    return [{"summary": "", "topic": "Other"} for _ in qa_items]
+                
                 if len(normalized) < num_items:
-                    # Pad with empty
-                    self.logger.warning(f"Padding {num_items - len(normalized)} missing results")
+                    # Pad with empty - but log error
+                    missing = num_items - len(normalized)
+                    self.logger.error(f"❌ OpenAI returned only {len(normalized)} results for {num_items} items. Padding {missing} with empty.")
                     while len(normalized) < num_items:
                         normalized.append({"summary": "", "topic": "Other"})
+                    return normalized
                 else:
-                    # Truncate
+                    # Truncate to expected count
                     normalized = normalized[:num_items]
-                return normalized
+                    # Check if any are empty
+                    empty_count = sum(1 for n in normalized if not n["summary"].strip())
+                    if empty_count > 0:
+                        self.logger.warning(f"⚠️ {empty_count} summaries are empty out of {num_items}")
+                    return normalized
             else:
                 # No results at all - return empty but log error
                 self.logger.error(f"❌ OpenAI returned no parseable results for {num_items} items")

@@ -86,8 +86,9 @@ export default function PDFViewer({
       left: 0,
       top: startY,
       height: Math.max(endY - startY, lineHeight), // Minimum one line height
-      width: '20px', // 5x thicker (was 4px)
-      backgroundColor: '#c9a66b',
+      width: '100%', // Full width highlight
+      backgroundColor: 'rgba(201, 166, 107, 0.2)', // Semi-transparent overlay
+      borderLeft: '4px solid #c9a66b', // Thick left border for visibility
       borderRadius: '0 4px 4px 0',
       boxShadow: '0 0 20px rgba(201, 166, 107, 0.6), 0 0 40px rgba(201, 166, 107, 0.3)',
       transition: 'all 0.3s ease-out',
