@@ -313,13 +313,13 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                 },
                 json={
                     "model": self.model,
-                    "response_format": {"type": "json_object"},
+                    "response_format": {"type": "json_object"},  # Must be json_object for structured output
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
                     "temperature": 0.3,
-                    "max_tokens": num_items * 120  # More tokens per item
+                    "max_tokens": min(4000, num_items * 150)  # Cap at 4000 tokens, more per item
                 }
             )
             
