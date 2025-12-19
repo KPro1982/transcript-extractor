@@ -250,22 +250,29 @@ Return a JSON array of topic strings in the EXACT same order as input."""
             self.logger.error(f"❌ OpenAI classify error: {e}")
             return ["Other"] * len(qa_items)
     
-    async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60) -> List[Dict]:
+    async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60, _retry_mode: bool = False) -> List[Dict]:
         """Optimized batch processing with JSON mode.
         
         Uses OpenAI's JSON mode for guaranteed structured output.
+        
+        Args:
+            qa_items: List of Q&A dictionaries
+            timeout: Request timeout in seconds
+            _retry_mode: Internal flag to prevent infinite recursion on retries
         """
         num_items = len(qa_items)
         
         system_prompt = f"""You are a legal assistant analyzing deposition testimony.
 
-You will receive {num_items} NUMBERED Q&A exchanges. You MUST provide a SEPARATE summary for EACH one.
+You will receive EXACTLY {num_items} NUMBERED Q&A exchanges. You MUST provide a SEPARATE summary for EACH numbered item.
 
-CRITICAL REQUIREMENTS:
-1. Return a JSON object with a "results" array
-2. The array MUST contain EXACTLY {num_items} objects - ONE per input Q&A
-3. DO NOT combine multiple Q&A into one summary
-4. Each object must have: {{"summary": "...", "topic": "..."}}
+CRITICAL REQUIREMENTS - READ CAREFULLY:
+1. You will receive {num_items} numbered Q&A pairs (numbered 1 through {num_items})
+2. You MUST return EXACTLY {num_items} summaries - one for each numbered input
+3. The "results" array MUST contain EXACTLY {num_items} objects - NO MORE, NO LESS
+4. DO NOT skip any numbered items
+5. DO NOT combine multiple Q&A into one summary
+6. Each object must have: {{"summary": "...", "topic": "..."}}
 
 Summary rules:
 - Transform each Q&A into a narrative statement (DO NOT repeat the question)
@@ -283,18 +290,19 @@ A: ABC Corp.
 2. Q: When did you start?
 A: January 2020.
 
-Output:
+Output (MUST have exactly 2 items):
 {{"results": [
   {{"summary": "The witness testified they worked at ABC Corp.", "topic": "Employment History"}},
   {{"summary": "The witness stated they started in January 2020.", "topic": "Employment History"}}
 ]}}
 
-IMPORTANT: Return EXACTLY {num_items} separate summaries in the "results" array."""
+VERIFICATION: Count the number of items in your "results" array. It MUST equal {num_items}. If it doesn't, you have made an error."""
         
-        # Compact user prompt
-        user_prompt = f"Analyze these {num_items} Q&A exchanges:\n\n"
+        # More explicit user prompt with numbering
+        user_prompt = f"You will analyze EXACTLY {num_items} Q&A exchanges. Return a summary for EACH one:\n\n"
         for i, qa in enumerate(qa_items, 1):
-            user_prompt += f"{i}. Q: {qa['question']}\nA: {qa['answer']}\n\n"
+            user_prompt += f"[{i}/{num_items}] Q: {qa['question']}\nA: {qa['answer']}\n\n"
+        user_prompt += f"\nRemember: You received {num_items} Q&A pairs. Return EXACTLY {num_items} summaries in the 'results' array."
         
         try:
             response = await self.client.post(
@@ -419,12 +427,40 @@ IMPORTANT: Return EXACTLY {num_items} separate summaries in the "results" array.
                     return [{"summary": "", "topic": "Other"} for _ in qa_items]
                 
                 if len(normalized) < num_items:
-                    # Pad with empty - but log error
+                    # OpenAI returned fewer results
                     missing = num_items - len(normalized)
-                    self.logger.error(f"❌ OpenAI returned only {len(normalized)} results for {num_items} items. Padding {missing} with empty.")
-                    while len(normalized) < num_items:
-                        normalized.append({"summary": "", "topic": "Other"})
-                    return normalized
+                    missing_indices = list(range(len(normalized), num_items))
+                    
+                    if not _retry_mode:
+                        # Retry missing items individually (only if not already in retry mode)
+                        self.logger.warning(f"⚠️ OpenAI returned only {len(normalized)} results for {num_items} items. Retrying {missing} missing items individually...")
+                        
+                        # Process missing items one by one
+                        for idx in missing_indices:
+                            try:
+                                qa = qa_items[idx]
+                                # Retry with single item (set retry_mode=True to prevent recursion)
+                                single_result = await self.summarize_and_classify_batch([qa], timeout=timeout, _retry_mode=True)
+                                if single_result and len(single_result) > 0 and single_result[0].get("summary"):
+                                    normalized.append(single_result[0])
+                                    self.logger.info(f"✅ Retried item {idx+1}/{num_items} successfully")
+                                else:
+                                    self.logger.error(f"❌ Retry failed for item {idx+1}, using empty summary")
+                                    normalized.append({"summary": "", "topic": "Other"})
+                            except Exception as e:
+                                self.logger.error(f"❌ Error retrying item {idx+1}: {e}")
+                                normalized.append({"summary": "", "topic": "Other"})
+                        
+                        if len(normalized) == num_items:
+                            valid_count = sum(1 for n in normalized if n["summary"].strip())
+                            self.logger.info(f"✅ Successfully recovered all {num_items} summaries via retry ({valid_count} valid)")
+                        return normalized
+                    else:
+                        # Already in retry mode - just pad with empty to avoid infinite recursion
+                        self.logger.error(f"❌ In retry mode: OpenAI returned only {len(normalized)} results for {num_items} items. Padding {missing} with empty.")
+                        while len(normalized) < num_items:
+                            normalized.append({"summary": "", "topic": "Other"})
+                        return normalized
                 else:
                     # Truncate to expected count
                     normalized = normalized[:num_items]
