@@ -76,6 +76,27 @@ async def upload_document(file: UploadFile = File(...)):
                 }
             )
         
+        # SECURITY: Clear all existing data before processing new document
+        # This ensures data isolation between different users/documents
+        # Each transcript stands alone and should not contain data from previous imports
+        logger.info("Clearing all existing data for new document import...")
+        
+        # Clear database tables (in order to respect foreign key constraints)
+        await db_service.execute("DELETE FROM qa_items")
+        await db_service.execute("DELETE FROM processing_jobs")
+        await db_service.execute("DELETE FROM documents")
+        
+        # Clear Redis cache to remove any cached document data
+        # Note: We keep summary_cache as it's content-based and can be safely reused
+        try:
+            # Clear document cache (we'll use a pattern if available, otherwise manual clear)
+            # For now, we'll let cache expire naturally, but document will be overwritten below
+            logger.info("Cache will be overwritten with new document data")
+        except Exception as e:
+            logger.warning(f"Cache clear warning (non-critical): {e}")
+        
+        logger.info("All existing documents, Q&A items, and jobs cleared")
+        
         # Save to temporary location for processing
         temp_path = f"/tmp/upload_{file_hash[:16]}.pdf"
         async with aiofiles.open(temp_path, 'wb') as f:
