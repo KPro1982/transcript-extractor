@@ -282,7 +282,7 @@ Summary rules:
 
 Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
 
-EXAMPLE for 2 inputs:
+EXAMPLE JSON for 2 inputs:
 Input:
 1. Q: Where did you work?
 A: ABC Corp.
@@ -290,19 +290,20 @@ A: ABC Corp.
 2. Q: When did you start?
 A: January 2020.
 
-Output (MUST have exactly 2 items):
+Example JSON Output (MUST have exactly 2 items):
 {{"results": [
   {{"summary": "The witness testified they worked at ABC Corp.", "topic": "Employment History"}},
   {{"summary": "The witness stated they started in January 2020.", "topic": "Employment History"}}
 ]}}
 
+IMPORTANT: Return your response in JSON format with a "results" array.
 VERIFICATION: Count the number of items in your "results" array. It MUST equal {num_items}. If it doesn't, you have made an error."""
         
         # More explicit user prompt with numbering
-        user_prompt = f"You will analyze EXACTLY {num_items} Q&A exchanges. Return a summary for EACH one:\n\n"
+        user_prompt = f"You will analyze EXACTLY {num_items} Q&A exchanges. Return a summary for EACH one in JSON format:\n\n"
         for i, qa in enumerate(qa_items, 1):
             user_prompt += f"[{i}/{num_items}] Q: {qa['question']}\nA: {qa['answer']}\n\n"
-        user_prompt += f"\nRemember: You received {num_items} Q&A pairs. Return EXACTLY {num_items} summaries in the 'results' array."
+        user_prompt += f"\nRemember: You received {num_items} Q&A pairs. Return EXACTLY {num_items} summaries in the 'results' array as JSON."
         
         try:
             response = await self.client.post(
