@@ -321,6 +321,7 @@ class PDFService:
             page_number_map = await self.detect_all_page_numbers(pdf_path)
             
             pages = []
+            previous_incomplete_state = None
             
             for page_num in range(first_page - 1, last_page):
                 page = doc[page_num]
@@ -329,8 +330,17 @@ class PDFService:
                 # Get the detected printed page number
                 printed_page = page_number_map.get(pdf_idx)
                 
-                page_data = await self._extract_page(page, pdf_idx, printed_page)
+                # Extract page with state continuation
+                page_data = await self._extract_page_with_state(
+                    page, pdf_idx, printed_page, previous_incomplete_state
+                )
                 pages.append(page_data)
+                
+                # Update state for next page
+                previous_incomplete_state = page_data.get("incomplete_state")
+            
+            # Merge any remaining interim Q&A pairs
+            pages = self._merge_interim_qa_pairs(pages)
             
             doc.close()
             
@@ -386,6 +396,7 @@ class PDFService:
             logger.info(f"Detected printed page numbers for {detected_count}/{total_pages} pages")
             
             current_batch = []
+            previous_incomplete_state = None
             
             for page_num in range(first_page - 1, last_page):
                 page = doc[page_num]
@@ -394,12 +405,19 @@ class PDFService:
                 # Get the detected printed page number
                 printed_page = page_number_map.get(pdf_idx)
                 
-                # Extract page with the correct printed page number
-                page_data = await self._extract_page(page, pdf_idx, printed_page)
+                # Extract page with state continuation
+                page_data = await self._extract_page_with_state(
+                    page, pdf_idx, printed_page, previous_incomplete_state
+                )
                 current_batch.append(page_data)
+                
+                # Update state for next page
+                previous_incomplete_state = page_data.get("incomplete_state")
                 
                 # Yield batch when full
                 if len(current_batch) >= batch_size:
+                    # Merge interim pairs within batch
+                    current_batch = self._merge_interim_qa_pairs(current_batch)
                     logger.debug(f"Streaming batch of {len(current_batch)} pages")
                     yield current_batch
                     current_batch = []
@@ -409,6 +427,8 @@ class PDFService:
             
             # Yield remaining pages
             if current_batch:
+                # Merge interim pairs in final batch
+                current_batch = self._merge_interim_qa_pairs(current_batch)
                 logger.debug(f"Streaming final batch of {len(current_batch)} pages")
                 yield current_batch
             
@@ -475,13 +495,15 @@ class PDFService:
         line_numbers = await self._extract_line_numbers(text_items, width)
         
         # Parse Q&A pairs using the PRINTED page number, but also pass PDF index for rendering
-        qa_pairs = await self._parse_qa_pairs(
+        # Note: previous_incomplete_state will be handled at the batch level
+        qa_pairs, incomplete_state = await self._parse_qa_pairs(
             text_items, 
             printed_page_number, 
             width, 
             height, 
             line_numbers,
-            pdf_page_index=pdf_page_index
+            pdf_page_index=pdf_page_index,
+            previous_incomplete_state=None  # Will be set at batch processing level
         )
         
         return {
@@ -491,8 +513,133 @@ class PDFService:
             "height": height,
             "text_items": text_items,
             "line_numbers": line_numbers,
-            "qa_pairs": qa_pairs
+            "qa_pairs": qa_pairs,
+            "incomplete_state": incomplete_state
         }
+    
+    async def _extract_page_with_state(
+        self,
+        page: fitz.Page,
+        pdf_page_index: int,
+        printed_page_number: Optional[int],
+        previous_incomplete_state: Optional[Dict]
+    ) -> Dict:
+        """Extract page with Q&A state continuation from previous page."""
+        # Get page dimensions
+        rect = page.rect
+        width = rect.width
+        height = rect.height
+        
+        # Extract text with position data
+        text_dict = page.get_text("dict")
+        text_items = []
+        for block in text_dict.get("blocks", []):
+            if block.get("type") == 0:  # Text block
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        text = span.get("text", "").strip()
+                        if text:
+                            bbox = span.get("bbox", [0, 0, 0, 0])
+                            text_items.append({
+                                "text": text,
+                                "x": bbox[0],
+                                "y": bbox[1],
+                                "width": bbox[2] - bbox[0],
+                                "height": bbox[3] - bbox[1],
+                                "font": span.get("font", ""),
+                                "size": span.get("size", 12)
+                            })
+        
+        # Detect printed page number if not provided
+        if printed_page_number is None:
+            detected = await self.detect_printed_page_number(text_items, height, width)
+            printed_page_number = detected if detected else pdf_page_index
+        
+        # Extract line numbers
+        line_numbers = await self._extract_line_numbers(text_items, width)
+        
+        # Parse Q&A pairs with state continuation
+        qa_pairs, incomplete_state = await self._parse_qa_pairs(
+            text_items,
+            printed_page_number,
+            width,
+            height,
+            line_numbers,
+            pdf_page_index=pdf_page_index,
+            previous_incomplete_state=previous_incomplete_state
+        )
+        
+        return {
+            "pdf_page_index": pdf_page_index,
+            "page_number": printed_page_number,
+            "width": width,
+            "height": height,
+            "text_items": text_items,
+            "line_numbers": line_numbers,
+            "qa_pairs": qa_pairs,
+            "incomplete_state": incomplete_state
+        }
+    
+    def _merge_interim_qa_pairs(self, pages: List[Dict]) -> List[Dict]:
+        """
+        Merge interim Q&A pairs that span across pages.
+        
+        This ensures cross-page Q&A pairs are properly combined into final pairs.
+        """
+        all_qa_pairs = []
+        interim_pairs = []
+        
+        for page in pages:
+            qa_pairs = page.get("qa_pairs", [])
+            for qa in qa_pairs:
+                if qa.get("is_final", True):
+                    # Final pair - check if it should merge with previous interim
+                    if interim_pairs:
+                        # Try to merge with last interim pair
+                        last_interim = interim_pairs[-1]
+                        # Merge if sequential pages and same question start
+                        if (qa.get("page") == last_interim.get("answer_end_page", 0) + 1 or
+                            qa.get("page") == last_interim.get("page")):
+                            # Merge: combine question and answer
+                            merged_qa = {
+                                **last_interim,
+                                "question": last_interim.get("question", "") + " " + qa.get("question", ""),
+                                "answer": last_interim.get("answer", "") + " " + qa.get("answer", ""),
+                                "answer_end_page": qa.get("answer_end_page", qa.get("page")),
+                                "answer_end_line": qa.get("answer_end_line", qa.get("line")),
+                                "is_final": True
+                            }
+                            interim_pairs.pop()
+                            all_qa_pairs.append(merged_qa)
+                        else:
+                            # Can't merge - save interim as final and add new final
+                            all_qa_pairs.extend([{**p, "is_final": True} for p in interim_pairs])
+                            interim_pairs = []
+                            all_qa_pairs.append(qa)
+                    else:
+                        all_qa_pairs.append(qa)
+                else:
+                    # Interim pair - collect for potential merging
+                    interim_pairs.append(qa)
+        
+        # Convert any remaining interim pairs to final
+        if interim_pairs:
+            all_qa_pairs.extend([{**p, "is_final": True} for p in interim_pairs])
+        
+        # Update pages with merged Q&A pairs
+        # Distribute merged pairs back to pages based on their start page
+        page_qa_map = {}
+        for qa in all_qa_pairs:
+            page_num = qa.get("page")
+            if page_num not in page_qa_map:
+                page_qa_map[page_num] = []
+            page_qa_map[page_num].append(qa)
+        
+        for page in pages:
+            page_num = page.get("page_number")
+            page["qa_pairs"] = page_qa_map.get(page_num, [])
+        
+        return pages
     
     async def _extract_line_numbers(self, text_items: List[Dict], page_width: float) -> List[Dict]:
         """Extract line numbers from left margin."""
@@ -523,8 +670,9 @@ class PDFService:
         page_width: float,
         page_height: float,
         line_numbers: List[Dict],
-        pdf_page_index: Optional[int] = None
-    ) -> List[Dict]:
+        pdf_page_index: Optional[int] = None,
+        previous_incomplete_state: Optional[Dict] = None
+    ) -> Tuple[List[Dict], Dict]:
         """Parse Q&A pairs from text items using multiple patterns.
         
         Args:
@@ -652,15 +800,27 @@ class PDFService:
         # Do NOT save during processing - only save when:
         # 1. A new question starts (save previous complete Q&A)
         # 2. End marker encountered (save current complete Q&A)
-        # 3. End of page (save current complete Q&A)
+        # 3. End of page (save current complete Q&A as interim if incomplete)
+        
+        # Continue from previous page's incomplete state if provided
+        if previous_incomplete_state:
+            current_question = previous_incomplete_state.get("current_question")
+            current_question_y = previous_incomplete_state.get("current_question_y")
+            current_answer = previous_incomplete_state.get("current_answer", [])
+            current_answer_end_line = previous_incomplete_state.get("current_answer_end_line")
+            current_answer_end_y = previous_incomplete_state.get("current_answer_end_y")
+            state = previous_incomplete_state.get("state", "searching")
+            logger.debug(f"Continuing Q&A from page {previous_incomplete_state.get('page_number')} to page {page_number}")
+        else:
+            current_question = None
+            current_question_y = None
+            current_answer = []
+            current_answer_end_line = None
+            current_answer_end_y = None
+            state = 'searching'
+        
         qa_pairs = []
         seen_qa_keys = set()  # Track saved Q&A pairs to prevent duplicates
-        current_question = None
-        current_question_y = None
-        current_answer = []
-        current_answer_end_line = None  # Track the last line number of the answer
-        current_answer_end_y = None  # Track Y position of answer end
-        state = 'searching'  # searching, in_question, in_answer
         
         def save_current_qa_if_complete(is_final: bool = True):
             """Helper to save current Q&A pair only if it's complete and not already saved.
@@ -780,19 +940,72 @@ class PDFService:
                 
             else:
                 # Continuation of current element (regular text, not a marker)
+                # CRITICAL: ALL lines must be included in a Q&A pair - no skipped lines
                 if state == 'in_question' and current_question:
                     # Continue question across multiple lines
                     current_question += ' ' + trimmed
+                    # Update question end tracking
+                    current_answer_end_line = current_line_num
+                    current_answer_end_y = line["y"]
                 elif state == 'in_answer' and current_answer:
                     # Continue answer across multiple lines
                     current_answer.append(trimmed)
                     # Update answer end tracking
                     current_answer_end_line = current_line_num
                     current_answer_end_y = line["y"]
-                # If state is 'searching', skip this line (not part of Q&A yet)
+                elif state == 'searching':
+                    # If searching and we hit regular text, it might be:
+                    # 1. Continuation from previous page (if we have incomplete state)
+                    # 2. Start of content - treat as question continuation or start new Q&A
+                    if previous_incomplete_state and current_question:
+                        # Continuation from previous page - add to question
+                        current_question += ' ' + trimmed
+                        state = 'in_question'
+                        current_answer_end_line = current_line_num
+                        current_answer_end_y = line["y"]
+                    elif previous_incomplete_state and current_answer:
+                        # Continuation from previous page - add to answer
+                        current_answer.append(trimmed)
+                        state = 'in_answer'
+                        current_answer_end_line = current_line_num
+                        current_answer_end_y = line["y"]
+                    else:
+                        # No previous state - this might be content before first Q/A marker
+                        # Start as question to ensure line is included
+                        current_question = trimmed
+                        current_question_y = line["y"]
+                        state = 'in_question'
+                        current_answer_end_line = current_line_num
+                        current_answer_end_y = line["y"]
         
-        # Save last Q&A pair if complete (FINAL - end of page)
-        save_current_qa_if_complete(is_final=True)
+        # At end of page, check if we have incomplete Q&A pairs
+        # If we're continuing from a previous page, don't save yet - continue on next page
+        # If incomplete and NOT continuing, save as interim (will be merged with next page)
+        # If complete, save as final
+        has_incomplete_qa = (current_question is not None) or (current_answer and not current_question)
+        is_continuation = previous_incomplete_state is not None
+        
+        if has_incomplete_qa and not is_continuation:
+            # New incomplete Q&A started on this page - save as interim
+            save_current_qa_if_complete(is_final=False)
+        elif has_incomplete_qa and is_continuation:
+            # Continuing from previous page - don't save, will continue
+            pass
+        else:
+            # Complete Q&A - save as final
+            save_current_qa_if_complete(is_final=True)
+        
+        # Return incomplete state for continuation on next page
+        incomplete_state = {
+            "current_question": current_question,
+            "current_question_y": current_question_y,
+            "current_answer": current_answer,
+            "current_answer_end_line": current_answer_end_line,
+            "current_answer_end_y": current_answer_end_y,
+            "state": state,
+            "page_number": page_number,
+            "pdf_page_index": _pdf_idx
+        }
         
         # Debug logging for first page
         if page_number == 1 and len(lines) > 0:
@@ -801,7 +1014,7 @@ class PDFService:
             sample_lines = [l["text"][:80] for l in lines[:10]]
             logger.debug(f"Sample lines from page 1: {sample_lines}")
         
-        return qa_pairs
+        return qa_pairs, incomplete_state
     
     def _find_closest_line_number(self, y_position: float, line_numbers: List[Dict]) -> int:
         """Find the closest line number for a given Y position."""
