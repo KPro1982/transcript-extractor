@@ -125,8 +125,9 @@ async def get_document(document_id: UUID):
 async def get_qa_items(document_id: UUID):
     """Get all FINAL Q&A items for a document with line range information.
     
-    Only returns Q&A items marked as final (is_final = TRUE), filtering out
-    any interim entries that were created during processing.
+    Returns Q&A items from the final_qa_items table, which contains only
+    complete final Q/A pairs with summaries. Interim/variable items are
+    stored separately in qa_items table and are not returned here.
     
     Each item includes start and end positions for citation formatting.
     End positions use the stored answer_end_line/answer_end_page from parsing,
@@ -137,53 +138,76 @@ async def get_qa_items(document_id: UUID):
         - pdf_page_index: The 1-based index in the PDF file (for rendering)
         - end_page/end_line: Where the answer ends (from stored data)
     """
-    # Check if new columns exist first, then use appropriate query
+    # Check if final_qa_items table exists
     try:
-        # Try to check if is_final column exists by querying information_schema
-        column_check = await db_service.fetchval(
+        table_check = await db_service.fetchval(
             """
-            SELECT COUNT(*) FROM information_schema.columns 
-            WHERE table_name = 'qa_items' AND column_name = 'is_final'
+            SELECT COUNT(*) FROM information_schema.tables 
+            WHERE table_name = 'final_qa_items'
             """
         )
-        has_new_columns = column_check > 0
+        has_final_table = table_check > 0
     except Exception:
         # If check fails, assume old schema
-        has_new_columns = False
+        has_final_table = False
     
-    if has_new_columns:
-        # Use new schema with is_final filter
+    if has_final_table:
+        # Use new schema with final_qa_items table
         items = await db_service.fetch(
             """
-            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, is_final, question, answer, summary, topic
-            FROM qa_items
-            WHERE document_id = $1 AND (is_final IS NULL OR is_final = TRUE)
-            ORDER BY page_number, line_number
-            """,
-            document_id
-        )
-    else:
-        # Fallback: use old schema (columns don't exist yet)
-        logger.info("Using fallback query - new columns not yet migrated")
-        items = await db_service.fetch(
-            """
-            SELECT id, page_number, line_number, pdf_page_index, question, answer, summary, topic
-            FROM qa_items
+            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic
+            FROM final_qa_items
             WHERE document_id = $1
             ORDER BY page_number, line_number
             """,
             document_id
         )
-        # Add missing columns with None values
-        items = [
-            {
-                **item,
-                "answer_end_page": None,
-                "answer_end_line": None,
-                "is_final": True
-            }
-            for item in items
-        ]
+    else:
+        # Fallback: use old schema (final_qa_items table doesn't exist yet)
+        logger.info("Using fallback query - final_qa_items table not yet migrated")
+        # Check if is_final column exists
+        try:
+            column_check = await db_service.fetchval(
+                """
+                SELECT COUNT(*) FROM information_schema.columns 
+                WHERE table_name = 'qa_items' AND column_name = 'is_final'
+                """
+            )
+            has_is_final = column_check > 0
+        except Exception:
+            has_is_final = False
+        
+        if has_is_final:
+            # Use qa_items with is_final filter
+            items = await db_service.fetch(
+                """
+                SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic
+                FROM qa_items
+                WHERE document_id = $1 AND (is_final IS NULL OR is_final = TRUE)
+                ORDER BY page_number, line_number
+                """,
+                document_id
+            )
+        else:
+            # Oldest schema - no is_final column
+            items = await db_service.fetch(
+                """
+                SELECT id, page_number, line_number, pdf_page_index, question, answer, summary, topic
+                FROM qa_items
+                WHERE document_id = $1
+                ORDER BY page_number, line_number
+                """,
+                document_id
+            )
+            # Add missing columns with None values
+            items = [
+                {
+                    **item,
+                    "answer_end_page": None,
+                    "answer_end_line": None
+                }
+                for item in items
+            ]
     
     # Convert to list
     items_list = list(items)

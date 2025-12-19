@@ -223,13 +223,34 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                         message=f"AI processing: {int(total_processed)}/{len(all_qa_pairs)} items ({overall_pct:.1f}%)"
                     )
                 
-                # Process batch with AI
+                # Filter to only final Q/A pairs for summarization
+                final_batch = [qa for qa in batch if qa.get('is_final', True)]
+                non_final_batch = [qa for qa in batch if not qa.get('is_final', True)]
+                
+                # Add non-final items without summarization
+                for qa in non_final_batch:
+                    summarized_items.append({
+                        **qa,
+                        'summary': '',
+                        'topic': 'Other'
+                    })
+                
+                if not final_batch:
+                    # No final Q/As in this batch, skip summarization
+                    processed_count += len(batch)
+                    continue
+                
+                # Process batch with AI (only final Q/As)
                 try:
                     summarized_batch = await ai_service.summarize_batch_parallel(
-                        batch,
+                        final_batch,
                         progress_callback=batch_progress_callback
                     )
-                    summarized_items.extend(summarized_batch)
+                    
+                    # Add summarized final Q/As to results
+                    for summarized_qa in summarized_batch:
+                        summarized_items.append(summarized_qa)
+                    
                     processed_count += len(batch)
                     
                     # Send update after batch completes
@@ -265,9 +286,22 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         
         await send_job_update(job_id, "processing", 90, message="Saving results to database...")
         
-        # Save to database (90% -> 95% progress)
-        saved_count = 0
-        for idx, item in enumerate(summarized_items):
+        # Separate final Q/As from interim/variables
+        final_qa_items = []
+        interim_qa_items = []
+        
+        for item in summarized_items:
+            is_final = item.get('is_final', True)
+            if is_final:
+                final_qa_items.append(item)
+            else:
+                interim_qa_items.append(item)
+        
+        logger.info(f"Saving {len(final_qa_items)} final Q/A pairs and {len(interim_qa_items)} interim items")
+        
+        # Save final Q/As to final_qa_items table (with summaries)
+        saved_final_count = 0
+        for idx, item in enumerate(final_qa_items):
             # page_number is the PRINTED transcript page number (for display/citation)
             # pdf_page_index is the 1-based index in the PDF file (for rendering)
             printed_page_num = item.get('page', 1)
@@ -277,11 +311,44 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             # Get answer end line/page (stored during parsing)
             answer_end_page = item.get('answer_end_page', printed_page_num)
             answer_end_line = item.get('answer_end_line', line_num)
-            is_final = item.get('is_final', True)  # Default to True for backward compatibility
             
             # Log first few items to debug page/line data
             if idx < 3:
-                logger.info(f"Saving Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, is_final={is_final}, question={item['question'][:50]}...")
+                logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if item.get('summary') else 'no'}, question={item['question'][:50]}...")
+            
+            await db_service.execute(
+                """
+                INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                """,
+                document_id,
+                printed_page_num,
+                line_num,
+                pdf_page_idx,
+                answer_end_page,
+                answer_end_line,
+                item['question'],
+                item['answer'],
+                item.get('summary', ''),
+                item.get('topic', 'Other')
+            )
+            saved_final_count += 1
+            
+            # Stream partial results every 10 items
+            if saved_final_count % 10 == 0:
+                await send_partial_result(job_id, {
+                    "saved_count": saved_final_count,
+                    "total": len(final_qa_items)
+                })
+        
+        # Save interim/variables to qa_items table (without summaries, for reference)
+        saved_interim_count = 0
+        for item in interim_qa_items:
+            printed_page_num = item.get('page', 1)
+            pdf_page_idx = item.get('pdf_page_index', printed_page_num)
+            line_num = item.get('line', 1)
+            answer_end_page = item.get('answer_end_page', printed_page_num)
+            answer_end_line = item.get('answer_end_line', line_num)
             
             await db_service.execute(
                 """
@@ -294,20 +361,15 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                 pdf_page_idx,
                 answer_end_page,
                 answer_end_line,
-                is_final,
+                False,  # Mark as interim
                 item['question'],
                 item['answer'],
-                item.get('summary', ''),
-                item.get('topic', 'Other')
+                '',  # No summary for interim items
+                'Other'
             )
-            saved_count += 1
-            
-            # Stream partial results every 10 items
-            if saved_count % 10 == 0:
-                await send_partial_result(job_id, {
-                    "saved_count": saved_count,
-                    "total": len(summarized_items)
-                })
+            saved_interim_count += 1
+        
+        logger.info(f"Saved {saved_final_count} final Q/A pairs and {saved_interim_count} interim items")
         
         await send_job_update(job_id, "processing", 95, message="Finalizing...")
         
@@ -317,9 +379,12 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             job_id
         )
         
+        # Count only final Q/As for result reporting
+        final_count = len([item for item in summarized_items if item.get('is_final', True)])
+        
         result = {
             "document_id": document_id,
-            "total_qa_pairs": len(summarized_items),
+            "total_qa_pairs": final_count,
             "pages_processed": total_pages_extracted,
             "filename": doc['filename']
         }

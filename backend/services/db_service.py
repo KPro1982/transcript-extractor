@@ -136,6 +136,25 @@ async def init_db():
             -- Create index on is_final AFTER column is added (migration)
             CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
             
+            -- Create separate table for final Q/A pairs (distinct from interim/variables)
+            CREATE TABLE IF NOT EXISTS final_qa_items (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                page_number INT NOT NULL,
+                line_number INT NOT NULL,
+                pdf_page_index INT,
+                answer_end_page INT,
+                answer_end_line INT,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                summary TEXT,
+                topic VARCHAR(255),
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_final_qa_items_document_id ON final_qa_items(document_id);
+            CREATE INDEX IF NOT EXISTS idx_final_qa_items_page_line ON final_qa_items(document_id, page_number, line_number);
+            
             CREATE TABLE IF NOT EXISTS summary_cache (
                 content_hash VARCHAR(64) PRIMARY KEY,
                 summary TEXT NOT NULL,
