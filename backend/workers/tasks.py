@@ -140,9 +140,27 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                     for page in page_batch:
                         batch_qa_pairs.extend(page['qa_pairs'])
                     
-                    if batch_qa_pairs:
-                        await processing_queue.put(batch_qa_pairs)
-                        all_qa_pairs.extend(batch_qa_pairs)
+                    # Deduplicate Q&A pairs within batch (prevent duplicates from same page)
+                    # Use question + answer + page + line as unique key
+                    seen_in_batch = {}
+                    unique_batch_qa = []
+                    for qa in batch_qa_pairs:
+                        key = (
+                            qa.get('question', '').strip(),
+                            qa.get('answer', '').strip(),
+                            qa.get('page', 0),
+                            qa.get('line', 0)
+                        )
+                        if key not in seen_in_batch:
+                            seen_in_batch[key] = True
+                            unique_batch_qa.append(qa)
+                    
+                    if len(unique_batch_qa) < len(batch_qa_pairs):
+                        logger.warning(f"Deduplicated {len(batch_qa_pairs) - len(unique_batch_qa)} duplicate Q&A pairs in batch")
+                    
+                    if unique_batch_qa:
+                        await processing_queue.put(unique_batch_qa)
+                        all_qa_pairs.extend(unique_batch_qa)
                     
                     # Update progress (extraction is 5-20%)
                     progress = min(20, 5 + (total_pages_extracted * 15 // max(1, last_page or 100)))
