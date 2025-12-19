@@ -6,7 +6,8 @@ import { getPDFPageUrl } from '@/lib/api'
 
 interface PDFViewerProps {
   documentId: string
-  pageNumber: number
+  pageNumber: number           // PDF page index (1-based) - used for fetching the image
+  displayPageNumber?: number   // Printed transcript page number - shown in the header
   totalPages: number
   highlightStartLine: number
   highlightEndLine: number
@@ -19,15 +20,22 @@ const LINES_PER_PAGE = 25
  * PDF page viewer with line highlighting for reading mode.
  * Displays PDF pages as images with a thick left border indicator showing
  * which lines correspond to the current summary.
+ * 
+ * Note: pageNumber is the PDF file index (for fetching), while displayPageNumber
+ * is the printed transcript page (for display). This handles transcripts with
+ * cover sheets, index pages, or partial uploads.
  */
 export default function PDFViewer({
   documentId,
   pageNumber,
+  displayPageNumber,
   totalPages,
   highlightStartLine,
   highlightEndLine,
   onPageChange
 }: PDFViewerProps) {
+  // Use displayPageNumber for header if provided, otherwise use pageNumber
+  const shownPageNumber = displayPageNumber ?? pageNumber
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -169,7 +177,7 @@ export default function PDFViewer({
         </button>
         
         <div className="text-sm font-mono text-gray-400">
-          Page <span className="text-white font-semibold">{pageNumber}</span> of {totalPages}
+          Page <span className="text-white font-semibold">{shownPageNumber}</span> of {totalPages}
         </div>
         
         <button

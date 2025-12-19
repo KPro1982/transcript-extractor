@@ -10,7 +10,8 @@ import SummaryDisplay from '@/components/SummaryDisplay'
 
 interface QAItem {
   id: string
-  page_number: number
+  page_number: number       // Printed transcript page number (for citation display)
+  pdf_page_index: number    // 1-based PDF page index (for rendering)
   line_number: number
   end_page: number
   end_line: number
@@ -51,6 +52,9 @@ export default function ResultsPage() {
 
   // Current item and its page info
   const currentItem = qaItems[currentIndex] || null
+  // Use pdf_page_index for rendering, fall back to page_number for compatibility
+  const currentPdfPageIndex = currentItem?.pdf_page_index || currentItem?.page_number || 1
+  // Keep printed page number for citation display
   const currentPageNumber = currentItem?.page_number || 1
   const highlightStartLine = currentItem?.line_number || 1
   const highlightEndLine = currentItem?.end_line || highlightStartLine
@@ -208,7 +212,8 @@ export default function ResultsPage() {
           {documentId && (
             <PDFViewer
               documentId={documentId}
-              pageNumber={currentPageNumber}
+              pageNumber={currentPdfPageIndex}
+              displayPageNumber={currentPageNumber}
               totalPages={totalPages}
               highlightStartLine={highlightStartLine}
               highlightEndLine={highlightEndLine}

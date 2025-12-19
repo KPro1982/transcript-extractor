@@ -79,6 +79,7 @@ async def init_db():
                 document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
                 page_number INT NOT NULL,
                 line_number INT NOT NULL,
+                pdf_page_index INT,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 summary TEXT,
@@ -87,6 +88,17 @@ async def init_db():
             );
             
             CREATE INDEX IF NOT EXISTS idx_qa_items_document_id ON qa_items(document_id);
+            
+            -- Add pdf_page_index column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'qa_items' AND column_name = 'pdf_page_index'
+                ) THEN
+                    ALTER TABLE qa_items ADD COLUMN pdf_page_index INT;
+                END IF;
+            END $$;
             
             CREATE TABLE IF NOT EXISTS summary_cache (
                 content_hash VARCHAR(64) PRIMARY KEY,
@@ -111,4 +123,10 @@ async def init_db():
         """)
         
         logger.info("Database tables initialized")
+
+
+
+
+
+
 

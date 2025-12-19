@@ -250,21 +250,25 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         # Save to database (90% -> 95% progress)
         saved_count = 0
         for idx, item in enumerate(summarized_items):
-            page_num = item.get('page', 1)
+            # page_number is the PRINTED transcript page number (for display/citation)
+            # pdf_page_index is the 1-based index in the PDF file (for rendering)
+            printed_page_num = item.get('page', 1)
+            pdf_page_idx = item.get('pdf_page_index', printed_page_num)  # Fallback to page if not set
             line_num = item.get('line', 1)
             
             # Log first few items to debug page/line data
             if idx < 3:
-                logger.info(f"Saving Q&A {idx+1}: page={page_num}, line={line_num}, question={item['question'][:50]}...")
+                logger.info(f"Saving Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, question={item['question'][:50]}...")
             
             await db_service.execute(
                 """
-                INSERT INTO qa_items (document_id, page_number, line_number, question, answer, summary, topic)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO qa_items (document_id, page_number, line_number, pdf_page_index, question, answer, summary, topic)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
                 document_id,
-                page_num,
+                printed_page_num,
                 line_num,
+                pdf_page_idx,
                 item['question'],
                 item['answer'],
                 item.get('summary', ''),

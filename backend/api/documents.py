@@ -157,10 +157,14 @@ async def get_qa_items(document_id: UUID):
     
     Each item includes start and end positions for citation formatting.
     End positions are calculated based on the next Q&A item's start position.
+    
+    Returns:
+        - page_number: The PRINTED transcript page number (for display/citation)
+        - pdf_page_index: The 1-based index in the PDF file (for rendering)
     """
     items = await db_service.fetch(
         """
-        SELECT id, page_number, line_number, question, answer, summary, topic
+        SELECT id, page_number, line_number, pdf_page_index, question, answer, summary, topic
         FROM qa_items
         WHERE document_id = $1
         ORDER BY page_number, line_number
@@ -189,9 +193,13 @@ async def get_qa_items(document_id: UUID):
             end_page = item["page_number"]
             end_line = 25
         
+        # Use pdf_page_index if available, fallback to page_number for old data
+        pdf_idx = item.get("pdf_page_index") or item["page_number"]
+        
         qa_items_with_ranges.append({
             "id": str(item["id"]),
-            "page_number": item["page_number"],
+            "page_number": item["page_number"],  # Printed transcript page (for citation)
+            "pdf_page_index": pdf_idx,           # PDF index (for rendering)
             "line_number": item["line_number"],
             "end_page": end_page,
             "end_line": end_line,
