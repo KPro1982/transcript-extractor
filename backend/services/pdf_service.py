@@ -654,26 +654,40 @@ class PDFService:
         # 2. End marker encountered (save current complete Q&A)
         # 3. End of page (save current complete Q&A)
         qa_pairs = []
+        seen_qa_keys = set()  # Track saved Q&A pairs to prevent duplicates
         current_question = None
         current_question_y = None
         current_answer = []
         state = 'searching'  # searching, in_question, in_answer
         
         def save_current_qa_if_complete():
-            """Helper to save current Q&A pair only if it's complete.
+            """Helper to save current Q&A pair only if it's complete and not already saved.
             
             This ensures we only save once per complete Q&A pair.
-            The Q&A is cleared by the caller when starting a new question.
+            Uses a key based on question + answer + page + line to detect duplicates.
             """
-            nonlocal qa_pairs
+            nonlocal qa_pairs, seen_qa_keys
             if current_question and current_answer:
-                qa_pairs.append({
-                    "question": current_question,
-                    "answer": " ".join(current_answer),
-                    "page": page_number,
-                    "pdf_page_index": _pdf_idx,
-                    "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
-                })
+                # Create unique key to prevent duplicates
+                qa_key = (
+                    current_question.strip(),
+                    " ".join(current_answer).strip(),
+                    page_number,
+                    self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                )
+                
+                # Only save if we haven't seen this exact Q&A pair before
+                if qa_key not in seen_qa_keys:
+                    seen_qa_keys.add(qa_key)
+                    qa_pairs.append({
+                        "question": current_question,
+                        "answer": " ".join(current_answer),
+                        "page": page_number,
+                        "pdf_page_index": _pdf_idx,
+                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                    })
+                else:
+                    logger.warning(f"Skipping duplicate Q&A pair at page {page_number}, line {self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1}")
         
         for i, line in enumerate(lines):
             text = line["text"]

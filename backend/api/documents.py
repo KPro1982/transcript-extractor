@@ -34,68 +34,17 @@ async def upload_document(file: UploadFile = File(...)):
         content = await file.read()
         file_hash = hashlib.sha256(content).hexdigest()
         
-        # Check if document already exists
-        cached_doc = await cache_service.get_document(file_hash)
-        if cached_doc:
-            logger.info(f"Document already processed: {file_hash[:8]}...")
-            # Still store PDF content for worker access (may have expired)
-            await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "message": "Document already exists",
-                    "document_id": cached_doc["id"],
-                    "cached": True
-                }
-            )
-        
-        # Check database
-        existing = await db_service.fetchrow(
-            "SELECT id, filename, total_pages, created_at FROM documents WHERE file_hash = $1",
-            file_hash
-        )
-        
-        if existing:
-            logger.info(f"Document found in database: {file_hash[:8]}...")
-            doc_data = {
-                "id": str(existing["id"]),
-                "filename": existing["filename"],
-                "file_hash": file_hash,
-                "total_pages": existing["total_pages"],
-                "created_at": existing["created_at"].isoformat()
-            }
-            await cache_service.set_document(file_hash, doc_data)
-            # Store PDF content for worker access (may have expired)
-            await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "message": "Document already exists",
-                    "document_id": str(existing["id"]),
-                    "cached": False
-                }
-            )
-        
-        # SECURITY: Clear all existing data before processing new document
-        # This ensures data isolation between different users/documents
-        # Each transcript stands alone and should not contain data from previous imports
-        logger.info("Clearing all existing data for new document import...")
+        # SECURITY: ALWAYS clear all existing data before processing ANY document upload
+        # This ensures data isolation and fresh start for every upload, even if same file
+        # Each transcript import should start completely fresh with zero data
+        logger.info("Clearing all existing data for document import (fresh start)...")
         
         # Clear database tables (in order to respect foreign key constraints)
         await db_service.execute("DELETE FROM qa_items")
         await db_service.execute("DELETE FROM processing_jobs")
         await db_service.execute("DELETE FROM documents")
         
-        # Clear Redis cache to remove any cached document data
-        # Note: We keep summary_cache as it's content-based and can be safely reused
-        try:
-            # Clear document cache (we'll use a pattern if available, otherwise manual clear)
-            # For now, we'll let cache expire naturally, but document will be overwritten below
-            logger.info("Cache will be overwritten with new document data")
-        except Exception as e:
-            logger.warning(f"Cache clear warning (non-critical): {e}")
-        
-        logger.info("All existing documents, Q&A items, and jobs cleared")
+        logger.info("All existing documents, Q&A items, and jobs cleared - starting fresh")
         
         # Save to temporary location for processing
         temp_path = f"/tmp/upload_{file_hash[:16]}.pdf"
@@ -109,7 +58,7 @@ async def upload_document(file: UploadFile = File(...)):
         # This allows workers in different containers to access the file
         await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
         
-        # Store in database
+        # Always create a new document entry (database was cleared above)
         doc_id = await db_service.fetchval(
             """
             INSERT INTO documents (filename, file_hash, s3_key, total_pages)
@@ -132,7 +81,7 @@ async def upload_document(file: UploadFile = File(...)):
         # Cache document metadata
         await cache_service.set_document(file_hash, doc_data)
         
-        logger.info(f"New document uploaded: {file.filename} ({file_hash[:8]}...)")
+        logger.info(f"Document uploaded and ready for processing: {file.filename} ({file_hash[:8]}...) - Fresh start with zero existing data")
         
         return {
             "document_id": str(doc_id),
