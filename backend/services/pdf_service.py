@@ -648,11 +648,32 @@ class PDFService:
             return cleaned.strip()
         
         # Find Q&A pairs using state machine
+        # CRITICAL: Only save Q&A pairs once when complete (question + answer)
+        # Do NOT save during processing - only save when:
+        # 1. A new question starts (save previous complete Q&A)
+        # 2. End marker encountered (save current complete Q&A)
+        # 3. End of page (save current complete Q&A)
         qa_pairs = []
         current_question = None
         current_question_y = None
         current_answer = []
         state = 'searching'  # searching, in_question, in_answer
+        
+        def save_current_qa_if_complete():
+            """Helper to save current Q&A pair only if it's complete.
+            
+            This ensures we only save once per complete Q&A pair.
+            The Q&A is cleared by the caller when starting a new question.
+            """
+            nonlocal qa_pairs
+            if current_question and current_answer:
+                qa_pairs.append({
+                    "question": current_question,
+                    "answer": " ".join(current_answer),
+                    "page": page_number,
+                    "pdf_page_index": _pdf_idx,
+                    "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                })
         
         for i, line in enumerate(lines):
             text = line["text"]
@@ -667,15 +688,7 @@ class PDFService:
             
             # Check for end markers
             if is_end_marker(trimmed):
-                # Save current Q&A if complete
-                if current_question and current_answer:
-                    qa_pairs.append({
-                        "question": current_question,
-                        "answer": " ".join(current_answer),
-                        "page": page_number,
-                        "pdf_page_index": _pdf_idx,
-                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
-                    })
+                save_current_qa_if_complete()
                 break
             
             # Check if this line starts a new question (question markers only match at start)
@@ -684,19 +697,10 @@ class PDFService:
             line_is_answer = is_answer(trimmed)
             
             if line_is_question:
-                # Only save previous Q&A if it's complete (has both question and answer)
-                if current_question and current_answer:
-                    qa_pairs.append({
-                        "question": current_question,
-                        "answer": " ".join(current_answer),
-                        "page": page_number,
-                        "pdf_page_index": _pdf_idx,
-                        "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
-                    })
+                # Save previous complete Q&A before starting new question
+                save_current_qa_if_complete()
                 
-                # If we're already in a question state and encounter a new question,
-                # discard the incomplete previous question (it had no answer)
-                # Start new question
+                # Clear and start new question
                 current_question = clean_qa_text(text)
                 current_question_y = line["y"]
                 current_answer = []
@@ -708,7 +712,7 @@ class PDFService:
                     answer_text = clean_qa_text(text)
                     if state == 'in_answer':
                         # Another answer marker (like another THE WITNESS:)
-                        # Append the new answer text
+                        # Append the new answer text - this is continuation, not a new Q&A
                         current_answer.append(answer_text)
                     else:
                         # Transition from question to answer
@@ -738,15 +742,8 @@ class PDFService:
                     current_answer.append(trimmed)
                 # If state is 'searching', skip this line (not part of Q&A yet)
         
-        # Save last Q&A pair if complete
-        if current_question and current_answer:
-            qa_pairs.append({
-                "question": current_question,
-                "answer": " ".join(current_answer),
-                "page": page_number,
-                "pdf_page_index": _pdf_idx,
-                "line": self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
-            })
+        # Save last Q&A pair if complete (only once at end of page)
+        save_current_qa_if_complete()
         
         # Debug logging for first page
         if page_number == 1 and len(lines) > 0:
