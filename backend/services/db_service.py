@@ -147,13 +147,23 @@ async def init_db():
                 answer_end_line INT,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
-                summary TEXT,
-                topic VARCHAR(255),
+                summary TEXT DEFAULT '',
+                topic VARCHAR(255) DEFAULT 'Other',
                 created_at TIMESTAMP DEFAULT NOW()
             );
             
             CREATE INDEX IF NOT EXISTS idx_final_qa_items_document_id ON final_qa_items(document_id);
             CREATE INDEX IF NOT EXISTS idx_final_qa_items_page_line ON final_qa_items(document_id, page_number, line_number);
+            
+            -- Verify table was created
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'final_qa_items') THEN
+                    RAISE NOTICE 'final_qa_items table exists';
+                ELSE
+                    RAISE EXCEPTION 'final_qa_items table was not created';
+                END IF;
+            END $$;
             
             CREATE TABLE IF NOT EXISTS summary_cache (
                 content_hash VARCHAR(64) PRIMARY KEY,

@@ -138,7 +138,8 @@ async def get_qa_items(document_id: UUID):
         - pdf_page_index: The 1-based index in the PDF file (for rendering)
         - end_page/end_line: Where the answer ends (from stored data)
     """
-    # Check if final_qa_items table exists
+    # Check if final_qa_items table exists and has data
+    has_final_table = False
     try:
         table_check = await db_service.fetchval(
             """
@@ -147,12 +148,27 @@ async def get_qa_items(document_id: UUID):
             """
         )
         has_final_table = table_check > 0
-    except Exception:
+        
+        # Also check if table has any rows for this document
+        if has_final_table:
+            row_count = await db_service.fetchval(
+                """
+                SELECT COUNT(*) FROM final_qa_items WHERE document_id = $1
+                """,
+                document_id
+            )
+            logger.info(f"final_qa_items table exists with {row_count} rows for document {document_id}")
+            if row_count == 0:
+                # Table exists but empty - might need to check old table
+                logger.warning(f"final_qa_items table is empty for document {document_id}, checking qa_items table")
+    except Exception as e:
         # If check fails, assume old schema
+        logger.warning(f"Error checking final_qa_items table: {e}")
         has_final_table = False
     
     if has_final_table:
         # Use new schema with final_qa_items table
+        logger.info(f"Querying final_qa_items table for document {document_id}")
         items = await db_service.fetch(
             """
             SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic
@@ -162,6 +178,11 @@ async def get_qa_items(document_id: UUID):
             """,
             document_id
         )
+        logger.info(f"Retrieved {len(items)} items from final_qa_items table")
+        # Log summary status for first few items
+        for idx, item in enumerate(items[:5]):
+            has_summary = bool(item.get('summary'))
+            logger.info(f"Item {idx+1}: page={item.get('page_number')}, line={item.get('line_number')}, summary={'present' if has_summary else 'MISSING'}, summary_preview={item.get('summary', '')[:50] if has_summary else 'N/A'}...")
     else:
         # Fallback: use old schema (final_qa_items table doesn't exist yet)
         logger.info("Using fallback query - final_qa_items table not yet migrated")

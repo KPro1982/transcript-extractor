@@ -312,26 +312,35 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             answer_end_page = item.get('answer_end_page', printed_page_num)
             answer_end_line = item.get('answer_end_line', line_num)
             
+            # Get summary and verify it's not empty
+            summary_text = item.get('summary', '') or ''
+            topic_text = item.get('topic', 'Other') or 'Other'
+            
             # Log first few items to debug page/line data
             if idx < 3:
-                logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if item.get('summary') else 'no'}, question={item['question'][:50]}...")
+                logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if summary_text else 'no'}, summary_preview={summary_text[:100] if summary_text else 'EMPTY'}..., question={item['question'][:50]}...")
             
-            await db_service.execute(
-                """
-                INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                """,
-                document_id,
-                printed_page_num,
-                line_num,
-                pdf_page_idx,
-                answer_end_page,
-                answer_end_line,
-                item['question'],
-                item['answer'],
-                item.get('summary', ''),
-                item.get('topic', 'Other')
-            )
+            try:
+                await db_service.execute(
+                    """
+                    INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    """,
+                    document_id,
+                    printed_page_num,
+                    line_num,
+                    pdf_page_idx,
+                    answer_end_page,
+                    answer_end_line,
+                    item['question'],
+                    item['answer'],
+                    summary_text,
+                    topic_text
+                )
+            except Exception as e:
+                logger.error(f"Failed to save final Q&A {idx+1}: {e}")
+                logger.error(f"Q&A data: page={printed_page_num}, line={line_num}, summary_length={len(summary_text)}")
+                raise
             saved_final_count += 1
             
             # Stream partial results every 10 items

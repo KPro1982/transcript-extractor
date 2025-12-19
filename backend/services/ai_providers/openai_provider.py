@@ -328,6 +328,20 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                 self.logger.error(f"⚠️  RATE LIMIT (COMBINED): OpenAI rate limit exceeded for {num_items} items")
                 raise RateLimitError(f"OpenAI combined rate limit exceeded. Items: {num_items}, Retry after: {retry_after}s")
             
+            if response.status_code == 400:
+                # Log the error details for debugging
+                try:
+                    error_data = response.json()
+                    self.logger.error(f"❌ OpenAI 400 Bad Request for {num_items} items:")
+                    self.logger.error(f"Error: {error_data}")
+                    self.logger.error(f"Request preview: model={self.model}, max_tokens={num_items * 120}, prompt_length={len(user_prompt)}")
+                except:
+                    error_text = response.text[:500]
+                    self.logger.error(f"❌ OpenAI 400 Bad Request (non-JSON): {error_text}")
+                # Return empty summaries instead of raising - allow processing to continue
+                self.logger.warning(f"Returning empty summaries for {num_items} items due to 400 error")
+                return [{"summary": "", "topic": "Other"} for _ in qa_items]
+            
             response.raise_for_status()
             result = response.json()
             content = result["choices"][0]["message"]["content"].strip()
