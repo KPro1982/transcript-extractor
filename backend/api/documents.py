@@ -137,15 +137,53 @@ async def get_qa_items(document_id: UUID):
         - pdf_page_index: The 1-based index in the PDF file (for rendering)
         - end_page/end_line: Where the answer ends (from stored data)
     """
-    items = await db_service.fetch(
-        """
-        SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, is_final, question, answer, summary, topic
-        FROM qa_items
-        WHERE document_id = $1 AND is_final = TRUE
-        ORDER BY page_number, line_number
-        """,
-        document_id
-    )
+    # Check if new columns exist first, then use appropriate query
+    try:
+        # Try to check if is_final column exists by querying information_schema
+        column_check = await db_service.fetchval(
+            """
+            SELECT COUNT(*) FROM information_schema.columns 
+            WHERE table_name = 'qa_items' AND column_name = 'is_final'
+            """
+        )
+        has_new_columns = column_check > 0
+    except Exception:
+        # If check fails, assume old schema
+        has_new_columns = False
+    
+    if has_new_columns:
+        # Use new schema with is_final filter
+        items = await db_service.fetch(
+            """
+            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, is_final, question, answer, summary, topic
+            FROM qa_items
+            WHERE document_id = $1 AND (is_final IS NULL OR is_final = TRUE)
+            ORDER BY page_number, line_number
+            """,
+            document_id
+        )
+    else:
+        # Fallback: use old schema (columns don't exist yet)
+        logger.info("Using fallback query - new columns not yet migrated")
+        items = await db_service.fetch(
+            """
+            SELECT id, page_number, line_number, pdf_page_index, question, answer, summary, topic
+            FROM qa_items
+            WHERE document_id = $1
+            ORDER BY page_number, line_number
+            """,
+            document_id
+        )
+        # Add missing columns with None values
+        items = [
+            {
+                **item,
+                "answer_end_page": None,
+                "answer_end_line": None,
+                "is_final": True
+            }
+            for item in items
+        ]
     
     # Convert to list
     items_list = list(items)

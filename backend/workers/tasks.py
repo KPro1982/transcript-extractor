@@ -9,7 +9,7 @@ import aiofiles
 from workers.celery_app import celery_app
 from services.pdf_service import pdf_service
 from services.ai_service import ai_service
-from services.db_service import db_service
+from services.db_service import db_service, init_db
 from services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
     try:
         # Initialize connections
         await cache_service.connect()
-        await db_service.init_pool()
+        await init_db()  # Initialize database and run migrations
         
         # Update job status to processing
         await db_service.execute(

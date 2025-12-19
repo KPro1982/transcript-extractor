@@ -80,9 +80,6 @@ async def init_db():
                 page_number INT NOT NULL,
                 line_number INT NOT NULL,
                 pdf_page_index INT,
-                answer_end_page INT,
-                answer_end_line INT,
-                is_final BOOLEAN DEFAULT TRUE,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 summary TEXT,
@@ -91,7 +88,6 @@ async def init_db():
             );
             
             CREATE INDEX IF NOT EXISTS idx_qa_items_document_id ON qa_items(document_id);
-            CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
             
             -- Add pdf_page_index column if it doesn't exist (migration)
             DO $$ 
@@ -136,6 +132,9 @@ async def init_db():
                     ALTER TABLE qa_items ADD COLUMN is_final BOOLEAN DEFAULT TRUE;
                 END IF;
             END $$;
+            
+            -- Create index on is_final AFTER column is added (migration)
+            CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
             
             CREATE TABLE IF NOT EXISTS summary_cache (
                 content_hash VARCHAR(64) PRIMARY KEY,
