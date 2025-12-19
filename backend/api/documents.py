@@ -158,59 +158,6 @@ async def get_qa_items(document_id: UUID):
                 document_id
             )
             logger.info(f"final_qa_items table exists with {row_count} rows for document {document_id}")
-            if row_count == 0:
-                # Table exists but empty - check old table and migrate if needed
-                logger.warning(f"final_qa_items table is empty for document {document_id}, checking qa_items table")
-                # Try to migrate data from qa_items to final_qa_items
-                try:
-                    old_items = await db_service.fetch(
-                        """
-                        SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic, is_final
-                        FROM qa_items
-                        WHERE document_id = $1 AND (is_final IS NULL OR is_final = TRUE)
-                        ORDER BY page_number, line_number
-                        """,
-                        document_id
-                    )
-                    if old_items and len(old_items) > 0:
-                        logger.info(f"Found {len(old_items)} items in qa_items table, migrating to final_qa_items")
-                        # Migrate items to final_qa_items
-                        for old_item in old_items:
-                            await db_service.execute(
-                                """
-                                INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic)
-                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                                ON CONFLICT DO NOTHING
-                                """,
-                                document_id,
-                                old_item.get('page_number'),
-                                old_item.get('line_number'),
-                                old_item.get('pdf_page_index'),
-                                old_item.get('answer_end_page'),
-                                old_item.get('answer_end_line'),
-                                old_item.get('question'),
-                                old_item.get('answer'),
-                                old_item.get('summary') or '',
-                                old_item.get('topic') or 'Other'
-                            )
-                        logger.info(f"Migrated {len(old_items)} items to final_qa_items")
-                        # Re-query final_qa_items
-                        items = await db_service.fetch(
-                            """
-                            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic
-                            FROM final_qa_items
-                            WHERE document_id = $1
-                            ORDER BY page_number, line_number
-                            """,
-                            document_id
-                        )
-                        logger.info(f"After migration: Retrieved {len(items)} items from final_qa_items table")
-                    else:
-                        logger.warning(f"No items found in qa_items table either for document {document_id}")
-                except Exception as migrate_error:
-                    logger.error(f"Error migrating data: {migrate_error}")
-                    # Fall through to use old table
-                    has_final_table = False
     except Exception as e:
         # If check fails, assume old schema
         logger.warning(f"Error checking final_qa_items table: {e}")
