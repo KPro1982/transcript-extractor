@@ -585,6 +585,10 @@ class PDFService:
         Merge interim Q&A pairs that span across pages.
         
         This ensures cross-page Q&A pairs are properly combined into final pairs.
+        Handles cases where:
+        - Question starts on one page, answer on next page
+        - Question spans multiple pages
+        - Answer spans multiple pages
         """
         all_qa_pairs = []
         interim_pairs = []
@@ -597,18 +601,44 @@ class PDFService:
                     if interim_pairs:
                         # Try to merge with last interim pair
                         last_interim = interim_pairs[-1]
-                        # Merge if sequential pages and same question start
-                        if (qa.get("page") == last_interim.get("answer_end_page", 0) + 1 or
-                            qa.get("page") == last_interim.get("page")):
+                        last_page = last_interim.get("page")
+                        last_end_page = last_interim.get("answer_end_page", last_page)
+                        current_page = qa.get("page")
+                        
+                        # Merge if:
+                        # 1. Sequential pages (current page is next after last end page)
+                        # 2. Same page (continuation within page)
+                        # 3. Last interim has incomplete answer (empty or just question)
+                        should_merge = (
+                            current_page == last_end_page + 1 or
+                            current_page == last_page or
+                            (not last_interim.get("answer") or last_interim.get("answer", "").strip() == "")
+                        )
+                        
+                        if should_merge:
                             # Merge: combine question and answer
-                            merged_qa = {
-                                **last_interim,
-                                "question": last_interim.get("question", "") + " " + qa.get("question", ""),
-                                "answer": last_interim.get("answer", "") + " " + qa.get("answer", ""),
-                                "answer_end_page": qa.get("answer_end_page", qa.get("page")),
-                                "answer_end_line": qa.get("answer_end_line", qa.get("line")),
-                                "is_final": True
-                            }
+                            # If last interim has no answer, it's likely a question continuation
+                            last_answer = last_interim.get("answer", "").strip()
+                            if not last_answer:
+                                # Last was incomplete question - merge questions and use current answer
+                                merged_qa = {
+                                    **last_interim,
+                                    "question": last_interim.get("question", "") + " " + qa.get("question", ""),
+                                    "answer": qa.get("answer", ""),
+                                    "answer_end_page": qa.get("answer_end_page", qa.get("page")),
+                                    "answer_end_line": qa.get("answer_end_line", qa.get("line")),
+                                    "is_final": True
+                                }
+                            else:
+                                # Both have content - combine both
+                                merged_qa = {
+                                    **last_interim,
+                                    "question": last_interim.get("question", "") + " " + qa.get("question", ""),
+                                    "answer": last_interim.get("answer", "") + " " + qa.get("answer", ""),
+                                    "answer_end_page": qa.get("answer_end_page", qa.get("page")),
+                                    "answer_end_line": qa.get("answer_end_line", qa.get("line")),
+                                    "is_final": True
+                                }
                             interim_pairs.pop()
                             all_qa_pairs.append(merged_qa)
                         else:
@@ -803,6 +833,8 @@ class PDFService:
         # 3. End of page (save current complete Q&A as interim if incomplete)
         
         # Continue from previous page's incomplete state if provided
+        original_qa_page = page_number  # Track original page for Q&A that spans pages
+        original_qa_line = None
         if previous_incomplete_state:
             current_question = previous_incomplete_state.get("current_question")
             current_question_y = previous_incomplete_state.get("current_question_y")
@@ -810,7 +842,12 @@ class PDFService:
             current_answer_end_line = previous_incomplete_state.get("current_answer_end_line")
             current_answer_end_y = previous_incomplete_state.get("current_answer_end_y")
             state = previous_incomplete_state.get("state", "searching")
-            logger.debug(f"Continuing Q&A from page {previous_incomplete_state.get('page_number')} to page {page_number}")
+            # Preserve original page and line from where Q&A started
+            original_qa_page = previous_incomplete_state.get("page_number", page_number)
+            if current_question_y:
+                # Try to get original line number from previous state if available
+                original_qa_line = previous_incomplete_state.get("original_qa_line")
+            logger.debug(f"Continuing Q&A from page {original_qa_page} to page {page_number}")
         else:
             current_question = None
             current_question_y = None
@@ -822,17 +859,30 @@ class PDFService:
         qa_pairs = []
         seen_qa_keys = set()  # Track saved Q&A pairs to prevent duplicates
         
-        def save_current_qa_if_complete(is_final: bool = True):
-            """Helper to save current Q&A pair only if it's complete and not already saved.
+        def save_current_qa_if_complete(is_final: bool = True, allow_incomplete: bool = False):
+            """Helper to save current Q&A pair.
             
-            This ensures we only save once per complete Q&A pair.
-            Uses a key based on question + answer + page + line to detect duplicates.
+            By default, only saves complete Q&A pairs (question + answer).
+            If allow_incomplete=True, also saves incomplete pairs (question without answer).
             
             Args:
                 is_final: True if this is a final Q&A pair (complete), False if interim
+                allow_incomplete: If True, save even if incomplete (e.g., question without answer)
             """
             nonlocal qa_pairs, seen_qa_keys
-            if current_question and current_answer:
+            
+            # Check if we have something to save
+            has_question = current_question is not None
+            has_answer = current_answer and len(current_answer) > 0
+            
+            if not (has_question or has_answer):
+                return  # Nothing to save
+            
+            # Only save complete pairs unless allow_incomplete is True
+            if not (has_question and has_answer) and not allow_incomplete:
+                return
+            
+            if has_question and has_answer:
                 # Create unique key to prevent duplicates
                 qa_key = (
                     current_question.strip(),
@@ -857,18 +907,41 @@ class PDFService:
                     if answer_end_line_num is None:
                         answer_end_line_num = question_start_line
                     
+                    # Use original page/line if continuing from previous page
+                    qa_start_page = original_qa_page if previous_incomplete_state else page_number
+                    qa_start_line = original_qa_line if (original_qa_line and previous_incomplete_state) else question_start_line
+                    
                     qa_pairs.append({
                         "question": current_question,
                         "answer": " ".join(current_answer),
-                        "page": page_number,
+                        "page": qa_start_page,  # Use original start page
                         "pdf_page_index": _pdf_idx,
-                        "line": question_start_line,
-                        "answer_end_page": page_number,
+                        "line": qa_start_line,  # Use original start line
+                        "answer_end_page": page_number,  # Answer ends on current page
                         "answer_end_line": answer_end_line_num,
                         "is_final": is_final
                     })
                 else:
                     logger.warning(f"Skipping duplicate Q&A pair at page {page_number}, line {self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1}")
+            elif allow_incomplete and has_question:
+                # Save incomplete Q&A pair (question without answer)
+                question_start_line = self._find_closest_line_number(current_question_y, line_numbers) if current_question_y else 1
+                answer_end_line_num = current_answer_end_line if current_answer_end_line else question_start_line
+                
+                # Use original page/line if continuing from previous page
+                qa_start_page = original_qa_page if previous_incomplete_state else page_number
+                qa_start_line = original_qa_line if (original_qa_line and previous_incomplete_state) else question_start_line
+                
+                qa_pairs.append({
+                    "question": current_question,
+                    "answer": "",  # Empty answer for incomplete pair
+                    "page": qa_start_page,  # Use original start page
+                    "pdf_page_index": _pdf_idx,
+                    "line": qa_start_line,  # Use original start line
+                    "answer_end_page": page_number,  # Question ends on current page
+                    "answer_end_line": answer_end_line_num,
+                    "is_final": False  # Always interim if incomplete
+                })
         
         for i, line in enumerate(lines):
             text = line["text"]
@@ -895,8 +968,14 @@ class PDFService:
             current_line_num = self._find_closest_line_number(line["y"], line_numbers)
             
             if line_is_question:
-                # Save previous complete Q&A before starting new question (FINAL - new Q starts)
-                save_current_qa_if_complete(is_final=True)
+                # Save previous Q&A before starting new question
+                # If complete, save as final; if incomplete, save as interim
+                if current_question and current_answer:
+                    # Complete Q&A - save as final
+                    save_current_qa_if_complete(is_final=True)
+                elif current_question:
+                    # Incomplete Q&A (question without answer) - save as interim
+                    save_current_qa_if_complete(is_final=False, allow_incomplete=True)
                 
                 # Clear and start new question
                 current_question = clean_qa_text(text)
@@ -905,6 +984,9 @@ class PDFService:
                 current_answer_end_line = None
                 current_answer_end_y = None
                 state = 'in_question'
+                # Reset original page tracking for new Q&A
+                original_qa_page = page_number
+                original_qa_line = self._find_closest_line_number(line["y"], line_numbers)
                 
             elif line_is_answer:
                 if current_question:
@@ -1002,7 +1084,8 @@ class PDFService:
             "current_answer_end_line": current_answer_end_line,
             "current_answer_end_y": current_answer_end_y,
             "state": state,
-            "page_number": page_number,
+            "page_number": original_qa_page,  # Preserve original start page
+            "original_qa_line": original_qa_line,  # Preserve original start line
             "pdf_page_index": _pdf_idx
         }
         
