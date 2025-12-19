@@ -17,6 +17,8 @@ class PDFService:
         # Page number patterns to look for in headers/footers
         # Ordered by specificity - more specific patterns first
         self.page_number_patterns = [
+            # "Page: X" or "PAGE: X" or "page: X" (with colon)
+            re.compile(r'\bPage\s*:\s*(\d+)\b', re.IGNORECASE),
             # "Page X" or "PAGE X" or "page X"
             re.compile(r'\bPage\s+(\d+)\b', re.IGNORECASE),
             # "Page X of Y"
@@ -40,8 +42,10 @@ class PDFService:
         
         Legal transcripts have page numbers in headers or footers. This function:
         1. Looks at the top 12% (header) and bottom 12% (footer) of the page
-        2. Searches for common page number patterns
-        3. Returns the detected page number or None if not found
+        2. Excludes the left margin (where line numbers are located)
+        3. Prioritizes the right side of footer/header for page numbers
+        4. Searches for common page number patterns
+        5. Returns the detected page number or None if not found
         
         Args:
             text_items: List of text items with x, y, text properties
@@ -55,15 +59,23 @@ class PDFService:
         header_threshold = page_height * 0.12
         footer_threshold = page_height * 0.88
         
-        # Collect text from header and footer regions
+        # Exclude left margin where line numbers are (same threshold as line number extraction)
+        left_margin_threshold = page_width * 0.15
+        
+        # Collect text from header and footer regions, excluding left margin
         header_items = []
         footer_items = []
         
         for item in text_items:
             y = item.get("y", 0)
+            x = item.get("x", 0)
             text = item.get("text", "").strip()
             
             if not text:
+                continue
+            
+            # Skip items in the left margin - those are line numbers, not page numbers
+            if x < left_margin_threshold:
                 continue
                 
             if y < header_threshold:
@@ -71,10 +83,15 @@ class PDFService:
             elif y > footer_threshold:
                 footer_items.append(item)
         
-        # Try to find page number in header first, then footer
-        for region_name, items in [("header", header_items), ("footer", footer_items)]:
-            # Sort items by x position to combine into lines
-            items_sorted = sorted(items, key=lambda x: (x.get("y", 0), x.get("x", 0)))
+        # Try to find page number in footer first (most common), then header
+        # Also prioritize right side of footer/header
+        for region_name, items in [("footer", footer_items), ("header", header_items)]:
+            if not items:
+                continue
+                
+            # Sort items by x position (right to left) and y position to combine into lines
+            # Prioritize right side items first
+            items_sorted = sorted(items, key=lambda x: (x.get("y", 0), -x.get("x", 0)))
             
             # Combine items on same line
             lines = []
@@ -96,6 +113,7 @@ class PDFService:
                 lines.append(" ".join(current_line))
             
             # Search each line for page number patterns
+            # Check rightmost lines first (where page numbers typically are)
             for line in lines:
                 page_num = self._extract_page_number_from_text(line)
                 if page_num is not None:
