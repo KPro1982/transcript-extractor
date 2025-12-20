@@ -86,8 +86,9 @@ export default function PDFViewer({
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions.height * topMarginPercent
 
-    const startY = topMargin + (highlightStartLine - 1) * lineHeight
-    const endY = topMargin + highlightEndLine * lineHeight
+    // Adjust highlighting to move up by 1 line to fix offset issue
+    const startY = topMargin + (highlightStartLine - 2) * lineHeight
+    const endY = topMargin + (highlightEndLine - 1) * lineHeight
 
     return {
       position: 'absolute' as const,

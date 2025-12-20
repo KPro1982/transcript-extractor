@@ -221,6 +221,17 @@ async def init_db():
                 END IF;
             END $$;
             
+            -- Add event_date column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'final_qa_items' AND column_name = 'event_date'
+                ) THEN
+                    ALTER TABLE final_qa_items ADD COLUMN event_date VARCHAR(50);
+                END IF;
+            END $$;
+            
             CREATE TABLE IF NOT EXISTS summary_cache (
                 content_hash VARCHAR(64) PRIMARY KEY,
                 summary TEXT NOT NULL,

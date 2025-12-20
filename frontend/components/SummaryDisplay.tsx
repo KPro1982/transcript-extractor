@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, MessageSquare, Brain } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageSquare, Brain, Edit2, Save, X } from 'lucide-react'
 import LearningFeedbackModal from './LearningFeedbackModal'
+import { api } from '@/lib/api'
 
 interface QAItem {
   id: string
@@ -14,6 +15,7 @@ interface QAItem {
   answer: string
   summary: string
   topic: string
+  event_date?: string
 }
 
 interface SummaryDisplayProps {
@@ -53,6 +55,45 @@ export default function SummaryDisplay({
   onNext
 }: SummaryDisplayProps) {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedSummary, setEditedSummary] = useState('')
+  const [editedDate, setEditedDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleStartEdit = () => {
+    setEditedSummary(item?.summary || '')
+    setEditedDate(item?.event_date || '')
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditedSummary('')
+    setEditedDate('')
+  }
+
+  const handleSave = async () => {
+    if (!item) return
+    
+    try {
+      setSaving(true)
+      await api.patch(`/api/documents/qa-items/${item.id}`, {
+        summary: editedSummary,
+        event_date: editedDate || null
+      })
+      
+      // Update local state
+      item.summary = editedSummary
+      item.event_date = editedDate
+      
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Failed to save summary:', error)
+      alert('Failed to save changes. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (!item) {
     return (
@@ -108,21 +149,99 @@ export default function SummaryDisplay({
       <div className="flex-1 overflow-auto p-6 flex flex-col">
         {/* Summary Text - Takes up most of the space */}
         <div className="flex-1">
-          {item.summary ? (
+          {item.summary || isEditing ? (
             <div className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-gray-100 text-xl leading-relaxed flex-1">
-                  {item.summary}
-                </p>
-                {/* Brain Icon Button */}
-                <button
-                  onClick={() => setFeedbackModalOpen(true)}
-                  className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group"
-                  title="Provide learning feedback"
-                >
-                  <Brain className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                </button>
-              </div>
+              {isEditing ? (
+                // Edit Mode
+                <div className="space-y-4">
+                  {/* Editable Summary */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">
+                      Summary
+                    </label>
+                    <textarea
+                      value={editedSummary}
+                      onChange={(e) => setEditedSummary(e.target.value)}
+                      className="w-full min-h-[200px] px-4 py-3 bg-bg-elevated border border-gray-700 rounded-xl text-gray-100 text-lg leading-relaxed focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 resize-y"
+                      placeholder="Enter summary..."
+                    />
+                  </div>
+
+                  {/* Editable Event Date */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">
+                      Event Date (Optional)
+                      <span className="ml-2 text-xs text-gray-500 font-normal">
+                        Format: yyyy-mm-dd, yyyy-mm, yyyy, or flexible like &quot;2020 mid-year&quot;
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editedDate}
+                      onChange={(e) => setEditedDate(e.target.value)}
+                      className="w-full px-4 py-2 bg-bg-elevated border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+                      placeholder="e.g., 2020-04, 2020, 2020 mid-year"
+                    />
+                  </div>
+
+                  {/* Edit Actions */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-black font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // View Mode
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <p className="text-gray-100 text-xl leading-relaxed flex-1">
+                      {item.summary}
+                    </p>
+                    <div className="flex gap-2">
+                      {/* Edit Button */}
+                      <button
+                        onClick={handleStartEdit}
+                        className="flex-shrink-0 p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 transition-colors group"
+                        title="Edit summary and date"
+                      >
+                        <Edit2 className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+                      </button>
+                      {/* Brain Icon Button */}
+                      <button
+                        onClick={() => setFeedbackModalOpen(true)}
+                        className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group"
+                        title="Provide learning feedback"
+                      >
+                        <Brain className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Display Event Date if present */}
+                  {item.event_date && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <span className="font-semibold">Event Date:</span>
+                      <span className="px-2 py-1 bg-blue-500/10 border border-blue-500/30 rounded text-blue-400">
+                        {item.event_date}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">
@@ -132,6 +251,13 @@ export default function SummaryDisplay({
                 <p className="text-sm mt-2 text-gray-600">
                   This Q&A pair was not summarized by AI.
                 </p>
+                <button
+                  onClick={handleStartEdit}
+                  className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-lg transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Add Summary
+                </button>
               </div>
             </div>
           )}

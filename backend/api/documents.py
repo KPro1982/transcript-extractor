@@ -1,11 +1,12 @@
 """Document upload and management endpoints."""
 import hashlib
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 import aiofiles
 
 from services.db_service import db_service
@@ -195,7 +196,7 @@ async def get_qa_items(document_id: UUID):
         logger.info(f"Querying final_qa_items table for document {document_id}")
         items = await db_service.fetch(
             """
-            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic
+            SELECT id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic, event_date
             FROM final_qa_items
             WHERE document_id = $1
             ORDER BY page_number, line_number
@@ -361,7 +362,8 @@ async def get_qa_items(document_id: UUID):
             "question": item["question"],
             "answer": item["answer"],
             "summary": item["summary"],
-            "topic": item["topic"]
+            "topic": item["topic"],
+            "event_date": item.get("event_date")  # Include event date if present
         })
     
     result = {
@@ -440,5 +442,106 @@ async def get_pdf_page(document_id: UUID, page_number: int):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to render page: {str(e)}"
         )
+
+
+class QAItemUpdate(BaseModel):
+    """Model for updating QA item summary and date."""
+    summary: Optional[str] = None
+    event_date: Optional[str] = None
+
+
+@router.patch("/qa-items/{qa_item_id}")
+async def update_qa_item(qa_item_id: UUID, update: QAItemUpdate):
+    """
+    Update a QA item's summary and/or event date.
+    
+    Args:
+        qa_item_id: UUID of the QA item to update
+        update: Fields to update (summary, event_date)
+    
+    Returns:
+        Updated QA item
+    """
+    try:
+        # Check if item exists in final_qa_items table
+        item = await db_service.fetchrow(
+            """
+            SELECT id, document_id, page_number, line_number, pdf_page_index, 
+                   answer_end_page, answer_end_line, question, answer, summary, 
+                   topic, event_date
+            FROM final_qa_items
+            WHERE id = $1
+            """,
+            qa_item_id
+        )
+        
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="QA item not found"
+            )
+        
+        # Build update query dynamically based on provided fields
+        update_fields = []
+        update_values = []
+        param_count = 1
+        
+        if update.summary is not None:
+            update_fields.append(f"summary = ${param_count}")
+            update_values.append(update.summary)
+            param_count += 1
+        
+        if update.event_date is not None:
+            update_fields.append(f"event_date = ${param_count}")
+            update_values.append(update.event_date)
+            param_count += 1
+        
+        if not update_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update"
+            )
+        
+        # Add the ID as the last parameter
+        update_values.append(qa_item_id)
+        
+        # Execute update
+        query = f"""
+            UPDATE final_qa_items
+            SET {', '.join(update_fields)}
+            WHERE id = ${param_count}
+            RETURNING id, document_id, page_number, line_number, pdf_page_index,
+                      answer_end_page, answer_end_line, question, answer, summary,
+                      topic, event_date
+        """
+        
+        updated_item = await db_service.fetchrow(query, *update_values)
+        
+        logger.info(f"Updated QA item {qa_item_id}: {update_fields}")
+        
+        return {
+            "id": str(updated_item["id"]),
+            "document_id": str(updated_item["document_id"]),
+            "page_number": updated_item["page_number"],
+            "line_number": updated_item["line_number"],
+            "pdf_page_index": updated_item["pdf_page_index"],
+            "end_page": updated_item["answer_end_page"],
+            "end_line": updated_item["answer_end_line"],
+            "question": updated_item["question"],
+            "answer": updated_item["answer"],
+            "summary": updated_item["summary"],
+            "topic": updated_item["topic"],
+            "event_date": updated_item["event_date"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update QA item: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update QA item: {str(e)}"
+        )
+
 
 
