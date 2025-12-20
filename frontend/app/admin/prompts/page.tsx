@@ -43,7 +43,7 @@ export default function AdminPromptsPage() {
                     <div>
                       <h3 className="font-semibold mb-2">Review Learning Feedback</h3>
                       <p className="text-sm text-gray-400 mb-3">
-                        Access user corrections through the "Learning Feedback" page. Compare AI-generated 
+                        Access user corrections through the &ldquo;Learning Feedback&rdquo; page. Compare AI-generated 
                         summaries with user corrections to identify patterns and improvement opportunities.
                       </p>
                       <button
@@ -68,7 +68,7 @@ export default function AdminPromptsPage() {
                         <li>Identify common issues in user corrections</li>
                         <li>Modify prompts in <code className="bg-bg-card px-2 py-1 rounded text-accent">backend/services/ai_providers/openai_provider.py</code></li>
                         <li>Test with sample documents</li>
-                        <li>Mark feedback as "Applied" when integrated</li>
+                        <li>Mark feedback as &ldquo;Applied&rdquo; when integrated</li>
                         <li>Monitor new feedback for continued improvement</li>
                       </ol>
                     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, MessageSquare, AlertCircle, CheckCircle, Clock, X } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -25,11 +25,7 @@ export default function AdminChatsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
 
-  useEffect(() => {
-    fetchReports()
-  }, [filter])
-
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true)
       const statusFilter = filter === 'all' ? undefined : filter
@@ -42,7 +38,11 @@ export default function AdminChatsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    fetchReports()
+  }, [filter, fetchReports])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

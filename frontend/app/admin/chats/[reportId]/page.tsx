@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Send, Loader2, Image as ImageIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -39,13 +39,7 @@ export default function BugReportChatPage() {
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState('')
 
-  useEffect(() => {
-    if (reportId) {
-      fetchReport()
-    }
-  }, [reportId])
-
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     try {
       const response = await api.get(`/api/bug-reports/${reportId}`)
       setReport(response.data)
@@ -55,7 +49,13 @@ export default function BugReportChatPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [reportId])
+
+  useEffect(() => {
+    if (reportId) {
+      fetchReport()
+    }
+  }, [reportId, fetchReport])
 
   const sendMessage = async () => {
     if (!message.trim() || sending) return

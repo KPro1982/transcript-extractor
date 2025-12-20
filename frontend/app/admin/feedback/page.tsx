@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Brain, Check, X, Clock, ChevronRight } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -28,11 +28,7 @@ export default function AdminFeedbackPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('pending')
 
-  useEffect(() => {
-    fetchFeedback()
-  }, [filter])
-
-  const fetchFeedback = async () => {
+  const fetchFeedback = useCallback(async () => {
     try {
       setLoading(true)
       const response = await api.get('/api/learning-feedback', {
@@ -47,7 +43,11 @@ export default function AdminFeedbackPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    fetchFeedback()
+  }, [filter, fetchFeedback])
 
   const updateStatus = async (feedbackId: string, newStatus: string) => {
     try {

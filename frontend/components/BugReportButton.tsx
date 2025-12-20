@@ -86,7 +86,7 @@ export default function BugReportButton() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Thank you!</h3>
                 <p className="text-gray-400 text-sm">
-                  Your report has been submitted. We'll get back to you soon.
+                  Your report has been submitted. We&apos;ll get back to you soon.
                 </p>
               </div>
             ) : (
