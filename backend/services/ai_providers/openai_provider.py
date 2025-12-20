@@ -451,6 +451,7 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                 valid_count = sum(1 for n in normalized if n["summary"].strip())
                 self.logger.warning(f"Got {len(normalized)} results, {valid_count} have non-empty summaries")
                 
+                # Try to handle single combined summary first
                 if len(normalized) == 1 and num_items > 1:
                     # OpenAI returned a single combined summary - try to split it
                     self.logger.error(f"❌ OpenAI returned 1 combined summary instead of {num_items} individual summaries")
@@ -463,28 +464,40 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                     parts = re.split(r'\n\s*\d+[\.\)]\s*', combined_text)
                     if len(parts) > 1:
                         self.logger.info(f"Attempting to split combined summary into {len(parts)} parts")
-                        normalized = []
+                        split_normalized = []
                         for part in parts:
                             part = part.strip()
                             if part:
-                                normalized.append({"summary": part, "topic": "Other"})
-                    # If we got the right number, use it
-                    if len(normalized) == num_items:
-                        self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")
-                        return normalized
+                                split_normalized.append({"summary": part, "topic": normalized[0].get("topic", "Other"), "event_date": normalized[0].get("event_date")})
+                        # If we got the right number, use it
+                        if len(split_normalized) == num_items:
+                            self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")
+                            return split_normalized
+                        # If we got closer but not exact, use what we have and retry missing
+                        elif len(split_normalized) > 1:
+                            self.logger.info(f"Split into {len(split_normalized)} parts (expected {num_items}), will retry missing items")
+                            normalized = split_normalized
+                    else:
+                        # Splitting failed - will fall through to retry logic below
+                        self.logger.error(f"❌ Could not split combined summary. Will retry missing items individually.")
                 
-                # If splitting failed, return empty for all but log error
-                self.logger.error(f"❌ Could not split combined summary. Returning empty summaries.")
-                return [{"summary": "", "topic": "Other", "event_date": None} for _ in qa_items]
-                
+                # Handle count mismatch - retry missing items or pad/truncate
                 if len(normalized) < num_items:
                     # OpenAI returned fewer results
                     missing = num_items - len(normalized)
-                    missing_indices = list(range(len(normalized), num_items))
+                    
+                    # If we got exactly 1 result for multiple items and splitting failed,
+                    # retry ALL items individually (don't trust the combined summary)
+                    if len(normalized) == 1 and num_items > 1:
+                        missing_indices = list(range(num_items))  # Retry all items
+                        normalized = []  # Clear the combined summary
+                        self.logger.warning(f"⚠️ Got 1 combined summary that couldn't be split. Retrying all {num_items} items individually...")
+                    else:
+                        missing_indices = list(range(len(normalized), num_items))  # Only retry missing
+                        self.logger.warning(f"⚠️ OpenAI returned only {len(normalized)} results for {num_items} items. Retrying {missing} missing items individually...")
                     
                     if not _retry_mode:
                         # Retry missing items individually (only if not already in retry mode)
-                        self.logger.warning(f"⚠️ OpenAI returned only {len(normalized)} results for {num_items} items. Retrying {missing} missing items individually...")
                         
                         # Process missing items one by one
                         for idx in missing_indices:
