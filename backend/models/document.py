@@ -36,3 +36,10 @@ class DocumentResponse(BaseModel):
     file_hash: str
     created_at: Optional[str] = None
 
+
+
+
+
+
+
+

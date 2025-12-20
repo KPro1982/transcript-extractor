@@ -37,8 +37,8 @@ export default function PDFViewer({
   onPageChange
 }: PDFViewerProps) {
   // Check if this is a cross-page Q/A
-  const isCrossPage = endPage && endPage > pageNumber
-  const secondPageNumber = isCrossPage ? pageNumber + 1 : null
+  const isCrossPage = endPage && endPage !== pageNumber
+  const secondPageNumber = isCrossPage ? endPage : null
   // Use displayPageNumber for header if provided, otherwise use pageNumber
   const shownPageNumber = displayPageNumber ?? pageNumber
   const [loading, setLoading] = useState(true)
@@ -333,7 +333,7 @@ export default function PDFViewer({
       {/* Line Number Indicator Footer */}
       <div className="px-4 py-2 bg-bg-card border-t border-gray-800 text-xs text-gray-500 text-center">
         {isCrossPage ? (
-          <>Lines {highlightStartLine} (Page {shownPageNumber}) - {highlightEndLine} (Page {shownPageNumber + 1})</>
+          <>Lines {highlightStartLine} (Page {shownPageNumber}) - {highlightEndLine} (Page {endPage})</>
         ) : (
           <>Lines {highlightStartLine}-{highlightEndLine}</>
         )}

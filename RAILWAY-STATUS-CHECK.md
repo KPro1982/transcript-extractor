@@ -353,3 +353,8 @@ The deployment is fully working when:
 
 **Next Action:** Run `.\check-railway-worker-logs.ps1` to verify current status, then proceed with testing or redeploy as needed.
 
+
+
+
+
+

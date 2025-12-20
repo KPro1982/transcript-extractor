@@ -50,3 +50,10 @@ echo "  - frontend/.env.local"
 echo ""
 echo "You can now run: docker-compose up -d"
 
+
+
+
+
+
+
+

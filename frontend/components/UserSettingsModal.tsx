@@ -44,6 +44,11 @@ const PRESET_OPTIONS = [
     key: 'highlight_inconsistencies',
     label: 'Highlight inconsistencies',
     description: 'Note contradictions or changes in testimony'
+  },
+  {
+    key: 'group_related',
+    label: 'Group closely related Q&As',
+    description: 'Combine sequential Q&As about the same topic (e.g., "Q. What is your birth day? A. 4/19/1968. Q. So you are 57 years old? A. Yes." → "The witness was born on April 19, 1968 and is 57 years old.")'
   }
 ]
 

@@ -129,3 +129,10 @@ Check your Cursor dashboard regularly:
 
 Both are configured to default to cheaper models and prevent accidental Opus usage.
 
+
+
+
+
+
+
+

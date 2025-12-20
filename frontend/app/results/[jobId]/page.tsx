@@ -211,18 +211,6 @@ export default function ResultsPage() {
             <span>{totalPages} pages</span>
           </div>
           
-          {/* Admin Button */}
-          {user?.is_admin && (
-            <button
-              onClick={() => router.push('/admin')}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-xl transition-all"
-              title="Admin Dashboard"
-            >
-              <Shield className="w-4 h-4" />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
-          )}
-          
           <button
             onClick={() => router.push('/upload')}
             className="flex items-center gap-2 px-4 py-2 bg-bg-elevated hover:bg-accent/10 border border-gray-700 hover:border-accent/50 rounded-xl transition-all"

@@ -26,3 +26,10 @@ if (Test-Path "artifacts/diagnostics") {
 
 Write-Host "`nTo view live output, check the terminal where the test was started." -ForegroundColor Cyan
 
+
+
+
+
+
+
+

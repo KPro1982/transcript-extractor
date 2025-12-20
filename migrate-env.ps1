@@ -77,3 +77,10 @@ Write-Host "Your OpenAI API Key: $($openaiKey.Substring(0, 10))..." -ForegroundC
 Write-Host ""
 Write-Host "You can now run: docker-compose up -d" -ForegroundColor Yellow
 
+
+
+
+
+
+
+

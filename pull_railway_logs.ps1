@@ -77,3 +77,10 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "`nOr run: railway logs --tail 500" -ForegroundColor Cyan
 }
 
+
+
+
+
+
+
+

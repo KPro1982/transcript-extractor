@@ -26,3 +26,10 @@ celery_app.conf.update(
 # Import tasks
 celery_app.autodiscover_tasks(['workers'])
 
+
+
+
+
+
+
+

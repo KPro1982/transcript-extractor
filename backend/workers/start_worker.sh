@@ -13,3 +13,10 @@ celery -A workers.celery_app worker \
     --time-limit=3600 \
     --soft-time-limit=3300
 
+
+
+
+
+
+
+

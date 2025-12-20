@@ -255,3 +255,10 @@ Expected performance with default configuration:
 
 **6.4x faster than previous Node.js implementation!**
 
+
+
+
+
+
+
+

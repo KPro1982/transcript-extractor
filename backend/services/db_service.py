@@ -365,6 +365,17 @@ async def init_persistent_db():
             
             CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(user_id, read_at);
+            
+            -- Processing metrics table (for time estimates)
+            CREATE TABLE IF NOT EXISTS processing_metrics (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                total_qa_pairs INT NOT NULL,
+                total_processing_time_seconds FLOAT NOT NULL,
+                avg_time_per_qa FLOAT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_processing_metrics_created_at ON processing_metrics(created_at DESC);
         """)
         
         logger.info("Persistent database tables initialized")

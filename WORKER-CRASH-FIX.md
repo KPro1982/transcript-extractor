@@ -57,3 +57,10 @@ After deployment, the worker logs should show:
 - `backend/services/ai_providers/base_provider.py` - Uses `http2=True` (line 34)
 - `backend/requirements.txt` - Now includes `httpx[http2]` (line 34)
 
+
+
+
+
+
+
+

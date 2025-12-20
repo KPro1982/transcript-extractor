@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from services.db_service import db_service
+from services.db_service import db_service, persistent_db_service
 from services.cache_service import cache_service
 from workers.tasks import process_document_task
 
@@ -135,4 +135,35 @@ async def get_job_status(job_id: UUID):
     await cache_service.set_job_status(str(job_id), status_data, ttl_seconds=60)
     
     return status_data
+
+
+@router.get("/metrics/avg-time")
+async def get_avg_processing_time():
+    """Get average processing time per Q/A based on recent jobs."""
+    # Get average from last 10 processing jobs
+    result = await persistent_db_service.fetchrow(
+        """
+        SELECT AVG(avg_time_per_qa) as avg_time
+        FROM (
+            SELECT avg_time_per_qa
+            FROM processing_metrics
+            ORDER BY created_at DESC
+            LIMIT 10
+        ) recent_jobs
+        """
+    )
+    
+    avg_time = result['avg_time'] if result and result['avg_time'] else 0.5  # Default 0.5s per Q/A
+    
+    return {
+        "avg_time_per_qa_seconds": float(avg_time),
+        "based_on_recent_jobs": 10
+    }
+
+
+
+
+
+
+
 

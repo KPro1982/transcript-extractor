@@ -23,3 +23,8 @@ Write-Host "2. Run: python test-railway-upload.py" -ForegroundColor Gray
 Write-Host "3. Or manually upload PDF at: https://frontend-production-e051f.up.railway.app" -ForegroundColor Gray
 Write-Host "========================================" -ForegroundColor Green
 
+
+
+
+
+

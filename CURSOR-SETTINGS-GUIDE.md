@@ -125,3 +125,10 @@ Check Cursor's usage dashboard (if available in your plan) to track:
 
 Adjust settings based on actual usage patterns.
 
+
+
+
+
+
+
+

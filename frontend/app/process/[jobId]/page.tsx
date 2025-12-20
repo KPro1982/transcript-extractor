@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { useJobProgress } from '@/hooks/useWebSocket'
+import { api } from '@/lib/api'
 
 export default function ProcessPage() {
   const router = useRouter()
@@ -12,6 +13,37 @@ export default function ProcessPage() {
   const jobId = params?.jobId as string
 
   const { progress, isConnected, error } = useJobProgress(jobId)
+  const [avgTimePerQA, setAvgTimePerQA] = useState(0.5) // Default 0.5s
+  const [estimatedCompletion, setEstimatedCompletion] = useState<string | null>(null)
+
+  // Fetch average processing time on mount
+  useEffect(() => {
+    const fetchAvgTime = async () => {
+      try {
+        const response = await api.get('/api/jobs/metrics/avg-time')
+        setAvgTimePerQA(response.data.avg_time_per_qa_seconds)
+      } catch (error) {
+        console.error('Failed to fetch avg time:', error)
+      }
+    }
+    fetchAvgTime()
+  }, [])
+
+  // Calculate estimated completion time
+  useEffect(() => {
+    if (progress.detailedProgress && avgTimePerQA > 0) {
+      const { current, total } = progress.detailedProgress
+      const remaining = total - current
+      const estimatedSeconds = remaining * avgTimePerQA
+      
+      if (estimatedSeconds > 0 && remaining > 0) {
+        const completionTime = new Date(Date.now() + estimatedSeconds * 1000)
+        setEstimatedCompletion(completionTime.toLocaleTimeString())
+      } else {
+        setEstimatedCompletion(null)
+      }
+    }
+  }, [progress.detailedProgress, avgTimePerQA])
 
   useEffect(() => {
     // Redirect to results when complete
@@ -77,6 +109,16 @@ export default function ProcessPage() {
                   <div className="text-xs text-gray-500">
                     {progress.detailedProgress.percentage.toFixed(1)}% of items complete
                   </div>
+                  
+                  {/* Estimated Completion Time */}
+                  {estimatedCompletion && progress.status !== 'completed' && (
+                    <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-400">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        Est. completion: <span className="text-accent font-mono">{estimatedCompletion}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

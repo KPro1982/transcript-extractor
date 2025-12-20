@@ -67,3 +67,10 @@ if (Test-Path railway_logs_raw.txt) {
     Write-Host "4. View logs in the 'Deployments' tab" -ForegroundColor Gray
 }
 
+
+
+
+
+
+
+

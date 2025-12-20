@@ -241,3 +241,10 @@ docker-compose exec redis redis-cli INFO stats
 
 **Your new system is ready! Start at http://localhost:3000** 🎉
 
+
+
+
+
+
+
+

@@ -90,10 +90,17 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
     Uses producer-consumer pattern to overlap PDF extraction and AI processing,
     resulting in 15-25% faster overall processing.
     """
+    import time
+    start_time = time.time()
+    
     try:
         # Initialize connections
         await cache_service.connect()
         await init_db()  # Initialize database and run migrations
+        
+        # Also initialize persistent DB for metrics
+        from services.db_service import persistent_db_service, init_persistent_db
+        await init_persistent_db()
         
         # Update job status to processing
         await db_service.execute(
@@ -292,6 +299,31 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             )
             raise Exception(error_msg)
         
+        # Check if user wants to group related Q&As
+        should_group = False
+        if user_id:
+            try:
+                user_settings = await persistent_db_service.fetchrow(
+                    "SELECT preset_options FROM user_prompt_settings WHERE user_id = $1",
+                    user_id
+                )
+                if user_settings and user_settings['preset_options']:
+                    should_group = user_settings['preset_options'].get('group_related', False)
+                    logger.info(f"Group related Q&As: {should_group}")
+            except Exception as e:
+                logger.warning(f"Failed to check group_related setting: {e}")
+        
+        # Group related Q&As if enabled (only for final Q&As)
+        if should_group:
+            from workers.qa_grouping import group_related_qas
+            final_qas = [item for item in summarized_items if item.get('is_final', True)]
+            grouped_qas = group_related_qas(final_qas, should_group=True)
+            
+            # Replace final Q&As with grouped versions, keep interim items
+            interim_qas = [item for item in summarized_items if not item.get('is_final', True)]
+            summarized_items = grouped_qas + interim_qas
+            logger.info(f"After grouping: {len(final_qas)} → {len(grouped_qas)} final Q&As")
+        
         await send_job_update(job_id, "processing", 90, message="Saving results to database...")
         
         # Separate final Q/As from interim/variables
@@ -387,6 +419,23 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             saved_interim_count += 1
         
         logger.info(f"Saved {saved_final_count} final Q/A pairs and {saved_interim_count} interim items")
+        
+        # Save processing metrics to persistent database
+        end_time = time.time()
+        total_processing_time = end_time - start_time
+        avg_time_per_qa = total_processing_time / final_count if final_count > 0 else 0
+        
+        logger.info(f"Processing metrics: {final_count} Q/As in {total_processing_time:.2f}s (avg {avg_time_per_qa:.2f}s per Q/A)")
+        
+        await persistent_db_service.execute(
+            """
+            INSERT INTO processing_metrics (total_qa_pairs, total_processing_time_seconds, avg_time_per_qa)
+            VALUES ($1, $2, $3)
+            """,
+            final_count,
+            total_processing_time,
+            avg_time_per_qa
+        )
         
         await send_job_update(job_id, "processing", 95, message="Finalizing...")
         
