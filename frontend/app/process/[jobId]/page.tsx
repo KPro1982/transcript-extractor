@@ -54,6 +54,8 @@ export default function ProcessPage() {
     }
 
     const updateCountdown = () => {
+      if (!progress.detailedProgress) return
+      
       const { current, total } = progress.detailedProgress
       const remaining = total - current
       const estimatedSeconds = remaining * avgTimePerPage
