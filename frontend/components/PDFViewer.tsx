@@ -11,6 +11,7 @@ interface PDFViewerProps {
   totalPages: number
   highlightStartLine: number
   highlightEndLine: number
+  endPage?: number            // End page for cross-page Q/A
   onPageChange?: (page: number) => void
 }
 
@@ -32,19 +33,27 @@ export default function PDFViewer({
   totalPages,
   highlightStartLine,
   highlightEndLine,
+  endPage,
   onPageChange
 }: PDFViewerProps) {
+  // Check if this is a cross-page Q/A
+  const isCrossPage = endPage && endPage > pageNumber
+  const secondPageNumber = isCrossPage ? pageNumber + 1 : null
   // Use displayPageNumber for header if provided, otherwise use pageNumber
   const shownPageNumber = displayPageNumber ?? pageNumber
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageUrl2, setImageUrl2] = useState<string | null>(null) // Second page for cross-page Q/A
   const [displayDimensions, setDisplayDimensions] = useState({ width: 0, height: 0 })
+  const [displayDimensions2, setDisplayDimensions2] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+  const imageRef2 = useRef<HTMLImageElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
+  const highlightRef2 = useRef<HTMLDivElement>(null)
 
-  // Load the PDF page image
+  // Load the PDF page image(s)
   useEffect(() => {
     if (!documentId || pageNumber < 1) return
 
@@ -53,10 +62,17 @@ export default function PDFViewer({
 
     const url = getPDFPageUrl(documentId, pageNumber)
     setImageUrl(url)
-  }, [documentId, pageNumber])
+    
+    // Load second page for cross-page Q/A
+    if (secondPageNumber && secondPageNumber <= totalPages) {
+      const url2 = getPDFPageUrl(documentId, secondPageNumber)
+      setImageUrl2(url2)
+    } else {
+      setImageUrl2(null)
+    }
+  }, [documentId, pageNumber, secondPageNumber, totalPages])
 
   const handleImageLoad = useCallback(() => {
-    setLoading(false)
     // Use displayed dimensions, not natural dimensions
     if (imageRef.current) {
       const rect = imageRef.current.getBoundingClientRect()
@@ -65,6 +81,21 @@ export default function PDFViewer({
         height: rect.height
       })
     }
+    // Only set loading to false when all required images are loaded
+    if (!isCrossPage || (isCrossPage && imageRef2.current)) {
+      setLoading(false)
+    }
+  }, [isCrossPage])
+  
+  const handleImageLoad2 = useCallback(() => {
+    if (imageRef2.current) {
+      const rect = imageRef2.current.getBoundingClientRect()
+      setDisplayDimensions2({
+        width: rect.width,
+        height: rect.height
+      })
+    }
+    setLoading(false)
   }, [])
 
   const handleImageError = useCallback(() => {
@@ -86,9 +117,12 @@ export default function PDFViewer({
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions.height * topMarginPercent
 
-    // Adjust highlighting to move up by 1 line to fix offset issue
-    const startY = topMargin + (highlightStartLine - 2) * lineHeight
-    const endY = topMargin + (highlightEndLine - 1) * lineHeight
+    // Adjust highlighting down by 0.5 lines from original position
+    const startY = topMargin + (highlightStartLine - 0.5) * lineHeight
+    
+    // For cross-page Q/A, highlight to end of first page
+    const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
+    const endY = topMargin + (endLine + 0.5) * lineHeight
 
     return {
       position: 'absolute' as const,
@@ -103,7 +137,38 @@ export default function PDFViewer({
       transition: 'all 0.3s ease-out',
       zIndex: 10
     }
-  }, [displayDimensions.height, highlightStartLine, highlightEndLine])
+  }, [displayDimensions.height, highlightStartLine, highlightEndLine, isCrossPage])
+  
+  // Calculate highlight for second page (cross-page Q/A continuation)
+  const calculateHighlightStyle2 = useCallback(() => {
+    if (!isCrossPage || !displayDimensions2.height) {
+      return { display: 'none' as const }
+    }
+
+    const topMarginPercent = 0.12
+    const bottomMarginPercent = 0.08
+    const contentHeight = displayDimensions2.height * (1 - topMarginPercent - bottomMarginPercent)
+    const lineHeight = contentHeight / LINES_PER_PAGE
+    const topMargin = displayDimensions2.height * topMarginPercent
+
+    // Start from line 1 on second page, continue to highlightEndLine
+    const startY = topMargin + (1 - 0.5) * lineHeight
+    const endY = topMargin + (highlightEndLine + 0.5) * lineHeight
+
+    return {
+      position: 'absolute' as const,
+      left: 0,
+      top: startY,
+      height: Math.max(endY - startY, lineHeight),
+      width: '100%',
+      backgroundColor: 'rgba(201, 166, 107, 0.2)',
+      borderLeft: '4px solid #c9a66b',
+      borderRadius: '0 4px 4px 0',
+      boxShadow: '0 0 20px rgba(201, 166, 107, 0.6), 0 0 40px rgba(201, 166, 107, 0.3)',
+      transition: 'all 0.3s ease-out',
+      zIndex: 10
+    }
+  }, [displayDimensions2.height, highlightEndLine, isCrossPage])
 
   // Scroll to highlight when it changes or image loads
   useEffect(() => {
@@ -164,6 +229,7 @@ export default function PDFViewer({
   }, [pageNumber, totalPages, onPageChange])
 
   const highlightStyle = calculateHighlightStyle()
+  const highlightStyle2 = calculateHighlightStyle2()
 
   return (
     <div className="flex flex-col h-full bg-bg-elevated rounded-xl overflow-hidden">
@@ -214,32 +280,63 @@ export default function PDFViewer({
         )}
 
         {imageUrl && (
-          <div className="relative">
-            {/* Line Highlight Indicator - Thick gold bar */}
-            {highlightStyle.display !== 'none' && (
-              <div 
-                ref={highlightRef}
-                style={highlightStyle} 
+          <div className="space-y-0">
+            {/* First Page */}
+            <div className="relative">
+              {/* Line Highlight Indicator - Thick gold bar */}
+              {highlightStyle.display !== 'none' && (
+                <div 
+                  ref={highlightRef}
+                  style={highlightStyle} 
+                />
+              )}
+              
+              {/* PDF Page Image */}
+              <img
+                ref={imageRef}
+                src={imageUrl}
+                alt={`Page ${pageNumber}`}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                draggable={false}
               />
-            )}
+            </div>
             
-            {/* PDF Page Image */}
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt={`Page ${pageNumber}`}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-              draggable={false}
-            />
+            {/* Second Page (for cross-page Q/A) */}
+            {isCrossPage && imageUrl2 && (
+              <div className="relative">
+                {/* Line Highlight Indicator for second page */}
+                {highlightStyle2.display !== 'none' && (
+                  <div 
+                    ref={highlightRef2}
+                    style={highlightStyle2} 
+                  />
+                )}
+                
+                {/* Second PDF Page Image */}
+                <img
+                  ref={imageRef2}
+                  src={imageUrl2}
+                  alt={`Page ${secondPageNumber}`}
+                  onLoad={handleImageLoad2}
+                  onError={handleImageError}
+                  className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                  draggable={false}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Line Number Indicator Footer */}
       <div className="px-4 py-2 bg-bg-card border-t border-gray-800 text-xs text-gray-500 text-center">
-        Lines {highlightStartLine}-{highlightEndLine}
+        {isCrossPage ? (
+          <>Lines {highlightStartLine} (Page {shownPageNumber}) - {highlightEndLine} (Page {shownPageNumber + 1})</>
+        ) : (
+          <>Lines {highlightStartLine}-{highlightEndLine}</>
+        )}
       </div>
     </div>
   )

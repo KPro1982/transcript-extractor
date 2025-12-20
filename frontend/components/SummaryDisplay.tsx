@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, MessageSquare, Brain, Edit2, Save, X } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageSquare, BrainCircuit, Edit2, Save, X } from 'lucide-react'
 import LearningFeedbackModal from './LearningFeedbackModal'
 import { api } from '@/lib/api'
 
@@ -226,7 +226,7 @@ export default function SummaryDisplay({
                         className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group"
                         title="Provide learning feedback"
                       >
-                        <Brain className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+                        <BrainCircuit className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
                       </button>
                     </div>
                   </div>

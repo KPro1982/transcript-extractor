@@ -54,10 +54,13 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [promptPreview, setPromptPreview] = useState<string>('')
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       fetchSettings()
+      fetchPromptPreview()
     }
   }, [isOpen])
 
@@ -75,11 +78,22 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
       setLoading(false)
     }
   }
+  
+  const fetchPromptPreview = async () => {
+    try {
+      const response = await api.get('/api/user-settings/prompt-preview')
+      setPromptPreview(response.data.system_prompt || '')
+    } catch (error) {
+      console.error('Failed to fetch prompt preview:', error)
+    }
+  }
 
   const handleSave = async () => {
     try {
       setSaving(true)
       await api.put('/api/user-settings/prompts', settings)
+      // Refresh prompt preview after save
+      await fetchPromptPreview()
       onClose()
     } catch (error) {
       console.error('Failed to save settings:', error)
@@ -97,6 +111,8 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
         [key]: !settings.preset_options[key]
       }
     })
+    // Refresh preview when settings change
+    setTimeout(fetchPromptPreview, 100)
   }
 
   if (!isOpen) return null
@@ -187,13 +203,37 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               </p>
               <textarea
                 value={settings.custom_instructions}
-                onChange={(e) =>
+                onChange={(e) => {
                   setSettings({ ...settings, custom_instructions: e.target.value })
-                }
+                  setTimeout(fetchPromptPreview, 100)
+                }}
                 placeholder="e.g., Always include timestamps, emphasize financial details, use formal language..."
                 className="w-full px-4 py-3 bg-bg-elevated border border-gray-700 rounded-xl resize-none focus:outline-none focus:border-accent"
                 rows={6}
               />
+            </div>
+            
+            {/* Prompt Preview Section */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold">Actual AI Prompt Being Used</h3>
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="text-sm text-accent hover:underline"
+                >
+                  {showPreview ? 'Hide' : 'Show'} Prompt
+                </button>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                This is the actual system prompt sent to the AI, with your settings applied
+              </p>
+              {showPreview && promptPreview && (
+                <div className="bg-bg-elevated border border-gray-700 rounded-xl p-4 max-h-96 overflow-y-auto">
+                  <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
+                    {promptPreview}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
         )}

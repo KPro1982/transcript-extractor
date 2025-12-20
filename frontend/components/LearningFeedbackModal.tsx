@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Send, Loader2, Brain } from 'lucide-react'
+import { X, Send, Loader2, BrainCircuit } from 'lucide-react'
 import { api } from '@/lib/api'
 
 interface LearningFeedbackModalProps {
@@ -72,7 +72,7 @@ export default function LearningFeedbackModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <Brain className="w-5 h-5 text-purple-400" />
+              <BrainCircuit className="w-5 h-5 text-purple-400" />
             </div>
             <div>
               <h2 className="text-xl font-semibold">Learning Feedback</h2>
@@ -92,7 +92,7 @@ export default function LearningFeedbackModal({
           <div className="flex-1 flex items-center justify-center p-12">
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Brain className="w-8 h-8 text-green-400" />
+                <BrainCircuit className="w-8 h-8 text-green-400" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Thank you!</h3>
               <p className="text-gray-400">

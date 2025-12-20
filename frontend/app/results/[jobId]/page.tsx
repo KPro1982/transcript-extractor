@@ -58,6 +58,7 @@ export default function ResultsPage() {
   const currentPageNumber = currentItem?.page_number || 1
   const highlightStartLine = currentItem?.line_number || 1
   const highlightEndLine = currentItem?.end_line || highlightStartLine
+  const endPage = currentItem?.end_page || currentPageNumber
 
   // Fetch results on mount
   useEffect(() => {
@@ -229,6 +230,7 @@ export default function ResultsPage() {
               totalPages={totalPages}
               highlightStartLine={highlightStartLine}
               highlightEndLine={highlightEndLine}
+              endPage={endPage}
               onPageChange={handlePageChange}
             />
           )}
