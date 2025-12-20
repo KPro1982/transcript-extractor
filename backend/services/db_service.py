@@ -376,6 +376,25 @@ async def init_persistent_db():
             );
             
             CREATE INDEX IF NOT EXISTS idx_processing_metrics_created_at ON processing_metrics(created_at DESC);
+            
+            -- Migration: Rename old columns to new schema if they exist
+            DO $$ 
+            BEGIN
+                -- Check if old column exists and rename
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'processing_metrics' AND column_name = 'total_qa_pairs'
+                ) THEN
+                    ALTER TABLE processing_metrics RENAME COLUMN total_qa_pairs TO total_pages;
+                END IF;
+                
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'processing_metrics' AND column_name = 'avg_time_per_qa'
+                ) THEN
+                    ALTER TABLE processing_metrics RENAME COLUMN avg_time_per_qa TO avg_time_per_page;
+                END IF;
+            END $$;
         """)
         
         logger.info("Persistent database tables initialized")
