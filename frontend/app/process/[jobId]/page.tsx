@@ -13,15 +13,16 @@ export default function ProcessPage() {
   const jobId = params?.jobId as string
 
   const { progress, isConnected, error } = useJobProgress(jobId)
-  const [avgTimePerQA, setAvgTimePerQA] = useState(0.5) // Default 0.5s
+  const [avgTimePerPage, setAvgTimePerPage] = useState(1.5) // Default 1.5s per page
   const [estimatedCompletion, setEstimatedCompletion] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState<string>('')
 
   // Fetch average processing time on mount
   useEffect(() => {
     const fetchAvgTime = async () => {
       try {
         const response = await api.get('/api/jobs/metrics/avg-time')
-        setAvgTimePerQA(response.data.avg_time_per_qa_seconds)
+        setAvgTimePerPage(response.data.avg_time_per_page_seconds || 1.5)
       } catch (error) {
         console.error('Failed to fetch avg time:', error)
       }
@@ -29,12 +30,12 @@ export default function ProcessPage() {
     fetchAvgTime()
   }, [])
 
-  // Calculate estimated completion time
+  // Calculate estimated completion time and countdown
   useEffect(() => {
-    if (progress.detailedProgress && avgTimePerQA > 0) {
+    if (progress.detailedProgress && avgTimePerPage > 0) {
       const { current, total } = progress.detailedProgress
       const remaining = total - current
-      const estimatedSeconds = remaining * avgTimePerQA
+      const estimatedSeconds = remaining * avgTimePerPage
       
       if (estimatedSeconds > 0 && remaining > 0) {
         const completionTime = new Date(Date.now() + estimatedSeconds * 1000)
@@ -43,7 +44,34 @@ export default function ProcessPage() {
         setEstimatedCompletion(null)
       }
     }
-  }, [progress.detailedProgress, avgTimePerQA])
+  }, [progress.detailedProgress, avgTimePerPage])
+
+  // Update countdown every second
+  useEffect(() => {
+    if (!progress.detailedProgress || progress.status === 'completed') {
+      setCountdown('')
+      return
+    }
+
+    const updateCountdown = () => {
+      const { current, total } = progress.detailedProgress
+      const remaining = total - current
+      const estimatedSeconds = remaining * avgTimePerPage
+      
+      if (estimatedSeconds > 0 && remaining > 0) {
+        const minutes = Math.floor(estimatedSeconds / 60)
+        const seconds = Math.floor(estimatedSeconds % 60)
+        setCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+      } else {
+        setCountdown('')
+      }
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    
+    return () => clearInterval(interval)
+  }, [progress.detailedProgress, avgTimePerPage, progress.status])
 
   useEffect(() => {
     // Redirect to results when complete
@@ -112,11 +140,19 @@ export default function ProcessPage() {
                   
                   {/* Estimated Completion Time */}
                   {estimatedCompletion && progress.status !== 'completed' && (
-                    <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-400">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        Est. completion: <span className="text-accent font-mono">{estimatedCompletion}</span>
-                      </span>
+                    <div className="mt-3 flex items-center justify-center gap-3 text-sm">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          Est. completion: <span className="text-accent font-mono">{estimatedCompletion}</span>
+                        </span>
+                      </div>
+                      {countdown && (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <span>•</span>
+                          <span className="font-mono text-accent">{countdown}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

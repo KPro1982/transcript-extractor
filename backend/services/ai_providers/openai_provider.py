@@ -297,7 +297,7 @@ CRITICAL REQUIREMENTS - READ CAREFULLY:
 3. The "results" array MUST contain EXACTLY {num_items} objects - NO MORE, NO LESS
 4. DO NOT skip any numbered items
 5. DO NOT combine multiple Q&A into one summary
-6. Each object must have: {{"summary": "...", "topic": "..."}}
+6. Each object must have: {{"summary": "...", "topic": "...", "event_date": "..."}}
 
 Summary rules:
 - Transform each Q&A into a narrative statement (DO NOT repeat the question)
@@ -305,20 +305,30 @@ Summary rules:
 - Be concise: 1-2 sentences per summary
 - Each summary must be unique and specific to its Q&A pair{additional_instructions}
 
+DATE EXTRACTION (CRITICAL):
+- Extract ANY dates, time periods, or date ranges mentioned in the Q&A
+- Format flexibly based on specificity:
+  * Full date: "2022-08-15" (YYYY-MM-DD)
+  * Month only: "2022-08" (YYYY-MM)
+  * Year only: "2022" (YYYY)
+  * Approximate: "2022 mid-year", "early 2023", "late 2020"
+- Examples: "from 2020 to 2022" → "2020-2022", "August 2022" → "2022-08", "beginning of employment" → extract the employment start date if mentioned
+- If NO date mentioned, use null
+
 Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
 
 EXAMPLE JSON for 2 inputs:
 Input:
 1. Q: Where did you work?
-A: ABC Corp.
+A: ABC Corp from 2020 to 2022.
 
 2. Q: When did you start?
-A: January 2020.
+A: January 15, 2020.
 
 Example JSON Output (MUST have exactly 2 items):
 {{"results": [
-  {{"summary": "The witness testified they worked at ABC Corp.", "topic": "Employment History"}},
-  {{"summary": "The witness stated they started in January 2020.", "topic": "Employment History"}}
+  {{"summary": "The witness testified they worked at ABC Corp from 2020 to 2022.", "topic": "Employment History", "event_date": "2020-2022"}},
+  {{"summary": "The witness stated they started on January 15, 2020.", "topic": "Employment History", "event_date": "2020-01-15"}}
 ]}}
 
 IMPORTANT: Return your response in JSON format with a "results" array.
@@ -412,15 +422,16 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                         self.logger.warning(f"Result {i} has empty summary: {r}")
                     normalized.append({
                         "summary": summary_text,
-                        "topic": r.get("topic", "Other")
+                        "topic": r.get("topic", "Other"),
+                        "event_date": r.get("event_date", None)  # Extract date if provided
                     })
                 elif isinstance(r, str):
                     if not r.strip():
                         self.logger.warning(f"Result {i} is empty string")
-                    normalized.append({"summary": r, "topic": "Other"})
+                    normalized.append({"summary": r, "topic": "Other", "event_date": None})
                 else:
                     self.logger.warning(f"Result {i} has unexpected type {type(r)}: {r}")
-                    normalized.append({"summary": "", "topic": "Other"})
+                    normalized.append({"summary": "", "topic": "Other", "event_date": None})
             
             if len(normalized) == num_items:
                 # Check if any summaries are empty
@@ -457,14 +468,14 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                             part = part.strip()
                             if part:
                                 normalized.append({"summary": part, "topic": "Other"})
-                        # If we got the right number, use it
-                        if len(normalized) == num_items:
-                            self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")
-                            return normalized
-                    
-                    # If splitting failed, return empty for all but log error
-                    self.logger.error(f"❌ Could not split combined summary. Returning empty summaries.")
-                    return [{"summary": "", "topic": "Other"} for _ in qa_items]
+                    # If we got the right number, use it
+                    if len(normalized) == num_items:
+                        self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")
+                        return normalized
+                
+                # If splitting failed, return empty for all but log error
+                self.logger.error(f"❌ Could not split combined summary. Returning empty summaries.")
+                return [{"summary": "", "topic": "Other", "event_date": None} for _ in qa_items]
                 
                 if len(normalized) < num_items:
                     # OpenAI returned fewer results
@@ -491,10 +502,10 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                                     self.logger.info(f"✅ Retried item {idx+1}/{num_items} successfully")
                                 else:
                                     self.logger.error(f"❌ Retry failed for item {idx+1}, using empty summary")
-                                    normalized.append({"summary": "", "topic": "Other"})
+                                    normalized.append({"summary": "", "topic": "Other", "event_date": None})
                             except Exception as e:
                                 self.logger.error(f"❌ Error retrying item {idx+1}: {e}")
-                                normalized.append({"summary": "", "topic": "Other"})
+                                normalized.append({"summary": "", "topic": "Other", "event_date": None})
                         
                         if len(normalized) == num_items:
                             valid_count = sum(1 for n in normalized if n["summary"].strip())
@@ -504,7 +515,7 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                         # Already in retry mode - just pad with empty to avoid infinite recursion
                         self.logger.error(f"❌ In retry mode: OpenAI returned only {len(normalized)} results for {num_items} items. Padding {missing} with empty.")
                         while len(normalized) < num_items:
-                            normalized.append({"summary": "", "topic": "Other"})
+                            normalized.append({"summary": "", "topic": "Other", "event_date": None})
                         return normalized
                 else:
                     # Truncate to expected count
@@ -517,7 +528,7 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
             else:
                 # No results at all - return empty but log error
                 self.logger.error(f"❌ OpenAI returned no parseable results for {num_items} items")
-                return [{"summary": "", "topic": "Other"} for _ in qa_items]
+                return [{"summary": "", "topic": "Other", "event_date": None} for _ in qa_items]
             
         except RateLimitError:
             raise

@@ -307,7 +307,7 @@ export default function SummaryDisplay({
                       >
                         <Edit2 className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
                       </button>
-                      {/* Brain/Learning Icon Button - Using User icon with brain styling */}
+                      {/* AI Learning Icon Button */}
                       <button
                         onClick={() => setFeedbackModalOpen(true)}
                         className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group relative"
@@ -322,16 +322,28 @@ export default function SummaryDisplay({
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
-                          {/* Head profile */}
-                          <path d="M12 2C9.5 2 7 3.5 6 6C5.5 7 5 8.5 5 10C5 12 5.5 14 7 15.5C8 16.5 9 17 10 17.5C10.5 17.7 11 18 11 18.5V20C11 21 12 22 13 22C14 22 15 21 15 20V18.5C15 18 15.5 17.7 16 17.5C17 17 18 16.5 19 15.5C20.5 14 21 12 21 10C21 8.5 20.5 7 20 6C19 3.5 16.5 2 14 2" />
-                          {/* Brain circuit lines */}
-                          <path d="M9 8H11" opacity="0.6" />
-                          <path d="M13 8H15" opacity="0.6" />
-                          <path d="M10 11H14" opacity="0.6" />
-                          <path d="M9 14H15" opacity="0.6" />
-                          <circle cx="9.5" cy="8" r="0.5" fill="currentColor" />
-                          <circle cx="14.5" cy="8" r="0.5" fill="currentColor" />
-                          <circle cx="12" cy="11" r="0.5" fill="currentColor" />
+                          {/* Left brain side (organic) */}
+                          <path d="M4 12c0-4 2-7 5-8 1.5-.5 3-.5 3-.5M12 3.5C12 3.5 13.5 3 15 3.5c3 1 5 4 5 8 0 4-2 7-5 8-1.5.5-3 .5-3 .5M12 20.5C12 20.5 10.5 21 9 20.5c-3-1-5-4-5-8" />
+                          
+                          {/* Center divider */}
+                          <line x1="12" y1="3.5" x2="12" y2="20.5" strokeDasharray="2 2" opacity="0.3" />
+                          
+                          {/* Right AI side (circuit/chip) */}
+                          <rect x="13.5" y="8" width="2" height="2" rx="0.5" fill="currentColor" />
+                          <rect x="16.5" y="8" width="2" height="2" rx="0.5" fill="currentColor" />
+                          <rect x="13.5" y="11.5" width="2" height="2" rx="0.5" fill="currentColor" />
+                          <rect x="16.5" y="11.5" width="2" height="2" rx="0.5" fill="currentColor" />
+                          <rect x="13.5" y="14" width="2" height="2" rx="0.5" fill="currentColor" />
+                          <rect x="16.5" y="14" width="2" height="2" rx="0.5" fill="currentColor" />
+                          
+                          {/* Connection lines */}
+                          <line x1="14.5" y1="10" x2="14.5" y2="11.5" opacity="0.5" />
+                          <line x1="17.5" y1="10" x2="17.5" y2="11.5" opacity="0.5" />
+                          <line x1="14.5" y1="13.5" x2="14.5" y2="14" opacity="0.5" />
+                          <line x1="17.5" y1="13.5" x2="17.5" y2="14" opacity="0.5" />
+                          <line x1="15.5" y1="9" x2="16.5" y2="9" opacity="0.5" />
+                          <line x1="15.5" y1="12.5" x2="16.5" y2="12.5" opacity="0.5" />
+                          <line x1="15.5" y1="15" x2="16.5" y2="15" opacity="0.5" />
                         </svg>
                       </button>
                     </div>

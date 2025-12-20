@@ -139,13 +139,13 @@ async def get_job_status(job_id: UUID):
 
 @router.get("/metrics/avg-time")
 async def get_avg_processing_time():
-    """Get average processing time per Q/A based on recent jobs."""
+    """Get average processing time per page based on recent jobs."""
     # Get average from last 10 processing jobs
     result = await persistent_db_service.fetchrow(
         """
-        SELECT AVG(avg_time_per_qa) as avg_time
+        SELECT AVG(avg_time_per_page) as avg_time
         FROM (
-            SELECT avg_time_per_qa
+            SELECT avg_time_per_page
             FROM processing_metrics
             ORDER BY created_at DESC
             LIMIT 10
@@ -153,10 +153,10 @@ async def get_avg_processing_time():
         """
     )
     
-    avg_time = result['avg_time'] if result and result['avg_time'] else 0.5  # Default 0.5s per Q/A
+    avg_time = result['avg_time'] if result and result['avg_time'] else 1.5  # Default 1.5s per page
     
     return {
-        "avg_time_per_qa_seconds": float(avg_time),
+        "avg_time_per_page_seconds": float(avg_time),
         "based_on_recent_jobs": 10
     }
 

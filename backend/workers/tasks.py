@@ -420,21 +420,24 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         
         logger.info(f"Saved {saved_final_count} final Q/A pairs and {saved_interim_count} interim items")
         
-        # Save processing metrics to persistent database
+        # Count only final Q/As for result reporting
+        final_count = len(final_qa_items)
+        
+        # Save processing metrics to persistent database (time per page, not per Q/A)
         end_time = time.time()
         total_processing_time = end_time - start_time
-        avg_time_per_qa = total_processing_time / final_count if final_count > 0 else 0
+        avg_time_per_page = total_processing_time / total_pages_extracted if total_pages_extracted > 0 else 0
         
-        logger.info(f"Processing metrics: {final_count} Q/As in {total_processing_time:.2f}s (avg {avg_time_per_qa:.2f}s per Q/A)")
+        logger.info(f"Processing metrics: {total_pages_extracted} pages in {total_processing_time:.2f}s (avg {avg_time_per_page:.2f}s per page)")
         
         await persistent_db_service.execute(
             """
-            INSERT INTO processing_metrics (total_qa_pairs, total_processing_time_seconds, avg_time_per_qa)
+            INSERT INTO processing_metrics (total_pages, total_processing_time_seconds, avg_time_per_page)
             VALUES ($1, $2, $3)
             """,
-            final_count,
+            total_pages_extracted,
             total_processing_time,
-            avg_time_per_qa
+            avg_time_per_page
         )
         
         await send_job_update(job_id, "processing", 95, message="Finalizing...")
@@ -444,9 +447,6 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             "UPDATE processing_jobs SET status = 'completed', progress = 100, completed_at = NOW() WHERE id = $1",
             job_id
         )
-        
-        # Count only final Q/As for result reporting
-        final_count = len([item for item in summarized_items if item.get('is_final', True)])
         
         result = {
             "document_id": document_id,
