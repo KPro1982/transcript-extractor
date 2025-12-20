@@ -226,7 +226,8 @@ class AIService:
     async def summarize_batch_parallel(
         self,
         qa_items: List[Dict],
-        progress_callback=None
+        progress_callback=None,
+        user_id: Optional[str] = None
     ) -> List[Dict]:
         """
         Massively parallel batch summarization with caching and deduplication.
@@ -237,9 +238,28 @@ class AIService:
         - Bulk cache lookups (O(1) instead of O(n) Redis calls)
         - Token-aware batching (prevents rate limits)
         - Massive parallelization (50+ concurrent requests)
+        - User prompt settings integration
         """
         import time
         start_time = time.time()
+        
+        # Fetch user prompt settings if user_id provided
+        user_prompt_settings = None
+        if user_id:
+            try:
+                from services.db_service import persistent_db_service
+                settings_row = await persistent_db_service.fetchrow(
+                    "SELECT preset_options, custom_instructions FROM user_prompt_settings WHERE user_id = $1",
+                    user_id
+                )
+                if settings_row:
+                    user_prompt_settings = {
+                        "preset_options": settings_row['preset_options'] or {},
+                        "custom_instructions": settings_row['custom_instructions']
+                    }
+                    logger.info(f"Loaded prompt settings for user {user_id}: {len(user_prompt_settings.get('preset_options', {}))} presets, custom={bool(user_prompt_settings.get('custom_instructions'))}")
+            except Exception as e:
+                logger.warning(f"Failed to load user prompt settings: {e}")
         
         if not qa_items:
             return []
@@ -378,7 +398,10 @@ class AIService:
             
             try:
                 # Try primary provider first
-                batch_results = await primary_provider.summarize_and_classify_batch(batch)
+                batch_results = await primary_provider.summarize_and_classify_batch(
+                    batch,
+                    user_prompt_settings=user_prompt_settings
+                )
                 
                 # Cache all results in bulk
                 cache_data = [

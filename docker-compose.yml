@@ -1,18 +1,36 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database - Ephemeral (for transcripts/documents)
   db:
     image: postgres:15-alpine
-    container_name: depodigest-db
+    container_name: depodigest-db-ephemeral
     environment:
-      POSTGRES_DB: depodigest
+      POSTGRES_DB: depodigest_ephemeral
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_ephemeral_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database - Persistent (for users/auth/feedback)
+  db_persistent:
+    image: postgres:15-alpine
+    container_name: depodigest-db-persistent
+    environment:
+      POSTGRES_DB: depodigest_persistent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_persistent_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -42,14 +60,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/depodigest
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/depodigest_ephemeral
+      - PERSISTENT_DATABASE_URL=postgresql://postgres:postgres@db_persistent:5432/depodigest_persistent
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - FRONTEND_URL=http://localhost:3000
       - LOG_LEVEL=INFO
     depends_on:
       db:
+        condition: service_healthy
+      db_persistent:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -65,13 +90,18 @@ services:
       dockerfile: Dockerfile
     container_name: depodigest-worker
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/depodigest
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/depodigest_ephemeral
+      - PERSISTENT_DATABASE_URL=postgresql://postgres:postgres@db_persistent:5432/depodigest_persistent
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - WORKERS_COUNT=4
     depends_on:
       - db
+      - db_persistent
       - redis
     volumes:
       - ./backend:/app
@@ -100,11 +130,19 @@ services:
     command: npm run dev
 
 volumes:
-  postgres_data:
+  postgres_ephemeral_data:
+  postgres_persistent_data:
   redis_data:
   upload_temp:
 
 networks:
   default:
     name: depodigest-network
+
+
+
+
+
+
+
 

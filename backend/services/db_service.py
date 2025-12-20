@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseService:
-    """PostgreSQL database connection manager."""
+    """PostgreSQL database connection manager (Ephemeral - for transcripts)."""
     
     def __init__(self):
         self.pool: Optional[Pool] = None
@@ -23,13 +23,13 @@ class DatabaseService:
             max_size=10,
             command_timeout=60
         )
-        logger.info("Database pool initialized")
+        logger.info("Ephemeral database pool initialized")
     
     async def close_pool(self):
         """Close database connection pool."""
         if self.pool:
             await self.pool.close()
-            logger.info("Database pool closed")
+            logger.info("Ephemeral database pool closed")
     
     async def execute(self, query: str, *args):
         """Execute a query."""
@@ -52,12 +52,56 @@ class DatabaseService:
             return await conn.fetchval(query, *args)
 
 
-# Global database service
+class PersistentDatabaseService:
+    """PostgreSQL database connection manager (Persistent - for users, auth, feedback)."""
+    
+    def __init__(self):
+        self.pool: Optional[Pool] = None
+    
+    async def init_pool(self):
+        """Initialize persistent database connection pool."""
+        self.pool = await asyncpg.create_pool(
+            settings.persistent_database_url,
+            min_size=2,
+            max_size=10,
+            command_timeout=60
+        )
+        logger.info("Persistent database pool initialized")
+    
+    async def close_pool(self):
+        """Close persistent database connection pool."""
+        if self.pool:
+            await self.pool.close()
+            logger.info("Persistent database pool closed")
+    
+    async def execute(self, query: str, *args):
+        """Execute a query."""
+        async with self.pool.acquire() as conn:
+            return await conn.execute(query, *args)
+    
+    async def fetch(self, query: str, *args):
+        """Fetch multiple rows."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetch(query, *args)
+    
+    async def fetchrow(self, query: str, *args):
+        """Fetch single row."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(query, *args)
+    
+    async def fetchval(self, query: str, *args):
+        """Fetch single value."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, *args)
+
+
+# Global database services
 db_service = DatabaseService()
+persistent_db_service = PersistentDatabaseService()
 
 
 async def init_db():
-    """Initialize database connection and create tables if needed."""
+    """Initialize ephemeral database connection and create tables if needed."""
     await db_service.init_pool()
     
     # Create tables if they don't exist
@@ -80,6 +124,9 @@ async def init_db():
                 page_number INT NOT NULL,
                 line_number INT NOT NULL,
                 pdf_page_index INT,
+                answer_end_page INT,
+                answer_end_line INT,
+                is_final BOOLEAN DEFAULT TRUE,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 summary TEXT,
@@ -134,7 +181,16 @@ async def init_db():
             END $$;
             
             -- Create index on is_final AFTER column is added (migration)
-            CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
+            -- Only create index if column exists
+            DO $$ 
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'qa_items' AND column_name = 'is_final'
+                ) THEN
+                    CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
+                END IF;
+            END $$;
             
             -- Create separate table for final Q/A pairs (distinct from interim/variables)
             CREATE TABLE IF NOT EXISTS final_qa_items (
@@ -187,7 +243,121 @@ async def init_db():
             );
         """)
         
-        logger.info("Database tables initialized")
+        logger.info("Ephemeral database tables initialized")
+
+
+async def init_persistent_db():
+    """Initialize persistent database connection and create tables if needed."""
+    await persistent_db_service.init_pool()
+    
+    # Create persistent tables if they don't exist
+    async with persistent_db_service.pool.acquire() as conn:
+        await conn.execute("""
+            -- Users table (from Google OAuth)
+            CREATE TABLE IF NOT EXISTS users (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                email VARCHAR(255) UNIQUE NOT NULL,
+                google_id VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255),
+                picture VARCHAR(500),
+                is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                last_login TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+            CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+            
+            -- Sessions table (JWT refresh tokens)
+            CREATE TABLE IF NOT EXISTS sessions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                refresh_token VARCHAR(500) UNIQUE NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token);
+            
+            -- Bug reports table
+            CREATE TABLE IF NOT EXISTS bug_reports (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                type VARCHAR(50) NOT NULL, -- 'bug' or 'feature'
+                status VARCHAR(50) DEFAULT 'open', -- 'open', 'in_progress', 'resolved', 'closed'
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_bug_reports_user_id ON bug_reports(user_id);
+            CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);
+            
+            -- Chat messages table
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                bug_report_id UUID REFERENCES bug_reports(id) ON DELETE CASCADE,
+                sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                screenshot_url VARCHAR(500),
+                is_admin_message BOOLEAN DEFAULT FALSE,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_bug_report_id ON chat_messages(bug_report_id);
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_sender_id ON chat_messages(sender_id);
+            
+            -- Learning feedback table
+            CREATE TABLE IF NOT EXISTS learning_feedback (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                ai_summary TEXT NOT NULL,
+                user_summary TEXT NOT NULL,
+                notes TEXT,
+                document_filename VARCHAR(255),
+                page_citation VARCHAR(50),
+                status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'reviewed', 'applied', 'rejected'
+                reviewed_by UUID REFERENCES users(id),
+                reviewed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_learning_feedback_user_id ON learning_feedback(user_id);
+            CREATE INDEX IF NOT EXISTS idx_learning_feedback_status ON learning_feedback(status);
+            
+            -- User prompt settings table
+            CREATE TABLE IF NOT EXISTS user_prompt_settings (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+                preset_options JSONB DEFAULT '{}',
+                custom_instructions TEXT,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_user_prompt_settings_user_id ON user_prompt_settings(user_id);
+            
+            -- Notifications table
+            CREATE TABLE IF NOT EXISTS notifications (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                type VARCHAR(50) NOT NULL, -- 'bug_report', 'chat_message', 'learning_feedback'
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                link VARCHAR(500),
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+            CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(user_id, read_at);
+        """)
+        
+        logger.info("Persistent database tables initialized")
+
 
 
 

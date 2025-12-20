@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { DM_Sans, DM_Serif_Display, JetBrains_Mono } from 'next/font/google'
 import { Providers } from './providers'
+import BugReportButton from '@/components/BugReportButton'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' })
 const dmSerif = DM_Serif_Display({ weight: ['400'], subsets: ['latin'], variable: '--font-serif' })
@@ -20,9 +21,19 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable} ${jetbrainsMono.variable}`}>
       <body className="bg-bg-base text-gray-100 font-sans">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <BugReportButton />
+        </Providers>
       </body>
     </html>
   )
 }
+
+
+
+
+
+
+
 

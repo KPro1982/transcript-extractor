@@ -1,6 +1,8 @@
 'use client'
 
-import { ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronUp, ChevronDown, MessageSquare, Brain } from 'lucide-react'
+import LearningFeedbackModal from './LearningFeedbackModal'
 
 interface QAItem {
   id: string
@@ -50,6 +52,8 @@ export default function SummaryDisplay({
   onPrevious,
   onNext
 }: SummaryDisplayProps) {
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
+
   if (!item) {
     return (
       <div className="flex flex-col h-full bg-bg-card rounded-xl overflow-hidden">
@@ -105,9 +109,21 @@ export default function SummaryDisplay({
         {/* Summary Text - Takes up most of the space */}
         <div className="flex-1">
           {item.summary ? (
-            <p className="text-gray-100 text-xl leading-relaxed">
-              {item.summary}
-            </p>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-gray-100 text-xl leading-relaxed flex-1">
+                  {item.summary}
+                </p>
+                {/* Brain Icon Button */}
+                <button
+                  onClick={() => setFeedbackModalOpen(true)}
+                  className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group"
+                  title="Provide learning feedback"
+                >
+                  <Brain className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-gray-500">
@@ -150,6 +166,18 @@ export default function SummaryDisplay({
           </span>
         </div>
       </div>
+
+      {/* Learning Feedback Modal */}
+      <LearningFeedbackModal
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        qaData={{
+          question: item.question,
+          answer: item.answer,
+          aiSummary: item.summary || '',
+          pageCitation: citation
+        }}
+      />
     </div>
   )
 }

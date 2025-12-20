@@ -45,6 +45,11 @@ pandas==2.2.0
 # Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+authlib==1.3.0
+itsdangerous==2.1.2
+
+# Email
+sendgrid==6.11.0
 
 # Testing (optional for now)
 pytest==7.4.4

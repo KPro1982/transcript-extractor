@@ -250,7 +250,7 @@ Return a JSON array of topic strings in the EXACT same order as input."""
             self.logger.error(f"❌ OpenAI classify error: {e}")
             return ["Other"] * len(qa_items)
     
-    async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60, _retry_mode: bool = False) -> List[Dict]:
+    async def summarize_and_classify_batch(self, qa_items: List[Dict], timeout: int = 60, _retry_mode: bool = False, user_prompt_settings: Dict = None) -> List[Dict]:
         """Optimized batch processing with JSON mode.
         
         Uses OpenAI's JSON mode for guaranteed structured output.
@@ -259,8 +259,33 @@ Return a JSON array of topic strings in the EXACT same order as input."""
             qa_items: List of Q&A dictionaries
             timeout: Request timeout in seconds
             _retry_mode: Internal flag to prevent infinite recursion on retries
+            user_prompt_settings: User's custom prompt preferences
         """
         num_items = len(qa_items)
+        
+        # Build additional instructions from user settings
+        additional_instructions = ""
+        if user_prompt_settings:
+            preset_options = user_prompt_settings.get("preset_options", {})
+            custom_instructions = user_prompt_settings.get("custom_instructions")
+            
+            if preset_options:
+                additional_instructions += "\n\nUser preferences:"
+                if preset_options.get("witness_last_name"):
+                    additional_instructions += "\n- Refer to witnesses by last name only"
+                if preset_options.get("exclude_colloquy"):
+                    additional_instructions += "\n- Exclude non-substantive colloquy and attorney dialogue"
+                if preset_options.get("factual_only"):
+                    additional_instructions += "\n- Focus exclusively on factual testimony, not opinions or speculation"
+                if preset_options.get("include_objections"):
+                    additional_instructions += "\n- Include context about objections and their outcomes"
+                if preset_options.get("chronological_order"):
+                    additional_instructions += "\n- Maintain strict chronological order of events"
+                if preset_options.get("highlight_inconsistencies"):
+                    additional_instructions += "\n- Note any contradictions or changes in testimony"
+            
+            if custom_instructions:
+                additional_instructions += f"\n\nAdditional custom instructions from user:\n{custom_instructions}"
         
         system_prompt = f"""You are a legal assistant analyzing deposition testimony.
 
@@ -278,7 +303,7 @@ Summary rules:
 - Transform each Q&A into a narrative statement (DO NOT repeat the question)
 - Use third person: "The witness testified that..."
 - Be concise: 1-2 sentences per summary
-- Each summary must be unique and specific to its Q&A pair
+- Each summary must be unique and specific to its Q&A pair{additional_instructions}
 
 Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
 
@@ -455,7 +480,12 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                             try:
                                 qa = qa_items[idx]
                                 # Retry with single item (set retry_mode=True to prevent recursion)
-                                single_result = await self.summarize_and_classify_batch([qa], timeout=timeout, _retry_mode=True)
+                                single_result = await self.summarize_and_classify_batch(
+                                    [qa],
+                                    timeout=timeout,
+                                    _retry_mode=True,
+                                    user_prompt_settings=user_prompt_settings
+                                )
                                 if single_result and len(single_result) > 0 and single_result[0].get("summary"):
                                     normalized.append(single_result[0])
                                     self.logger.info(f"✅ Retried item {idx+1}/{num_items} successfully")

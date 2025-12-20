@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, Loader2 } from 'lucide-react'
+import { Upload, FileText, Loader2, Settings } from 'lucide-react'
 import { uploadDocument, startJob } from '@/lib/api'
+import UserSettingsModal from '@/components/UserSettingsModal'
 
 export default function UploadPage() {
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -49,9 +51,20 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-serif mb-2">Upload Deposition</h1>
-          <p className="text-gray-400">Select a PDF transcript to begin AI-powered summarization</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-serif mb-2">Upload Deposition</h1>
+            <p className="text-gray-400">Select a PDF transcript to begin AI-powered summarization</p>
+          </div>
+          
+          {/* Settings Gear Icon */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="p-3 bg-bg-card border border-gray-800 hover:border-accent/50 rounded-xl transition-all group"
+            title="Summary Settings"
+          >
+            <Settings className="w-6 h-6 text-gray-400 group-hover:text-accent group-hover:rotate-90 transition-all" />
+          </button>
         </div>
 
         <div className="bg-bg-card border border-gray-800 rounded-2xl p-8">
@@ -135,7 +148,20 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
+
+      {/* User Settings Modal */}
+      <UserSettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   )
 }
+
+
+
+
+
+
+
 

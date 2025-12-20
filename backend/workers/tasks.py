@@ -59,10 +59,18 @@ async def send_partial_result(job_id: str, result: dict):
 
 
 @celery_app.task(name="process_document")
-def process_document_task(job_id: str, document_id: str, first_page: int = 1, last_page: Optional[int] = None):
+def process_document_task(job_id: str, document_id: str, first_page: int = 1, last_page: Optional[int] = None, user_id: Optional[str] = None):
     """
     Process a document: extract PDF, parse Q&A, summarize with AI.
     This runs in a background worker process.
+    
+    Args:
+        job_id: UUID of the processing job
+        document_id: UUID of the document to process
+        first_page: First page to process (1-indexed)
+        last_page: Last page to process (None = all pages)
+        user_id: Optional UUID of the user for custom prompt settings
+    """
     """
     # Run async code in event loop
     loop = asyncio.new_event_loop()
@@ -244,7 +252,8 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                 try:
                     summarized_batch = await ai_service.summarize_batch_parallel(
                         final_batch,
-                        progress_callback=batch_progress_callback
+                        progress_callback=batch_progress_callback,
+                        user_id=user_id
                     )
                     
                     # Add summarized final Q/As to results

@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
-from api import health, documents, jobs, websocket, cache
+from api import health, documents, jobs, websocket, cache, auth, bug_reports, learning_feedback, user_settings
 from services.cache_service import cache_service
-from services.db_service import init_db
+from services.db_service import init_db, init_persistent_db
 
 # Configure logging
 logging.basicConfig(
@@ -25,9 +25,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting DepoDigest API server...")
     
-    # Initialize database
+    # Initialize ephemeral database (transcripts)
     await init_db()
-    logger.info("Database initialized")
+    logger.info("Ephemeral database initialized")
+    
+    # Initialize persistent database (users, auth, feedback)
+    await init_persistent_db()
+    logger.info("Persistent database initialized")
     
     # Initialize cache
     await cache_service.connect()
@@ -63,6 +67,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, tags=["health"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(bug_reports.router, prefix="/api", tags=["bug-reports"])
+app.include_router(learning_feedback.router, prefix="/api", tags=["learning-feedback"])
+app.include_router(user_settings.router, prefix="/api", tags=["user-settings"])
 app.include_router(cache.router, prefix="/api", tags=["cache"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])

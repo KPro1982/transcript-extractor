@@ -7,8 +7,11 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Database
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/depodigest"
+    # Databases
+    # Ephemeral database for transcripts (can be cleared without losing user data)
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/depodigest_ephemeral"
+    # Persistent database for users, auth, feedback, settings
+    persistent_database_url: str = "postgresql://postgres:postgres@localhost:5432/depodigest_persistent"
     
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -23,6 +26,24 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
+    
+    # Google OAuth
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    
+    # JWT Authentication
+    jwt_secret_key: str = "change-this-secret-key-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24  # 24 hours
+    jwt_refresh_token_expire_days: int = 30
+    
+    # Admin
+    admin_email: str = "danieljcravens@gmail.com"
+    
+    # Email Notifications
+    sendgrid_api_key: Optional[str] = None
+    notification_from_email: str = "notifications@depodigest.com"
     
     # Server Configuration
     api_host: str = "0.0.0.0"
