@@ -7,8 +7,45 @@ DepoDigest is an AI-powered deposition transcript summarization platform with a 
 - **Platform**: Railway (cloud deployment)
 - **Services**: Backend, Worker, Frontend, PostgreSQL (2 databases), Redis
 - **Environment**: Railway sets `PORT` dynamically for backend
-- **Auto-deploy**: Pushes to `main` branch trigger production deployment
-- **Development**: Use `dev` branch for testing before production
+- **Auto-deploy**: Railway monitors `dev` branch and auto-deploys on push
+- **Development**: Use `dev` branch for testing - commits trigger Railway rebuilds
+- **Production**: Merge `dev` → `master` for production releases
+- **IMPORTANT**: After each refactor/fix, commit to `dev` and push to trigger Railway rebuild
+
+## Development Workflow
+
+### Git Branch Strategy
+- **`dev` branch**: Active development branch - Railway monitors this for auto-deployment
+- **`master` branch**: Production branch - merge from `dev` when ready for release
+
+### After Each Refactor/Fix
+1. **Commit to `dev` branch:**
+   ```bash
+   git checkout dev
+   git add .
+   git commit -m "Description of changes"
+   git push origin dev
+   ```
+
+2. **Railway will automatically:**
+   - Detect the push to `dev` branch
+   - Trigger rebuild of all services (Backend, Worker, Frontend)
+   - Deploy the changes to Railway environment
+
+3. **Monitor deployment:**
+   - Check Railway dashboard for build status
+   - Review logs if deployment fails
+   - Test changes in Railway environment
+
+### Merging to Production
+When ready to release:
+```bash
+git checkout master
+git merge dev
+git push origin master
+```
+
+**Note**: Railway monitors `dev` branch, not `master`. Always commit fixes/refactors to `dev` first.
 
 ## Tech Stack
 ### Backend (Python)

@@ -1,5 +1,26 @@
 # Railway Deployment Guide - New Features
 
+## 🔄 Railway Branch Configuration
+
+**CRITICAL**: Railway is configured to monitor the `dev` branch, not `master`.
+
+- **Development**: Push to `dev` branch → Railway auto-rebuilds and deploys
+- **Production**: Merge `dev` → `master` for release (but Railway doesn't auto-deploy from master)
+
+**After each refactor or fix:**
+1. Commit changes to `dev` branch
+2. Push to trigger Railway rebuild
+3. Monitor Railway dashboard for deployment status
+
+```bash
+git checkout dev
+git add .
+git commit -m "Your commit message"
+git push origin dev
+```
+
+---
+
 ## 🎯 Overview
 
 Based on your current Railway setup, you need to make these changes:
