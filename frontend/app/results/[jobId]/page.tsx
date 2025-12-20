@@ -62,6 +62,9 @@ export default function ResultsPage() {
   const highlightStartLine = currentItem?.line_number || 1
   const highlightEndLine = currentItem?.end_line || highlightStartLine
   const endPage = currentItem?.end_page || currentPageNumber
+  // Calculate the PDF page index for the end page based on the offset between printed and PDF pages
+  const pageOffset = currentPdfPageIndex - currentPageNumber
+  const endPdfPageIndex = endPage + pageOffset
 
   // Fetch results on mount
   useEffect(() => {
@@ -237,6 +240,7 @@ export default function ResultsPage() {
               highlightStartLine={highlightStartLine}
               highlightEndLine={highlightEndLine}
               endPage={endPage}
+              endPdfPageIndex={endPdfPageIndex}
               onPageChange={handlePageChange}
             />
           )}

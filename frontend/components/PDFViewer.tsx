@@ -11,7 +11,8 @@ interface PDFViewerProps {
   totalPages: number
   highlightStartLine: number
   highlightEndLine: number
-  endPage?: number            // End page for cross-page Q/A
+  endPage?: number            // End page for cross-page Q/A (printed page number)
+  endPdfPageIndex?: number    // PDF page index for end page (for cross-page rendering)
   onPageChange?: (page: number) => void
 }
 
@@ -34,11 +35,16 @@ export default function PDFViewer({
   highlightStartLine,
   highlightEndLine,
   endPage,
+  endPdfPageIndex,
   onPageChange
 }: PDFViewerProps) {
   // Check if this is a cross-page Q/A
-  const isCrossPage = endPage && endPage !== pageNumber
-  const secondPageNumber = isCrossPage ? endPage : null
+  // Compare using displayPageNumber (printed page) since endPage is also a printed page number
+  // This avoids false positives when pdf_page_index differs from page_number (e.g., cover sheets)
+  const printedStartPage = displayPageNumber ?? pageNumber
+  const isCrossPage = endPage && endPage !== printedStartPage
+  // Use endPdfPageIndex for loading the second page (falls back to endPage for backward compatibility)
+  const secondPagePdfIndex = isCrossPage ? (endPdfPageIndex ?? endPage) : null
   // Use displayPageNumber for header if provided, otherwise use pageNumber
   const shownPageNumber = displayPageNumber ?? pageNumber
   const [loading, setLoading] = useState(true)
@@ -64,13 +70,13 @@ export default function PDFViewer({
     setImageUrl(url)
     
     // Load second page for cross-page Q/A
-    if (secondPageNumber && secondPageNumber <= totalPages) {
-      const url2 = getPDFPageUrl(documentId, secondPageNumber)
+    if (secondPagePdfIndex && secondPagePdfIndex <= totalPages) {
+      const url2 = getPDFPageUrl(documentId, secondPagePdfIndex)
       setImageUrl2(url2)
     } else {
       setImageUrl2(null)
     }
-  }, [documentId, pageNumber, secondPageNumber, totalPages])
+  }, [documentId, pageNumber, secondPagePdfIndex, totalPages])
 
   const handleImageLoad = useCallback(() => {
     // Use displayed dimensions, not natural dimensions
@@ -318,7 +324,7 @@ export default function PDFViewer({
                 <img
                   ref={imageRef2}
                   src={imageUrl2}
-                  alt={`Page ${secondPageNumber}`}
+                  alt={`Page ${endPage}`}
                   onLoad={handleImageLoad2}
                   onError={handleImageError}
                   className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
