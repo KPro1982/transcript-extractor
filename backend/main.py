@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
@@ -55,6 +56,12 @@ app = FastAPI(
 # CORS configuration
 cors_origins = settings.allowed_origins + [settings.frontend_url]
 logger.info(f"Configuring CORS with origins: {cors_origins}")
+
+# Add SessionMiddleware (required for OAuth)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.jwt_secret_key
+)
 
 app.add_middleware(
     CORSMiddleware,

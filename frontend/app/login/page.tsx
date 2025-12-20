@@ -28,6 +28,50 @@ function LoginContent() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     window.location.href = `${apiUrl}/api/auth/google/login`
   }
+  
+  const handleBypassAdmin = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/auth/dev/bypass-admin`)
+      const data = await response.json()
+      
+      if (data.access_token && data.refresh_token) {
+        // Store tokens
+        localStorage.setItem('access_token', data.access_token)
+        localStorage.setItem('refresh_token', data.refresh_token)
+        
+        // Redirect to home
+        router.push('/')
+      } else {
+        setError('Failed to bypass login')
+      }
+    } catch (err) {
+      console.error('Bypass admin login error:', err)
+      setError('Failed to bypass login')
+    }
+  }
+  
+  const handleBypassUser = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/auth/dev/bypass-user`)
+      const data = await response.json()
+      
+      if (data.access_token && data.refresh_token) {
+        // Store tokens
+        localStorage.setItem('access_token', data.access_token)
+        localStorage.setItem('refresh_token', data.refresh_token)
+        
+        // Redirect to home
+        router.push('/')
+      } else {
+        setError('Failed to bypass login')
+      }
+    } catch (err) {
+      console.error('Bypass user login error:', err)
+      setError('Failed to bypass login')
+    }
+  }
 
   if (loading) {
     return (
@@ -58,7 +102,7 @@ function LoginContent() {
           {/* Google Sign In Button */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full px-6 py-4 bg-white hover:bg-gray-100 text-gray-900 font-semibold rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg"
+            className="w-full px-6 py-4 bg-white hover:bg-gray-100 text-gray-900 font-semibold rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg mb-6"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -80,6 +124,28 @@ function LoginContent() {
             </svg>
             <span>Sign in with Google</span>
           </button>
+          
+          {/* Development Bypass Buttons */}
+          <div className="mt-6 pt-6 border-t border-gray-800">
+            <p className="text-xs text-gray-500 mb-3 text-center">Development Bypass</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={handleBypassAdmin}
+                className="px-4 py-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-semibold rounded-xl transition-all text-sm"
+              >
+                Admin
+              </button>
+              <button
+                onClick={handleBypassUser}
+                className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 font-semibold rounded-xl transition-all text-sm"
+              >
+                User
+              </button>
+            </div>
+            <p className="text-xs text-gray-600 mt-2 text-center">
+              Skip OAuth for testing
+            </p>
+          </div>
 
           {/* Info */}
           <p className="text-center text-sm text-gray-500 mt-6">

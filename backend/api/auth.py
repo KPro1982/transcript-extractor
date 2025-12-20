@@ -228,6 +228,187 @@ async def refresh_token(refresh_token: str):
         
         # Check if refresh token exists in database
         session = await persistent_db_service.fetchrow(
+            """
+            SELECT user_id, expires_at FROM sessions 
+            WHERE refresh_token = $1 AND expires_at > NOW()
+            """,
+            refresh_token
+        )
+        
+        if not session:
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+        
+        # Get user data
+        user_data = await persistent_db_service.fetchrow(
+            "SELECT id, email, name, picture, is_admin FROM users WHERE id = $1",
+            user_id
+        )
+        
+        if not user_data:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        user = User(
+            id=str(user_data['id']),
+            email=user_data['email'],
+            name=user_data['name'],
+            picture=user_data['picture'],
+            is_admin=user_data['is_admin']
+        )
+        
+        # Create new access token
+        new_access_token = create_access_token(data={"sub": user.id})
+        
+        return TokenResponse(
+            access_token=new_access_token,
+            refresh_token=refresh_token,  # Reuse the same refresh token
+            user=user
+        )
+    
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@router.get("/dev/bypass-admin")
+async def bypass_login_admin():
+    """
+    Development bypass: Login as admin without OAuth.
+    Creates/updates admin user and returns tokens.
+    """
+    try:
+        admin_email = settings.admin_email
+        
+        # Check if admin user exists
+        user_data = await persistent_db_service.fetchrow(
+            "SELECT id, email, name, picture, is_admin FROM users WHERE email = $1",
+            admin_email
+        )
+        
+        if not user_data:
+            # Create admin user
+            user_data = await persistent_db_service.fetchrow(
+                """
+                INSERT INTO users (email, google_id, name, is_admin, last_login)
+                VALUES ($1, $2, $3, $4, NOW())
+                RETURNING id, email, name, picture, is_admin
+                """,
+                admin_email,
+                f"dev-admin-{admin_email}",
+                "Admin User (Dev)",
+                True
+            )
+        else:
+            # Update last login
+            await persistent_db_service.execute(
+                "UPDATE users SET last_login = NOW() WHERE id = $1",
+                user_data['id']
+            )
+        
+        user = User(
+            id=str(user_data['id']),
+            email=user_data['email'],
+            name=user_data['name'] or 'Admin User',
+            picture=user_data['picture'],
+            is_admin=True
+        )
+        
+        # Create tokens
+        access_token = create_access_token(data={"sub": user.id})
+        refresh_token = create_refresh_token(data={"sub": user.id})
+        
+        # Store refresh token
+        await persistent_db_service.execute(
+            """
+            INSERT INTO sessions (user_id, refresh_token, expires_at)
+            VALUES ($1, $2, NOW() + INTERVAL '30 days')
+            """,
+            user.id,
+            refresh_token
+        )
+        
+        logger.info(f"Dev bypass login as admin: {admin_email}")
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=user
+        )
+    
+    except Exception as e:
+        logger.error(f"Dev bypass admin login failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create dev admin session: {str(e)}")
+
+
+@router.get("/dev/bypass-user")
+async def bypass_login_user():
+    """
+    Development bypass: Login as regular user without OAuth.
+    Creates/updates user and returns tokens.
+    """
+    try:
+        test_email = "user@depodigest.net"
+        
+        # Check if user exists
+        user_data = await persistent_db_service.fetchrow(
+            "SELECT id, email, name, picture, is_admin FROM users WHERE email = $1",
+            test_email
+        )
+        
+        if not user_data:
+            # Create test user
+            user_data = await persistent_db_service.fetchrow(
+                """
+                INSERT INTO users (email, google_id, name, is_admin, last_login)
+                VALUES ($1, $2, $3, $4, NOW())
+                RETURNING id, email, name, picture, is_admin
+                """,
+                test_email,
+                f"dev-user-{test_email}",
+                "Test User (Dev)",
+                False
+            )
+        else:
+            # Update last login
+            await persistent_db_service.execute(
+                "UPDATE users SET last_login = NOW() WHERE id = $1",
+                user_data['id']
+            )
+        
+        user = User(
+            id=str(user_data['id']),
+            email=user_data['email'],
+            name=user_data['name'] or 'Test User',
+            picture=user_data['picture'],
+            is_admin=False
+        )
+        
+        # Create tokens
+        access_token = create_access_token(data={"sub": user.id})
+        refresh_token = create_refresh_token(data={"sub": user.id})
+        
+        # Store refresh token
+        await persistent_db_service.execute(
+            """
+            INSERT INTO sessions (user_id, refresh_token, expires_at)
+            VALUES ($1, $2, NOW() + INTERVAL '30 days')
+            """,
+            user.id,
+            refresh_token
+        )
+        
+        logger.info(f"Dev bypass login as user: {test_email}")
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=user
+        )
+    
+    except Exception as e:
+        logger.error(f"Dev bypass user login failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create dev user session: {str(e)}")
+        
+        # Check if refresh token exists in database
+        session = await persistent_db_service.fetchrow(
             "SELECT user_id, expires_at FROM sessions WHERE refresh_token = $1",
             refresh_token
         )
