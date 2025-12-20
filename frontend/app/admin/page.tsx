@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Shield, MessageSquare, Brain, Settings, Users, BarChart3 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import UserMenu from '@/components/UserMenu'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -36,12 +37,17 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-bg-base p-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Shield className="w-8 h-8 text-accent" />
-              <h1 className="text-4xl font-serif">Admin Panel</h1>
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Shield className="w-8 h-8 text-accent" />
+                <h1 className="text-4xl font-serif">Admin Panel</h1>
+              </div>
+              <p className="text-gray-400">Manage bug reports, feedback, and system improvements</p>
             </div>
-            <p className="text-gray-400">Manage bug reports, feedback, and system improvements</p>
+            
+            {/* User Menu */}
+            <UserMenu />
           </div>
 
           {/* Admin Cards */}

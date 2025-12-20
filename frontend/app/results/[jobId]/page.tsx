@@ -8,6 +8,7 @@ import { useKeyboardNav } from '@/hooks/useKeyboardNav'
 import { useAuth } from '@/contexts/AuthContext'
 import PDFViewer from '@/components/PDFViewer'
 import SummaryDisplay from '@/components/SummaryDisplay'
+import UserMenu from '@/components/UserMenu'
 
 interface QAItem {
   id: string
@@ -229,6 +230,9 @@ export default function ResultsPage() {
             <Upload className="w-4 h-4" />
             <span className="hidden sm:inline">New Document</span>
           </button>
+
+          {/* User Menu with Sign Out */}
+          <UserMenu />
         </div>
       </header>
 

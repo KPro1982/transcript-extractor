@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone'
 import { Upload, FileText, Loader2, Settings } from 'lucide-react'
 import { uploadDocument, startJob } from '@/lib/api'
 import UserSettingsModal from '@/components/UserSettingsModal'
+import UserMenu from '@/components/UserMenu'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -57,14 +58,19 @@ export default function UploadPage() {
             <p className="text-gray-400">Select a PDF transcript to begin AI-powered summarization</p>
           </div>
           
-          {/* Settings Gear Icon */}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="p-3 bg-bg-card border border-gray-800 hover:border-accent/50 rounded-xl transition-all group"
-            title="Summary Settings"
-          >
-            <Settings className="w-6 h-6 text-gray-400 group-hover:text-accent group-hover:rotate-90 transition-all" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Settings Gear Icon */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-3 bg-bg-card border border-gray-800 hover:border-accent/50 rounded-xl transition-all group"
+              title="Summary Settings"
+            >
+              <Settings className="w-6 h-6 text-gray-400 group-hover:text-accent group-hover:rotate-90 transition-all" />
+            </button>
+
+            {/* User Menu */}
+            <UserMenu />
+          </div>
         </div>
 
         <div className="bg-bg-card border border-gray-800 rounded-2xl p-8">
