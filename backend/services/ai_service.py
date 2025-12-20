@@ -413,7 +413,7 @@ class AIService:
                 completed_count += len(batch)
                 if progress_callback:
                     # Include cached items in progress calculation
-                    total_completed = len(cached_items) + completed_count
+                    total_completed = (len(unique_items) - len(uncached_items)) + completed_count
                     progress = int((total_completed / len(unique_items)) * 100)
                     await progress_callback(progress)
                 
