@@ -110,25 +110,31 @@ export default function PDFViewer({
     }
 
     // Calculate line positions based on legal transcript standard (25 lines/page)
-    // Account for margins (approximately 12% top, 8% bottom for legal transcripts)
-    const topMarginPercent = 0.12
-    const bottomMarginPercent = 0.08
+    // Legal transcripts typically have:
+    // - Top margin: ~10-12% (header area)
+    // - Bottom margin: ~6-8% (footer area)
+    // - Line numbers are positioned at the start of each line (not centered)
+    const topMarginPercent = 0.10  // Reduced from 0.12 for better alignment
+    const bottomMarginPercent = 0.07  // Reduced from 0.08
     const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions.height * topMarginPercent
 
-    // Adjust highlighting to be between line numbers (move up 1.5 lines)
-    const startY = topMargin + (highlightStartLine - 1.5) * lineHeight
+    // Line numbers are typically positioned at the start of each line
+    // Line 1 starts at topMargin, Line 2 at topMargin + lineHeight, etc.
+    // Adjust to center highlight on the line (subtract half line height)
+    const startY = topMargin + (highlightStartLine - 1) * lineHeight - (lineHeight * 0.1)
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
-    const endY = topMargin + (endLine - 0.5) * lineHeight
+    // End position: start of endLine + most of line height (to cover the full line)
+    const endY = topMargin + (endLine - 1) * lineHeight + (lineHeight * 0.9)
 
     return {
       position: 'absolute' as const,
       left: 0,
-      top: startY,
-      height: Math.max(endY - startY, lineHeight), // Minimum one line height
+      top: Math.max(0, startY), // Ensure not negative
+      height: Math.max(endY - startY, lineHeight * 0.8), // Minimum 80% of line height
       width: '100%', // Full width highlight
       backgroundColor: 'rgba(201, 166, 107, 0.2)', // Semi-transparent overlay
       borderLeft: '4px solid #c9a66b', // Thick left border for visibility
@@ -145,21 +151,21 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
-    const topMarginPercent = 0.12
-    const bottomMarginPercent = 0.08
+    const topMarginPercent = 0.10  // Match first page calculation
+    const bottomMarginPercent = 0.07
     const contentHeight = displayDimensions2.height * (1 - topMarginPercent - bottomMarginPercent)
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions2.height * topMarginPercent
 
-    // Start from line 1 on second page, continue to highlightEndLine (between line numbers)
-    const startY = topMargin + (1 - 1.5) * lineHeight
-    const endY = topMargin + (highlightEndLine - 0.5) * lineHeight
+    // Start from line 1 on second page, continue to highlightEndLine
+    const startY = topMargin + (1 - 1) * lineHeight - (lineHeight * 0.1)
+    const endY = topMargin + (highlightEndLine - 1) * lineHeight + (lineHeight * 0.9)
 
     return {
       position: 'absolute' as const,
       left: 0,
-      top: startY,
-      height: Math.max(endY - startY, lineHeight),
+      top: Math.max(0, startY),
+      height: Math.max(endY - startY, lineHeight * 0.8),
       width: '100%',
       backgroundColor: 'rgba(201, 166, 107, 0.2)',
       borderLeft: '4px solid #c9a66b',
@@ -176,13 +182,13 @@ export default function PDFViewer({
 
     // Small delay to ensure DOM is updated
     const timer = setTimeout(() => {
-      const topMarginPercent = 0.12
-      const bottomMarginPercent = 0.08
+      const topMarginPercent = 0.10  // Match highlight calculation
+      const bottomMarginPercent = 0.07
       const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
       const lineHeight = contentHeight / LINES_PER_PAGE
       const topMargin = displayDimensions.height * topMarginPercent
 
-      const startY = topMargin + (highlightStartLine - 1) * lineHeight
+      const startY = topMargin + (highlightStartLine - 1) * lineHeight - (lineHeight * 0.1)
       
       // Scroll to position the highlight about 1/4 from the top of the visible area
       const container = containerRef.current
