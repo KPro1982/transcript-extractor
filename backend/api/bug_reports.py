@@ -8,7 +8,6 @@ from uuid import UUID
 
 from api.auth import get_current_user, require_admin, User
 from services.db_service import persistent_db_service
-from services.pdf_service import upload_to_s3  # Reuse existing S3 upload
 from services.email_service import email_service
 from config import settings
 
