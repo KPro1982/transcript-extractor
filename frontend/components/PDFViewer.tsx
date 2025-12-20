@@ -117,12 +117,12 @@ export default function PDFViewer({
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions.height * topMarginPercent
 
-    // Adjust highlighting down by 0.5 lines from original position
-    const startY = topMargin + (highlightStartLine - 0.5) * lineHeight
+    // Adjust highlighting to be between line numbers (move up 1.5 lines)
+    const startY = topMargin + (highlightStartLine - 1.5) * lineHeight
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
-    const endY = topMargin + (endLine + 0.5) * lineHeight
+    const endY = topMargin + (endLine - 0.5) * lineHeight
 
     return {
       position: 'absolute' as const,
@@ -151,9 +151,9 @@ export default function PDFViewer({
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = displayDimensions2.height * topMarginPercent
 
-    // Start from line 1 on second page, continue to highlightEndLine
-    const startY = topMargin + (1 - 0.5) * lineHeight
-    const endY = topMargin + (highlightEndLine + 0.5) * lineHeight
+    // Start from line 1 on second page, continue to highlightEndLine (between line numbers)
+    const startY = topMargin + (1 - 1.5) * lineHeight
+    const endY = topMargin + (highlightEndLine - 0.5) * lineHeight
 
     return {
       position: 'absolute' as const,

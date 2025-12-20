@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, MessageSquare, BrainCircuit, Edit2, Save, X } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageSquare, User, Edit2, Save, X } from 'lucide-react'
 import LearningFeedbackModal from './LearningFeedbackModal'
 import { api } from '@/lib/api'
 
@@ -59,16 +59,27 @@ export default function SummaryDisplay({
   const [editedSummary, setEditedSummary] = useState('')
   const [editedDate, setEditedDate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [isEditingDate, setIsEditingDate] = useState(false)
 
   const handleStartEdit = () => {
     setEditedSummary(item?.summary || '')
     setEditedDate(item?.event_date || '')
     setIsEditing(true)
   }
+  
+  const handleStartEditDate = () => {
+    setEditedDate(item?.event_date || '')
+    setIsEditingDate(true)
+  }
 
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditedSummary('')
+    setEditedDate('')
+  }
+  
+  const handleCancelEditDate = () => {
+    setIsEditingDate(false)
     setEditedDate('')
   }
 
@@ -90,6 +101,27 @@ export default function SummaryDisplay({
     } catch (error) {
       console.error('Failed to save summary:', error)
       alert('Failed to save changes. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  
+  const handleSaveDate = async () => {
+    if (!item) return
+    
+    try {
+      setSaving(true)
+      await api.patch(`/api/documents/qa-items/${item.id}`, {
+        event_date: editedDate || null
+      })
+      
+      // Update local state
+      item.event_date = editedDate
+      
+      setIsEditingDate(false)
+    } catch (error) {
+      console.error('Failed to save date:', error)
+      alert('Failed to save date. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -147,6 +179,61 @@ export default function SummaryDisplay({
 
       {/* Summary Content Area - Full Width */}
       <div className="flex-1 overflow-auto p-6 flex flex-col">
+        {/* Event Date at Top - Always visible if exists or being edited */}
+        {(item?.event_date || isEditingDate) && (
+          <div className="mb-4 pb-4 border-b border-gray-800">
+            <label className="block text-xs font-semibold text-gray-400 mb-2">
+              Event Date
+            </label>
+            {isEditingDate ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={editedDate}
+                  onChange={(e) => setEditedDate(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-bg-elevated border border-gray-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+                  placeholder="e.g., 2020-04, 2020, 2020 mid-year"
+                />
+                <button
+                  onClick={handleSaveDate}
+                  disabled={saving}
+                  className="px-3 py-2 bg-accent hover:bg-accent/80 text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleCancelEditDate}
+                  disabled={saving}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 text-sm rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={handleStartEditDate}
+                className="flex items-center gap-2 cursor-pointer group"
+              >
+                <span className="px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-sm flex-1">
+                  {item.event_date}
+                </span>
+                <Edit2 className="w-4 h-4 text-gray-500 group-hover:text-accent transition-colors" />
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Add Date Button (when no date exists and not editing) */}
+        {!item?.event_date && !isEditingDate && !isEditing && (
+          <button
+            onClick={handleStartEditDate}
+            className="mb-4 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-sm rounded-lg transition-colors flex items-center gap-2 w-fit"
+          >
+            <Edit2 className="w-3 h-3" />
+            Add Event Date
+          </button>
+        )}
+        
         {/* Summary Text - Takes up most of the space */}
         <div className="flex-1">
           {item.summary || isEditing ? (
@@ -220,13 +307,32 @@ export default function SummaryDisplay({
                       >
                         <Edit2 className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
                       </button>
-                      {/* Brain Icon Button */}
+                      {/* Brain/Learning Icon Button - Using User icon with brain styling */}
                       <button
                         onClick={() => setFeedbackModalOpen(true)}
-                        className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group"
+                        className="flex-shrink-0 p-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors group relative"
                         title="Provide learning feedback"
                       >
-                        <BrainCircuit className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+                        <svg
+                          className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          {/* Head profile */}
+                          <path d="M12 2C9.5 2 7 3.5 6 6C5.5 7 5 8.5 5 10C5 12 5.5 14 7 15.5C8 16.5 9 17 10 17.5C10.5 17.7 11 18 11 18.5V20C11 21 12 22 13 22C14 22 15 21 15 20V18.5C15 18 15.5 17.7 16 17.5C17 17 18 16.5 19 15.5C20.5 14 21 12 21 10C21 8.5 20.5 7 20 6C19 3.5 16.5 2 14 2" />
+                          {/* Brain circuit lines */}
+                          <path d="M9 8H11" opacity="0.6" />
+                          <path d="M13 8H15" opacity="0.6" />
+                          <path d="M10 11H14" opacity="0.6" />
+                          <path d="M9 14H15" opacity="0.6" />
+                          <circle cx="9.5" cy="8" r="0.5" fill="currentColor" />
+                          <circle cx="14.5" cy="8" r="0.5" fill="currentColor" />
+                          <circle cx="12" cy="11" r="0.5" fill="currentColor" />
+                        </svg>
                       </button>
                     </div>
                   </div>

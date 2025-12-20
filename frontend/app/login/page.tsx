@@ -31,45 +31,67 @@ function LoginContent() {
   
   const handleBypassAdmin = async () => {
     try {
+      setError(null)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      console.log('Fetching admin bypass from:', `${apiUrl}/api/auth/dev/bypass-admin`)
       const response = await fetch(`${apiUrl}/api/auth/dev/bypass-admin`)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Bypass admin error:', errorText)
+        setError(`Failed to bypass login: ${errorText}`)
+        return
+      }
+      
       const data = await response.json()
+      console.log('Bypass admin response:', data)
       
       if (data.access_token && data.refresh_token) {
         // Store tokens
         localStorage.setItem('access_token', data.access_token)
         localStorage.setItem('refresh_token', data.refresh_token)
         
-        // Redirect to home
-        router.push('/')
+        // Force reload to trigger auth context
+        window.location.href = '/'
       } else {
-        setError('Failed to bypass login')
+        setError('Failed to bypass login - no tokens received')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bypass admin login error:', err)
-      setError('Failed to bypass login')
+      setError(`Failed to bypass login: ${err.message}`)
     }
   }
   
   const handleBypassUser = async () => {
     try {
+      setError(null)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      console.log('Fetching user bypass from:', `${apiUrl}/api/auth/dev/bypass-user`)
       const response = await fetch(`${apiUrl}/api/auth/dev/bypass-user`)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Bypass user error:', errorText)
+        setError(`Failed to bypass login: ${errorText}`)
+        return
+      }
+      
       const data = await response.json()
+      console.log('Bypass user response:', data)
       
       if (data.access_token && data.refresh_token) {
         // Store tokens
         localStorage.setItem('access_token', data.access_token)
         localStorage.setItem('refresh_token', data.refresh_token)
         
-        // Redirect to home
-        router.push('/')
+        // Force reload to trigger auth context
+        window.location.href = '/'
       } else {
-        setError('Failed to bypass login')
+        setError('Failed to bypass login - no tokens received')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bypass user login error:', err)
-      setError('Failed to bypass login')
+      setError(`Failed to bypass login: ${err.message}`)
     }
   }
 

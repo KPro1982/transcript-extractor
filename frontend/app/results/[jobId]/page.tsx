@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, BookOpen, Upload } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Upload, Shield } from 'lucide-react'
 import { getJobStatus, getQAItems, getDocument } from '@/lib/api'
 import { useKeyboardNav } from '@/hooks/useKeyboardNav'
+import { useAuth } from '@/contexts/AuthContext'
 import PDFViewer from '@/components/PDFViewer'
 import SummaryDisplay from '@/components/SummaryDisplay'
 
@@ -31,6 +32,7 @@ export default function ResultsPage() {
   const router = useRouter()
   const params = useParams()
   const jobId = params?.jobId as string
+  const { user } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -207,6 +209,18 @@ export default function ResultsPage() {
             <span className="text-gray-600">•</span>
             <span>{totalPages} pages</span>
           </div>
+          
+          {/* Admin Button */}
+          {user?.is_admin && (
+            <button
+              onClick={() => router.push('/admin')}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-xl transition-all"
+              title="Admin Dashboard"
+            >
+              <Shield className="w-4 h-4" />
+              <span className="hidden sm:inline">Admin</span>
+            </button>
+          )}
           
           <button
             onClick={() => router.push('/upload')}

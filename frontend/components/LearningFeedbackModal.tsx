@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Send, Loader2, BrainCircuit } from 'lucide-react'
+import { X, Send, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 
 interface LearningFeedbackModalProps {
@@ -72,7 +72,24 @@ export default function LearningFeedbackModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <BrainCircuit className="w-5 h-5 text-purple-400" />
+              <svg
+                className="w-5 h-5 text-purple-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 2C9.5 2 7 3.5 6 6C5.5 7 5 8.5 5 10C5 12 5.5 14 7 15.5C8 16.5 9 17 10 17.5C10.5 17.7 11 18 11 18.5V20C11 21 12 22 13 22C14 22 15 21 15 20V18.5C15 18 15.5 17.7 16 17.5C17 17 18 16.5 19 15.5C20.5 14 21 12 21 10C21 8.5 20.5 7 20 6C19 3.5 16.5 2 14 2" />
+                <path d="M9 8H11" opacity="0.6" />
+                <path d="M13 8H15" opacity="0.6" />
+                <path d="M10 11H14" opacity="0.6" />
+                <path d="M9 14H15" opacity="0.6" />
+                <circle cx="9.5" cy="8" r="0.5" fill="currentColor" />
+                <circle cx="14.5" cy="8" r="0.5" fill="currentColor" />
+                <circle cx="12" cy="11" r="0.5" fill="currentColor" />
+              </svg>
             </div>
             <div>
               <h2 className="text-xl font-semibold">Learning Feedback</h2>
@@ -92,7 +109,24 @@ export default function LearningFeedbackModal({
           <div className="flex-1 flex items-center justify-center p-12">
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BrainCircuit className="w-8 h-8 text-green-400" />
+                <svg
+                  className="w-8 h-8 text-green-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 2C9.5 2 7 3.5 6 6C5.5 7 5 8.5 5 10C5 12 5.5 14 7 15.5C8 16.5 9 17 10 17.5C10.5 17.7 11 18 11 18.5V20C11 21 12 22 13 22C14 22 15 21 15 20V18.5C15 18 15.5 17.7 16 17.5C17 17 18 16.5 19 15.5C20.5 14 21 12 21 10C21 8.5 20.5 7 20 6C19 3.5 16.5 2 14 2" />
+                  <path d="M9 8H11" opacity="0.6" />
+                  <path d="M13 8H15" opacity="0.6" />
+                  <path d="M10 11H14" opacity="0.6" />
+                  <path d="M9 14H15" opacity="0.6" />
+                  <circle cx="9.5" cy="8" r="0.5" fill="currentColor" />
+                  <circle cx="14.5" cy="8" r="0.5" fill="currentColor" />
+                  <circle cx="12" cy="11" r="0.5" fill="currentColor" />
+                </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Thank you!</h3>
               <p className="text-gray-400">
