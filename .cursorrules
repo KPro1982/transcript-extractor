@@ -1,30 +1,440 @@
 # Cursor AI Rules for DepoDigest Project
 
-## File Access Permissions
-- AI can read and modify all .env files
-- AI can read and modify all configuration files
-- AI can read and modify all source code
-- AI can create new files as needed for implementation
+## Project Overview
+DepoDigest is an AI-powered deposition transcript summarization platform with a FastAPI Python backend and Next.js TypeScript frontend. The system processes PDF depositions, extracts Q&A pairs, and generates AI summaries using OpenAI GPT-4o-mini with intelligent caching.
 
-## Project Context
-- This is a FastAPI + Next.js project
-- Backend is Python (FastAPI, Celery, Redis, PostgreSQL)
-- Frontend is TypeScript (Next.js, React, Tailwind)
-- Environment variables are CRITICAL for API keys and configuration
+## Deployment
+- **Platform**: Railway (cloud deployment)
+- **Services**: Backend, Worker, Frontend, PostgreSQL (2 databases), Redis
+- **Environment**: Railway sets `PORT` dynamically for backend
+- **Auto-deploy**: Pushes to `main` branch trigger production deployment
+- **Development**: Use `dev` branch for testing before production
 
-## Autonomous Operations Allowed
-- Read .env files to check configuration
-- Copy API keys between old and new structure
-- Create missing .env files with proper values
-- Run migration scripts
-- Start/stop Docker services
-- Check service health
+## Tech Stack
+### Backend (Python)
+- **Framework**: FastAPI (async)
+- **Task Queue**: Celery with Redis broker
+- **PDF Processing**: PyMuPDF (10x faster than Node alternatives)
+- **AI Providers**: OpenAI GPT-4o-mini (primary), Anthropic Claude (fallback)
+- **Authentication**: Google OAuth + JWT tokens (access + refresh)
+- **Database**: asyncpg for PostgreSQL connections
+
+### Frontend (TypeScript)
+- **Framework**: Next.js 14 (App Router)
+- **State Management**: React Context (AuthContext)
+- **Styling**: Tailwind CSS
+- **Real-time**: WebSocket connections for progress updates
+- **Icons**: lucide-react
+
+### Infrastructure
+- **Cache & Queue**: Redis (cache + Celery broker + pub/sub)
+- **Databases**: 2 separate PostgreSQL databases (see below)
+- **Containers**: Docker Compose for local development
+
+## Database Architecture (CRITICAL)
+
+### Two Separate Databases:
+
+1. **Ephemeral Database** (`depodigest_ephemeral`)
+   - **Purpose**: Transcript/document data that can be cleared without losing user data
+   - **Port**: 5432 (local), Railway managed (production)
+   - **Tables**: 
+     - `documents` - PDF metadata, file hashes
+     - `qa_items` - All Q&A pairs (interim and final)
+     - `final_qa_items` - Final Q&A pairs with summaries (main table for results)
+     - `summary_cache` - Database-level summary cache
+     - `processing_jobs` - Job status tracking
+   - **Access**: Via `db_service` (backend/services/db_service.py)
+   - **Environment Variable**: `DATABASE_URL`
+
+2. **Persistent Database** (`depodigest_persistent`)
+   - **Purpose**: User data, authentication, settings, feedback (NEVER cleared)
+   - **Port**: 5433 (local), Railway managed (production)
+   - **Tables**:
+     - `users` - User accounts from Google OAuth
+     - `sessions` - JWT refresh tokens
+     - `bug_reports` - User bug reports
+     - `chat_messages` - Admin-user chat threads
+     - `learning_feedback` - User corrections to AI summaries
+     - `user_prompt_settings` - Custom summarization prompts per user
+     - `notifications` - User notifications
+   - **Access**: Via `persistent_db_service` (backend/services/db_service.py)
+   - **Environment Variable**: `PERSISTENT_DATABASE_URL`
+
+### Database Rules:
+- **NEVER** store user authentication data in ephemeral database
+- **NEVER** store transcript data in persistent database
+- Ephemeral database can be cleared for testing (clears all documents/QA)
+- Persistent database must NEVER be cleared (contains user accounts)
+- Admin email is determined by `ADMIN_EMAIL` env var (danieljcravens@gmail.com)
+
+## Document Processing Workflow
+
+### 1. Upload (POST /api/documents/upload)
+- User uploads PDF via frontend
+- Backend calculates SHA256 hash of PDF content
+- **CLEARS ephemeral database** (for testing/development pattern)
+- Creates `documents` table entry
+- Stores PDF in **Redis** (24hr TTL) for worker access across containers
+- Returns `document_id`
+
+### 2. Job Start (POST /api/jobs/start)
+- Frontend requests processing with `document_id`, optional page range
+- Backend creates `processing_jobs` entry
+- Dispatches Celery task: `process_document_task`
+- Returns `job_id` and WebSocket URL
+- Frontend connects to WebSocket for real-time updates
+
+### 3. Background Processing (Celery Worker)
+- Worker retrieves PDF from **Redis cache** (cross-container access)
+- **Pipeline Architecture**: Extraction and AI processing overlap
+  - Producer: Extracts PDF pages, parses Q&A pairs → Queue
+  - Consumer: Fetches from queue, sends to AI for summarization
+- Sends progress updates via **Redis pub/sub** → WebSocket
+- Detailed progress: `current/total` Q&A pairs processed
+
+### 4. AI Summarization
+- **Caching Strategy**: 
+  - First checks Redis cache (30-day TTL, SHA256 of Q+A)
+  - 80-90% cache hit rate on repeated content
+  - Only uncached items sent to OpenAI
+- **Parallelization**: Up to 50 concurrent AI requests (vs 8 in Node)
+- **Batch Processing**: Dynamic batch sizes (10-20 items) based on content length
+- **Rate Limiting**: Adaptive rate limiter for OpenAI (500 RPM, 200k TPM)
+- **Fallback**: If OpenAI fails/rate-limited → Anthropic Claude
+
+### 5. Database Storage
+- Final Q&A pairs saved to `final_qa_items` table (ephemeral DB)
+- Includes: page/line numbers, question, answer, **summary**, topic, **event_date**
+- Interim Q&A (variable assignments) saved to `qa_items` with `is_final=false`
+
+### 6. Results (GET /api/documents/{id}/qa-items)
+- Frontend fetches processed Q&A items
+- Displays in reading mode: PDF viewer + summary panel side-by-side
+- Summaries are **editable** by user (saves back to `final_qa_items`)
+- Event dates are **editable** and AI-extracted (flexible format: YYYY, YYYY-MM, YYYY-MM-DD)
+
+## Real-Time Updates (WebSockets)
+
+### Architecture:
+1. **Worker** publishes updates to Redis pub/sub channel: `job_updates:{job_id}`
+2. **Backend WebSocket** subscribes to Redis channel
+3. **Backend** forwards messages to connected frontend WebSocket clients
+4. **Frontend** receives real-time progress updates
+
+### Update Types:
+- `progress` - Status + percentage (0-100)
+- `partial_result` - Streaming results as Q&A pairs complete
+- `complete` - Job finished successfully
+- `error` - Job failed with error message
+
+### Implementation:
+- Backend: `backend/api/websocket.py` (ConnectionManager class)
+- Worker: Calls `send_job_update()` function → Redis pub/sub
+- Frontend: `frontend/hooks/useWebSocket.ts` hook
+
+## Authentication Flow
+
+### Google OAuth:
+1. User clicks "Sign in with Google" → `/api/auth/google/login`
+2. Redirects to Google OAuth consent screen
+3. Google callback → `/api/auth/google/callback`
+4. Backend creates or updates user in **persistent DB** (`users` table)
+5. Creates JWT access token (24hr expiry) and refresh token (30 day expiry)
+6. Stores refresh token in `sessions` table
+7. Redirects to frontend with tokens in query params
+8. Frontend stores tokens in localStorage
+
+### JWT Authentication:
+- **Access Token**: Short-lived (24hr), sent in `Authorization: Bearer {token}` header
+- **Refresh Token**: Long-lived (30 days), stored in DB, used to get new access token
+- **Token Refresh**: POST `/api/auth/refresh` with refresh_token
+- **Current User**: GET `/api/auth/me` returns user info from access token
+
+### Development Bypass:
+- GET `/api/auth/dev/bypass-admin` - Login as admin without OAuth
+- GET `/api/auth/dev/bypass-user` - Login as regular user without OAuth
+- Returns JWT tokens directly (skip Google OAuth)
+- Used for testing/development
+
+### Admin Rights:
+- Admin status determined by matching `ADMIN_EMAIL` environment variable
+- Admin users have `is_admin=true` in `users` table
+- Admins can access `/admin` dashboard (bug reports, feedback, settings)
+
+## Caching Strategy
+
+### Redis Cache (Short-term, 30 days):
+- **PDF Content**: Stored 24 hours for worker access (key: `pdf:{file_hash}`)
+- **AI Summaries**: 30-day TTL (key: SHA256 of Q+A text)
+- **Document Metadata**: Short-term cache for quick lookups
+- **Job Updates**: Redis pub/sub for WebSocket real-time updates
+
+### Database Cache (Longer-term):
+- `summary_cache` table in ephemeral DB
+- Stores frequently accessed summaries
+- Indexed by content hash, last accessed timestamp
+
+### Cache Priority:
+1. Check Redis cache (fastest)
+2. Check database cache
+3. Call AI API (slowest, most expensive)
+4. Store result in both Redis and DB caches
+
+## Performance Optimizations
+
+### PDF Extraction:
+- PyMuPDF library (10x faster than pdf-parse in Node)
+- Processes ~3 seconds for 1000-page document
+
+### AI Parallelization:
+- Python asyncio allows 50+ concurrent AI requests
+- Node.js was limited to 8 concurrent requests
+- Result: 6x faster summarization (180s → 30s for 1000 items)
+
+### Pipeline Architecture:
+- PDF extraction and AI processing overlap (producer-consumer pattern)
+- Extraction adds to queue while AI consumer processes batches
+- 15-25% faster than sequential processing
+
+### Batch Processing:
+- Dynamic batch sizes: 10-20 items based on Q&A length
+- Uses tiktoken for accurate token counting
+- Stays within rate limits (500 RPM, 200k TPM)
+
+## Frontend Architecture
+
+### Pages:
+- `/login` - Landing page with Google OAuth (dev bypass buttons)
+- `/upload` - PDF upload with settings gear (prompt customization)
+- `/process/{jobId}` - Progress page with real-time updates
+- `/results/{jobId}` - Reading mode (PDF viewer + summary panel)
+- `/admin` - Admin dashboard (bug reports, feedback, prompts)
+
+### Key Components:
+- `PDFViewer` - Displays PDF pages with line-based highlighting
+- `SummaryDisplay` - Shows AI summaries with edit capability
+- `UserMenu` - User profile dropdown with sign-out button
+- `LearningFeedbackModal` - User corrections to AI summaries
+- `UserSettingsModal` - Custom prompt configuration
+
+### Authentication:
+- `AuthContext` - Global auth state (user, login, logout)
+- `ProtectedRoute` - Wrapper requiring authentication
+- `requireAdmin` - Wrapper requiring admin rights
+
+### WebSocket Hook:
+- `useJobProgress(jobId)` - Real-time progress updates
+- Auto-reconnects on disconnect
+- Tracks status, progress percentage, detailed Q&A count
+
+## Highlighting System
+
+### Line-Based Highlighting:
+- PDFs rendered with 34 lines per page (configurable)
+- Highlight positioned **between** line numbers (centered)
+- Margins: 12% top, 8% bottom
+- Calculation: `startY = topMargin + (line - 1.5) * lineHeight`
+
+### Cross-Page Q&A:
+- When answer spans multiple pages, display both pages vertically
+- First page shows start highlight
+- Second page shows end highlight
+- Continuous scroll behavior (no gap between pages)
+
+### Citation Format:
+- Page number is **printed transcript page** (user-visible)
+- `pdf_page_index` is 1-based PDF page (for rendering)
+- Line numbers are 1-based (line 1 = first line of content)
+
+## AI Prompt Customization
+
+### User Settings:
+- Stored in `user_prompt_settings` table (persistent DB)
+- Fields:
+  - `preset_options`: JSON object of toggle options
+  - `custom_instructions`: Free-form text added to system prompt
+- Accessed via Settings gear icon on upload page
+
+### Prompt Building:
+- Base system prompt (hardcoded in AI provider)
+- + User's preset options (if enabled)
+- + User's custom instructions (if provided)
+- Used for all AI summarization calls
+
+### Date Extraction:
+- AI extracts event dates from Q&A context
+- Flexible format: YYYY, YYYY-MM, YYYY-MM-DD, "2020 mid-year", "2022-04"
+- Stored in `event_date` field (VARCHAR, editable by user)
+- Displayed at top of summary panel with Calendar icon
+
+## Error Handling
+
+### API Errors:
+- Rate limit errors → Automatic fallback to Anthropic Claude
+- Network errors → Retry with exponential backoff
+- Authentication errors → Redirect to login page
+- Validation errors → Return 422 with detailed error messages
+
+### Worker Errors:
+- Syntax errors → Check backend/workers/tasks.py for uncommented code
+- Import errors → Verify all imports are correct
+- Job failures → Update job status to 'failed', send error via WebSocket
+
+### Frontend Errors:
+- 401 Unauthorized → Clear tokens, redirect to /login
+- 404 Not Found → Show "Document not found" message
+- WebSocket disconnect → Auto-reconnect with exponential backoff
+- Upload failures → Show error alert, allow retry
+
+## Environment Variables
+
+### Required for Backend:
+```bash
+DATABASE_URL=postgresql://postgres:postgres@db:5432/depodigest_ephemeral
+PERSISTENT_DATABASE_URL=postgresql://postgres:postgres@db_persistent:5432/depodigest_persistent
+REDIS_URL=redis://redis:6379
+OPENAI_API_KEY=sk-proj-...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+JWT_SECRET_KEY=...
+ADMIN_EMAIL=danieljcravens@gmail.com
+FRONTEND_URL=http://localhost:3000
+```
+
+### Optional:
+```bash
+ANTHROPIC_API_KEY=...  # Fallback AI provider
+SENDGRID_API_KEY=...   # Email notifications
+SENTRY_DSN=...         # Error tracking
+```
+
+### Railway Deployment:
+- Railway sets `PORT` dynamically (backend uses: `PORT || 8000`)
+- Set all env vars in Railway dashboard for each service
+- Database URLs provided automatically by Railway PostgreSQL plugins
+
+## File Operations
+
+### Autonomous Operations Allowed:
+- Read/modify all source code files
+- Read/modify .env files (NEVER commit to git)
+- Create new files as needed
+- Run Docker commands (start/stop services)
 - Run tests and benchmarks
 - Deploy configuration changes
+- Check service health
 
-## Safety Rules
-- Never commit .env files to git (they're in .gitignore)
-- Always validate API keys before using
+### Safety Rules:
+- **NEVER commit** .env files to git (in .gitignore)
+- **NEVER hard-code** API keys in source code
+- **ALWAYS validate** API keys before using
+- **TEST in Docker** before deploying to Railway
 - Keep backups of working configurations
-- Test changes in Docker before production
 
+## Testing
+
+### Health Checks:
+- Backend: http://localhost:8000/health
+- Worker: Smoke tests in `backend/tests/smoke/`
+- Database: Connection pool tests on startup
+
+### Performance Tests:
+- Benchmark scripts in `benchmark_*.py`
+- Compare old vs new system performance
+- Measure cache hit rates, API costs
+
+### Development Workflow:
+1. Make changes on `dev` branch
+2. Test locally with Docker Compose
+3. Run smoke tests: `pytest backend/tests/smoke/`
+4. Push to `dev` branch (does NOT auto-deploy)
+5. Manually trigger Railway deployment or merge to `main`
+
+## Common Issues & Solutions
+
+### Worker/Backend Crashes:
+- Check for syntax errors in recently modified files
+- Verify all imports are correct (especially after refactoring)
+- Check Railway logs: `railway logs --service backend`
+- Ensure environment variables are set in Railway
+
+### Stuck Processing Jobs:
+- Check if worker is running: `docker ps | grep worker`
+- Verify Redis connection: `redis-cli ping`
+- Check Celery queue: `celery -A workers.celery_app inspect active`
+- Restart worker: `docker-compose restart worker`
+
+### Authentication Issues:
+- Verify JWT_SECRET_KEY is same across backend/worker
+- Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+- Ensure FRONTEND_URL matches actual frontend URL
+- Test dev bypass: GET `/api/auth/dev/bypass-admin`
+
+### Database Issues:
+- Ephemeral DB cleared? Check document count: `SELECT COUNT(*) FROM documents`
+- Persistent DB missing users? Check: `SELECT COUNT(*) FROM users`
+- Connection errors? Verify DATABASE_URL and PERSISTENT_DATABASE_URL
+- Migration needed? Schemas auto-create on backend startup
+
+## Code Style
+
+### Python (Backend):
+- Type hints for function parameters and returns
+- Async/await for I/O operations
+- Docstrings for all public functions
+- Logging with structured messages
+- Error handling with try/except and proper logging
+
+### TypeScript (Frontend):
+- Functional components with hooks
+- Type interfaces for all data structures
+- Async/await for API calls
+- Error boundaries for component failures
+- Loading states for async operations
+
+### Naming Conventions:
+- Python: `snake_case` for functions/variables, `PascalCase` for classes
+- TypeScript: `camelCase` for functions/variables, `PascalCase` for components
+- Database: `snake_case` for table/column names
+- Environment variables: `UPPER_SNAKE_CASE`
+
+## Key File Locations
+
+### Backend:
+- Main app: `backend/main.py`
+- Config: `backend/config.py`
+- Database: `backend/services/db_service.py`
+- AI Service: `backend/services/ai_service.py`
+- Cache: `backend/services/cache_service.py`
+- Workers: `backend/workers/tasks.py`
+- Auth: `backend/api/auth.py`
+
+### Frontend:
+- Auth Context: `frontend/contexts/AuthContext.tsx`
+- PDF Viewer: `frontend/components/PDFViewer.tsx`
+- Summary Display: `frontend/components/SummaryDisplay.tsx`
+- WebSocket Hook: `frontend/hooks/useWebSocket.ts`
+- API Client: `frontend/lib/api.ts`
+
+### Infrastructure:
+- Docker Compose: `docker-compose.yml`
+- Environment: `.env` (local), Railway dashboard (production)
+
+## Performance Metrics (v2.0 vs v1.0)
+
+- PDF Extraction: 10x faster (30s → 3s for 1000 pages)
+- AI Summarization: 6x faster (180s → 30s for 1000 items)
+- Concurrent AI: 6x more (8 → 50+ concurrent requests)
+- Cache Hit Rate: 80-90% (massive cost savings)
+- API Cost: 90% reduction when cached ($2.00 → $0.20)
+- Total Processing: 6.4x faster (210s → 33s)
+
+## Project Goals
+
+1. **Speed**: Maximize AI summarization throughput
+2. **Cost**: Minimize API costs through intelligent caching
+3. **Reliability**: Multi-provider fallback, error handling
+4. **User Experience**: Real-time updates, editable results
+5. **Security**: OAuth authentication, JWT tokens, admin controls
+6. **Scalability**: Docker containers, Railway deployment, horizontal scaling
