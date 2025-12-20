@@ -71,21 +71,20 @@ def process_document_task(job_id: str, document_id: str, first_page: int = 1, la
         last_page: Last page to process (None = all pages)
         user_id: Optional UUID of the user for custom prompt settings
     """
-    """
     # Run async code in event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     try:
         result = loop.run_until_complete(
-            _process_document_async(job_id, document_id, first_page, last_page)
+            _process_document_async(job_id, document_id, first_page, last_page, user_id)
         )
         return result
     finally:
         loop.close()
 
 
-async def _process_document_async(job_id: str, document_id: str, first_page: int, last_page: Optional[int]):
+async def _process_document_async(job_id: str, document_id: str, first_page: int, last_page: Optional[int], user_id: Optional[str]):
     """Async implementation with pipeline parallelization.
     
     Uses producer-consumer pattern to overlap PDF extraction and AI processing,
