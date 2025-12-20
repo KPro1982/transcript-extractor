@@ -299,31 +299,6 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             )
             raise Exception(error_msg)
         
-        # Check if user wants to group related Q&As
-        should_group = False
-        if user_id:
-            try:
-                user_settings = await persistent_db_service.fetchrow(
-                    "SELECT preset_options FROM user_prompt_settings WHERE user_id = $1",
-                    user_id
-                )
-                if user_settings and user_settings['preset_options']:
-                    should_group = user_settings['preset_options'].get('group_related', False)
-                    logger.info(f"Group related Q&As: {should_group}")
-            except Exception as e:
-                logger.warning(f"Failed to check group_related setting: {e}")
-        
-        # Group related Q&As if enabled (only for final Q&As)
-        if should_group:
-            from workers.qa_grouping import group_related_qas
-            final_qas = [item for item in summarized_items if item.get('is_final', True)]
-            grouped_qas = group_related_qas(final_qas, should_group=True)
-            
-            # Replace final Q&As with grouped versions, keep interim items
-            interim_qas = [item for item in summarized_items if not item.get('is_final', True)]
-            summarized_items = grouped_qas + interim_qas
-            logger.info(f"After grouping: {len(final_qas)} → {len(grouped_qas)} final Q&As")
-        
         await send_job_update(job_id, "processing", 90, message="Saving results to database...")
         
         # Separate final Q/As from interim/variables
