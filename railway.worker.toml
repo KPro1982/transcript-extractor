@@ -5,6 +5,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
+rootDirectory = "backend"
 
 [deploy]
 numReplicas = 1
