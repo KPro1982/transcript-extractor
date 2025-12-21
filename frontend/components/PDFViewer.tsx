@@ -330,8 +330,8 @@ export default function PDFViewer({
             {/* Separator line and Second Page (for cross-page Q/A) */}
             {isCrossPage && imageUrl2 && (
               <>
-                {/* Black separator line */}
-                <div className="w-full h-px bg-black my-4" />
+                {/* Black separator line - no margin to prevent brown band showing through */}
+                <div className="w-full h-0.5 bg-black" />
                 
                 <div 
                   className="relative"
