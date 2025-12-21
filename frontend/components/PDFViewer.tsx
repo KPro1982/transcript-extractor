@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 import { getPDFPageUrl } from '@/lib/api'
 
 interface PDFViewerProps {
@@ -59,6 +59,7 @@ export default function PDFViewer({
   const [displayDimensions2, setDisplayDimensions2] = useState({ width: 0, height: 0 })
   const [zoom, setZoom] = useState(100) // Zoom percentage
   const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const imageRef2 = useRef<HTMLImageElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
@@ -261,91 +262,145 @@ export default function PDFViewer({
     setZoom(prev => Math.max(prev - 10, 50))
   }, [])
 
+  const fitToPage = useCallback(() => {
+    if (containerRef.current && imageRef.current) {
+      const containerHeight = containerRef.current.clientHeight
+      const imageHeight = imageRef.current.naturalHeight
+      const imageWidth = imageRef.current.naturalWidth
+      const containerWidth = containerRef.current.clientWidth
+      
+      // Calculate zoom to fit height
+      const heightZoom = (containerHeight / imageHeight) * 100
+      // Calculate zoom to fit width
+      const widthZoom = (containerWidth / imageWidth) * 100
+      
+      // Use the smaller zoom to ensure entire page fits
+      const fitZoom = Math.min(heightZoom, widthZoom, 200)
+      setZoom(Math.max(50, Math.round(fitZoom)))
+    }
+  }, [])
+
   const highlightStyle = calculateHighlightStyle()
   const highlightStyle2 = calculateHighlightStyle2()
 
   return (
-    <div className="flex flex-col h-full bg-bg-elevated rounded-xl overflow-hidden">
-      {/* PDF Page Display */}
+    <div className="flex flex-col h-full bg-bg-elevated rounded-xl overflow-hidden relative">
+      {/* Fixed Controls Layer - Positioned relative to container */}
+      
+      {/* Left Arrow - Fixed to container, centered vertically */}
+      <button
+        onClick={goToPreviousPage}
+        disabled={pageNumber <= 1}
+        className="fixed-control absolute left-2 top-1/2 -translate-y-1/2 z-30 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+        style={{ position: 'absolute' }}
+      >
+        <ChevronLeft className="w-6 h-6 text-white" />
+      </button>
+
+      {/* Right Arrow - Fixed to container, centered vertically */}
+      <button
+        onClick={goToNextPage}
+        disabled={pageNumber >= totalPages}
+        className="fixed-control absolute right-2 top-1/2 -translate-y-1/2 z-30 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+        style={{ position: 'absolute' }}
+      >
+        <ChevronRight className="w-6 h-6 text-white" />
+      </button>
+
+      {/* Zoom Controls - Fixed to container, top right */}
+      <div 
+        className="fixed-control absolute top-4 right-4 z-30 flex gap-2"
+        style={{ position: 'absolute' }}
+      >
+        <button
+          onClick={zoomOut}
+          disabled={zoom <= 50}
+          className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+          title="Zoom Out"
+        >
+          <ZoomOut className="w-5 h-5 text-white" />
+        </button>
+        <div className="px-3 py-2 rounded-lg bg-black/50 backdrop-blur-sm text-white text-sm font-mono">
+          {zoom}%
+        </div>
+        <button
+          onClick={fitToPage}
+          className="p-2 rounded-lg bg-black/50 hover:bg-black/70 transition-all backdrop-blur-sm"
+          title="Fit to Page"
+        >
+          <Maximize2 className="w-5 h-5 text-white" />
+        </button>
+        <button
+          onClick={zoomIn}
+          disabled={zoom >= 200}
+          className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+          title="Zoom In"
+        >
+          <ZoomIn className="w-5 h-5 text-white" />
+        </button>
+      </div>
+
+      {/* Scrollable PDF Content */}
       <div 
         ref={containerRef}
         className="flex-1 overflow-auto relative"
-        style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
       >
-        {/* Left Arrow - Centered vertically */}
-        <button
-          onClick={goToPreviousPage}
-          disabled={pageNumber <= 1}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+        <div 
+          ref={contentRef}
+          className="origin-top"
+          style={{ 
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top center',
+            minHeight: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}
         >
-          <ChevronLeft className="w-6 h-6 text-white" />
-        </button>
-
-        {/* Right Arrow - Centered vertically */}
-        <button
-          onClick={goToNextPage}
-          disabled={pageNumber >= totalPages}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
-        >
-          <ChevronRight className="w-6 h-6 text-white" />
-        </button>
-
-        {/* Zoom Controls - Top Right */}
-        <div className="absolute top-4 right-4 z-20 flex gap-2">
-          <button
-            onClick={zoomOut}
-            disabled={zoom <= 50}
-            className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-5 h-5 text-white" />
-          </button>
-          <div className="px-3 py-2 rounded-lg bg-black/50 backdrop-blur-sm text-white text-sm font-mono">
-            {zoom}%
-          </div>
-          <button
-            onClick={zoomIn}
-            disabled={zoom >= 200}
-            className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-5 h-5 text-white" />
-          </button>
-        </div>
-
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated z-20">
-            <div className="text-center">
-              <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Loading page {pageNumber}...</p>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated z-20">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-400">Loading page {pageNumber}...</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated p-8 z-20">
-            <div className="text-center">
-              <div className="text-red-400 mb-2">⚠️</div>
-              <p className="text-sm text-red-400">{error}</p>
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated p-8 z-20">
+              <div className="text-center">
+                <div className="text-red-400 mb-2">⚠️</div>
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {imageUrl && (
-          <div className="space-y-0">
-            {/* First Page */}
-            <div className="relative">
-              {/* Line Highlight Indicator - Thick gold bar */}
-              {highlightStyle.display !== 'none' && (
-                <div 
-                  ref={highlightRef}
-                  style={highlightStyle} 
-                />
-              )}
-              
-              {/* Wrapper to crop footer when cross-page */}
-              {isCrossPage && displayDimensions.height ? (
-                <div className="overflow-hidden" style={{ height: `${displayDimensions.height * 0.92}px` }}>
+          {imageUrl && (
+            <div className="space-y-0 w-full">
+              {/* First Page */}
+              <div className="relative">
+                {/* Line Highlight Indicator - Thick gold bar */}
+                {highlightStyle.display !== 'none' && (
+                  <div 
+                    ref={highlightRef}
+                    style={highlightStyle} 
+                  />
+                )}
+                
+                {/* Wrapper to crop footer when cross-page */}
+                {isCrossPage && displayDimensions.height ? (
+                  <div className="overflow-hidden" style={{ height: `${displayDimensions.height * 0.92}px` }}>
+                    <img
+                      ref={imageRef}
+                      src={imageUrl}
+                      alt={`Page ${pageNumber}`}
+                      onLoad={handleImageLoad}
+                      onError={handleImageError}
+                      className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                      draggable={false}
+                    />
+                  </div>
+                ) : (
                   <img
                     ref={imageRef}
                     src={imageUrl}
@@ -355,45 +410,46 @@ export default function PDFViewer({
                     className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
                     draggable={false}
                   />
-                </div>
-              ) : (
-                <img
-                  ref={imageRef}
-                  src={imageUrl}
-                  alt={`Page ${pageNumber}`}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                  className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                  draggable={false}
-                />
-              )}
-            </div>
-            
-            {/* Separator line and Second Page (for cross-page Q/A) */}
-            {isCrossPage && imageUrl2 && (
-              <>
-                {/* Separator container - white background with black line to prevent brown band */}
-                <div 
-                  className="w-full bg-white flex items-center justify-center"
-                  style={displayDimensions2.height ? {
-                    height: `${displayDimensions2.height * 0.80 / LINES_PER_PAGE * 1.5}px`
-                  } : { height: '2rem' }}
-                >
-                  <div className="w-full h-0.5 bg-black" />
-                </div>
-                
-                <div className="relative">
-                  {/* Line Highlight Indicator for second page */}
-                  {highlightStyle2.display !== 'none' && (
-                    <div 
-                      ref={highlightRef2}
-                      style={highlightStyle2} 
-                    />
-                  )}
+                )}
+              </div>
+              
+              {/* Separator line and Second Page (for cross-page Q/A) */}
+              {isCrossPage && imageUrl2 && (
+                <>
+                  {/* Separator container - white background with black line to prevent brown band */}
+                  <div 
+                    className="w-full bg-white flex items-center justify-center"
+                    style={displayDimensions2.height ? {
+                      height: `${displayDimensions2.height * 0.80 / LINES_PER_PAGE * 1.5}px`
+                    } : { height: '2rem' }}
+                  >
+                    <div className="w-full h-0.5 bg-black" />
+                  </div>
                   
-                  {/* Wrapper to crop header when cross-page */}
-                  {displayDimensions2.height ? (
-                    <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                  <div className="relative">
+                    {/* Line Highlight Indicator for second page */}
+                    {highlightStyle2.display !== 'none' && (
+                      <div 
+                        ref={highlightRef2}
+                        style={highlightStyle2} 
+                      />
+                    )}
+                    
+                    {/* Wrapper to crop header when cross-page */}
+                    {displayDimensions2.height ? (
+                      <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                        <img
+                          ref={imageRef2}
+                          src={imageUrl2}
+                          alt={`Page ${endPage}`}
+                          onLoad={handleImageLoad2}
+                          onError={handleImageError}
+                          className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                          style={{ marginTop: `-${displayDimensions2.height * 0.104}px` }}
+                          draggable={false}
+                        />
+                      </div>
+                    ) : (
                       <img
                         ref={imageRef2}
                         src={imageUrl2}
@@ -401,26 +457,15 @@ export default function PDFViewer({
                         onLoad={handleImageLoad2}
                         onError={handleImageError}
                         className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                        style={{ marginTop: `-${displayDimensions2.height * 0.104}px` }}
                         draggable={false}
                       />
-                    </div>
-                  ) : (
-                    <img
-                      ref={imageRef2}
-                      src={imageUrl2}
-                      alt={`Page ${endPage}`}
-                      onLoad={handleImageLoad2}
-                      onError={handleImageError}
-                      className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                      draggable={false}
-                    />
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
