@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-# Try backend/ first (Railway root context), fallback to current dir (local backend context)
-COPY backend/requirements.txt requirements.txt
+# Railway Root Directory is set to 'backend', so build context is backend/
+COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Production stage
@@ -35,8 +35,8 @@ ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
 # Copy application code
-# Try backend/ first (Railway root context), fallback to current dir (local backend context)
-COPY backend/ .
+# Railway Root Directory is set to 'backend', so build context is backend/
+COPY . .
 
 # Create temp directory for file uploads
 RUN mkdir -p /tmp/uploads
