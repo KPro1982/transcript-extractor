@@ -121,8 +121,9 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
-    // Scale dimensions by zoom factor to get actual displayed size
-    const scaledHeight = displayDimensions.height * (zoom / 100)
+    // Use display dimensions directly - DON'T multiply by zoom
+    // The highlight is inside the scaled content wrapper, so it will scale with the PDF
+    const height = displayDimensions.height
 
     // Calculate line positions based on legal transcript standard (25 lines/page)
     // Legal transcripts typically have:
@@ -130,9 +131,9 @@ export default function PDFViewer({
     // - Bottom margin: ~8% (footer area)
     const topMarginPercent = 0.12
     const bottomMarginPercent = 0.08
-    const contentHeight = scaledHeight * (1 - topMarginPercent - bottomMarginPercent)
+    const contentHeight = height * (1 - topMarginPercent - bottomMarginPercent)
     const lineHeight = contentHeight / LINES_PER_PAGE
-    const topMargin = scaledHeight * topMarginPercent
+    const topMargin = height * topMarginPercent
 
     // Line highlighting: center on the text line
     // Line 1 starts at topMargin, Line 2 at topMargin + lineHeight, etc.
@@ -156,7 +157,7 @@ export default function PDFViewer({
       transition: 'all 0.3s ease-out',
       zIndex: 10
     }
-  }, [displayDimensions.height, highlightStartLine, highlightEndLine, isCrossPage, zoom])
+  }, [displayDimensions.height, highlightStartLine, highlightEndLine, isCrossPage])
   
   // Calculate highlight for second page (cross-page Q/A continuation)
   const calculateHighlightStyle2 = useCallback(() => {
@@ -164,13 +165,13 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
-    // Scale dimensions by zoom factor
-    const scaledHeight = displayDimensions2.height * (zoom / 100)
+    // Use display dimensions directly - DON'T multiply by zoom
+    // The highlight is inside the scaled content wrapper
+    const height = displayDimensions2.height
 
     // Wrapper shows 88% of image (hiding top 12% header)
     // Content area: 80% of full image (100% - 12% header - 8% footer)
-    const fullHeight = scaledHeight
-    const contentHeight = fullHeight * 0.80  // 100% - 12% header - 8% footer
+    const contentHeight = height * 0.80  // 100% - 12% header - 8% footer
     const lineHeight = contentHeight / LINES_PER_PAGE
     // Top margin is 0 since header is already cropped
     const topMargin = 0
@@ -192,7 +193,7 @@ export default function PDFViewer({
       transition: 'all 0.3s ease-out',
       zIndex: 10
     }
-  }, [displayDimensions2.height, highlightEndLine, isCrossPage, zoom])
+  }, [displayDimensions2.height, highlightEndLine, isCrossPage])
 
   // Scroll to highlight when it changes or image loads
   useEffect(() => {
@@ -200,7 +201,8 @@ export default function PDFViewer({
 
     // Small delay to ensure DOM is updated
     const timer = setTimeout(() => {
-      // Scale dimensions by zoom factor
+      // Scroll position needs to account for zoom since scrolling happens in the unscaled container
+      // but we're scrolling to a position within the scaled content
       const scaledHeight = displayDimensions.height * (zoom / 100)
       
       const topMarginPercent = 0.12
