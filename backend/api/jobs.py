@@ -8,7 +8,14 @@ from pydantic import BaseModel
 
 from services.db_service import db_service, persistent_db_service
 from services.cache_service import cache_service
-from workers.tasks import process_document_task
+from services.pdf_service import pdf_service
+from workers.tasks import process_document_task, process_document_chunk_task
+from workers.chunk_coordinator import (
+    should_use_chunking,
+    calculate_optimal_chunks,
+    create_chunk_jobs
+)
+from config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,14 +45,17 @@ class JobStatus(BaseModel):
 
 
 @router.post("/start", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
-async def start_job(request: JobRequest):
+async def start_job(request: JobRequest, user_id: Optional[str] = None):
     """
-    Start processing a document.
-    Returns job ID for status tracking via WebSocket.
+    Start processing a document with automatic chunking support.
+    
+    If document is large enough and multiple API keys are available,
+    the document will be split into chunks and processed in parallel
+    across multiple workers for maximum speed.
     """
     # Verify document exists
     doc = await db_service.fetchrow(
-        "SELECT id, filename FROM documents WHERE id = $1",
+        "SELECT id, filename, total_pages, file_hash FROM documents WHERE id = $1",
         request.document_id
     )
     
@@ -55,48 +65,118 @@ async def start_job(request: JobRequest):
             detail="Document not found"
         )
     
-    # Create job record
-    job_id = await db_service.fetchval(
-        """
-        INSERT INTO processing_jobs (document_id, status, progress)
-        VALUES ($1, 'queued', 0)
-        RETURNING id
-        """,
-        request.document_id
-    )
+    total_pages = doc['total_pages']
     
-    # Enqueue task
-    try:
-        # This will be handled by Celery workers
-        process_document_task.delay(
-            str(job_id),
-            str(request.document_id),
-            request.first_page,
-            request.last_page
+    # Estimate Q&A pairs for chunking decision (rough: 5 pairs per page)
+    estimated_qa_pairs = total_pages * 5
+    
+    # Decide if we should use chunking
+    use_chunking = await should_use_chunking(estimated_qa_pairs)
+    
+    if use_chunking and total_pages >= 100:  # Also require minimum pages
+        # Create parent job for chunked processing
+        job_id = await db_service.fetchval(
+            """
+            INSERT INTO processing_jobs (document_id, status, progress, is_chunked, num_chunks)
+            VALUES ($1, 'queued', 0, TRUE, 0)
+            RETURNING id
+            """,
+            request.document_id
         )
         
-        logger.info(f"Job {job_id} queued for document {doc['filename']}")
+        # Calculate optimal number of chunks
+        num_chunks = calculate_optimal_chunks(total_pages, settings.available_worker_keys)
         
-        return {
-            "job_id": str(job_id),
-            "status": "queued",
-            "websocket_url": f"/ws/jobs/{job_id}"
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to enqueue job: {e}", exc_info=True)
-        
-        # Update job status to failed
+        # Update parent job with chunk count
         await db_service.execute(
-            "UPDATE processing_jobs SET status = 'failed', error_message = $1 WHERE id = $2",
-            str(e),
+            "UPDATE processing_jobs SET num_chunks = $1 WHERE id = $2",
+            num_chunks,
             job_id
         )
         
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start job: {str(e)}"
+        # Create chunk jobs
+        chunk_jobs = await create_chunk_jobs(
+            str(job_id),
+            str(request.document_id),
+            total_pages,
+            num_chunks
         )
+        
+        # Dispatch chunk tasks to workers
+        try:
+            for chunk in chunk_jobs:
+                process_document_chunk_task.delay(
+                    chunk['id'],
+                    str(request.document_id),
+                    chunk['first_page'],
+                    chunk['last_page'],
+                    user_id
+                )
+            
+            logger.info(f"Job {job_id} queued with {num_chunks} chunks for document {doc['filename']}")
+            
+            return {
+                "job_id": str(job_id),
+                "status": "queued",
+                "websocket_url": f"/ws/jobs/{job_id}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to enqueue chunk jobs: {e}", exc_info=True)
+            
+            await db_service.execute(
+                "UPDATE processing_jobs SET status = 'failed', error_message = $1 WHERE id = $2",
+                str(e),
+                job_id
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to start chunked job: {str(e)}"
+            )
+    
+    else:
+        # Standard single-worker processing
+        job_id = await db_service.fetchval(
+            """
+            INSERT INTO processing_jobs (document_id, status, progress, is_chunked)
+            VALUES ($1, 'queued', 0, FALSE)
+            RETURNING id
+            """,
+            request.document_id
+        )
+        
+        # Enqueue standard task
+        try:
+            process_document_task.delay(
+                str(job_id),
+                str(request.document_id),
+                request.first_page,
+                request.last_page,
+                user_id
+            )
+            
+            logger.info(f"Job {job_id} queued (standard) for document {doc['filename']}")
+            
+            return {
+                "job_id": str(job_id),
+                "status": "queued",
+                "websocket_url": f"/ws/jobs/{job_id}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to enqueue job: {e}", exc_info=True)
+            
+            await db_service.execute(
+                "UPDATE processing_jobs SET status = 'failed', error_message = $1 WHERE id = $2",
+                str(e),
+                job_id
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to start job: {str(e)}"
+            )
 
 
 @router.get("/{job_id}/status", response_model=JobStatus)

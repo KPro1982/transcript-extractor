@@ -250,8 +250,36 @@ async def init_db():
                 error_message TEXT,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT NOW()
+                created_at TIMESTAMP DEFAULT NOW(),
+                num_chunks INT DEFAULT 1,
+                is_chunked BOOLEAN DEFAULT FALSE
             );
+            
+            CREATE INDEX IF NOT EXISTS idx_processing_jobs_document_id ON processing_jobs(document_id);
+            CREATE INDEX IF NOT EXISTS idx_processing_jobs_status ON processing_jobs(status);
+            
+            -- Chunk jobs table for multi-worker parallel processing
+            CREATE TABLE IF NOT EXISTS chunk_jobs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                parent_job_id UUID REFERENCES processing_jobs(id) ON DELETE CASCADE,
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                chunk_index INT NOT NULL,
+                worker_id INT,
+                first_page INT NOT NULL,
+                last_page INT,
+                status VARCHAR(50) NOT NULL,
+                progress INT DEFAULT 0,
+                error_message TEXT,
+                items_processed INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                UNIQUE(parent_job_id, chunk_index)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_chunk_jobs_parent ON chunk_jobs(parent_job_id);
+            CREATE INDEX IF NOT EXISTS idx_chunk_jobs_status ON chunk_jobs(status);
+            CREATE INDEX IF NOT EXISTS idx_chunk_jobs_document ON chunk_jobs(document_id);
         """)
         
         logger.info("Ephemeral database tables initialized")

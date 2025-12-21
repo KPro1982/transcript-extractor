@@ -122,12 +122,15 @@ class AIService:
         }
     
     def _init_providers(self):
-        """Initialize available AI providers."""
-        if settings.openai_api_key:
+        """Initialize available AI providers using assigned worker key."""
+        # Use assigned key based on worker_id (supports multi-worker with different keys)
+        assigned_key = settings.assigned_openai_key
+        
+        if assigned_key:
             # Mask key for logging (show first 8 and last 4 chars)
-            masked_key = f"{settings.openai_api_key[:8]}...{settings.openai_api_key[-4:]}" if len(settings.openai_api_key) > 12 else "***"
-            logger.info(f"✅ OpenAI provider initialized with key: {masked_key}")
-            self.providers.append(OpenAIProvider(settings.openai_api_key))
+            masked_key = f"{assigned_key[:8]}...{assigned_key[-4:]}" if len(assigned_key) > 12 else "***"
+            logger.info(f"✅ OpenAI provider initialized (Worker {settings.worker_id}) with key: {masked_key}")
+            self.providers.append(OpenAIProvider(assigned_key))
         else:
             logger.error("❌ OPENAI_API_KEY not set! AI summarization will NOT work.")
         
