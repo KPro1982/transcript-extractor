@@ -19,6 +19,8 @@ DepoDigest is an AI-powered deposition transcript summarization platform with a 
 - **`master` branch**: Production branch - merge from `dev` when ready for release
 
 ### After Each Refactor/Fix
+**CRITICAL RULE: Always commit and push after refactoring or making fixes.**
+
 1. **Commit to `dev` branch:**
    ```bash
    git checkout dev
@@ -36,6 +38,8 @@ DepoDigest is an AI-powered deposition transcript summarization platform with a 
    - Check Railway dashboard for build status
    - Review logs if deployment fails
    - Test changes in Railway environment
+
+**Note**: Never leave refactored code uncommitted. Always commit and push immediately after completing a refactor or fix.
 
 ### Merging to Production
 When ready to release:
