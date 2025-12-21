@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react'
 import { getPDFPageUrl } from '@/lib/api'
 
 interface PDFViewerProps {
@@ -14,6 +14,8 @@ interface PDFViewerProps {
   endPage?: number            // End page for cross-page Q/A (printed page number)
   endPdfPageIndex?: number    // PDF page index for end page (for cross-page rendering)
   onPageChange?: (page: number) => void
+  onNext?: () => void         // Navigate to next Q&A item
+  onPrevious?: () => void     // Navigate to previous Q&A item
 }
 
 const LINES_PER_PAGE = 25
@@ -36,7 +38,9 @@ export default function PDFViewer({
   highlightEndLine,
   endPage,
   endPdfPageIndex,
-  onPageChange
+  onPageChange,
+  onNext,
+  onPrevious
 }: PDFViewerProps) {
   // Check if this is a cross-page Q/A
   // Compare using displayPageNumber (printed page) since endPage is also a printed page number
@@ -53,6 +57,7 @@ export default function PDFViewer({
   const [imageUrl2, setImageUrl2] = useState<string | null>(null) // Second page for cross-page Q/A
   const [displayDimensions, setDisplayDimensions] = useState({ width: 0, height: 0 })
   const [displayDimensions2, setDisplayDimensions2] = useState({ width: 0, height: 0 })
+  const [zoom, setZoom] = useState(100) // Zoom percentage
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const imageRef2 = useRef<HTMLImageElement>(null)
@@ -128,8 +133,8 @@ export default function PDFViewer({
 
     // Line numbers are typically positioned at the start of each line
     // Line 1 starts at topMargin, Line 2 at topMargin + lineHeight, etc.
-    // Adjust to center highlight on the line (subtract half line height)
-    const startY = topMargin + (highlightStartLine - 1) * lineHeight - (lineHeight * 0.1)
+    // Adjust to center highlight on the line - moved down 0.5 lines
+    const startY = topMargin + (highlightStartLine - 1) * lineHeight + (lineHeight * 0.4)
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
@@ -198,7 +203,7 @@ export default function PDFViewer({
       const lineHeight = contentHeight / LINES_PER_PAGE
       const topMargin = displayDimensions.height * topMarginPercent
 
-      const startY = topMargin + (highlightStartLine - 1) * lineHeight - (lineHeight * 0.1)
+      const startY = topMargin + (highlightStartLine - 1) * lineHeight + (lineHeight * 0.4)
       
       // Scroll to position the highlight about 1/4 from the top of the visible area
       const container = containerRef.current
@@ -233,50 +238,81 @@ export default function PDFViewer({
   }, [loading])
 
   const goToPreviousPage = useCallback(() => {
-    if (pageNumber > 1) {
+    if (onPrevious) {
+      onPrevious()
+    } else if (pageNumber > 1) {
       onPageChange?.(pageNumber - 1)
     }
-  }, [pageNumber, onPageChange])
+  }, [pageNumber, onPageChange, onPrevious])
 
   const goToNextPage = useCallback(() => {
-    if (pageNumber < totalPages) {
+    if (onNext) {
+      onNext()
+    } else if (pageNumber < totalPages) {
       onPageChange?.(pageNumber + 1)
     }
-  }, [pageNumber, totalPages, onPageChange])
+  }, [pageNumber, totalPages, onPageChange, onNext])
+
+  const zoomIn = useCallback(() => {
+    setZoom(prev => Math.min(prev + 10, 200))
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    setZoom(prev => Math.max(prev - 10, 50))
+  }, [])
 
   const highlightStyle = calculateHighlightStyle()
   const highlightStyle2 = calculateHighlightStyle2()
 
   return (
     <div className="flex flex-col h-full bg-bg-elevated rounded-xl overflow-hidden">
-      {/* Page Navigation Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-bg-card border-b border-gray-800">
-        <button
-          onClick={goToPreviousPage}
-          disabled={pageNumber <= 1}
-          className="p-2 rounded-lg hover:bg-bg-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        
-        <div className="text-sm font-mono text-gray-400">
-          Page <span className="text-white font-semibold">{shownPageNumber}</span> of {totalPages}
-        </div>
-        
-        <button
-          onClick={goToNextPage}
-          disabled={pageNumber >= totalPages}
-          className="p-2 rounded-lg hover:bg-bg-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-
       {/* PDF Page Display */}
       <div 
         ref={containerRef}
         className="flex-1 overflow-auto relative"
+        style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
       >
+        {/* Left Arrow - Centered vertically */}
+        <button
+          onClick={goToPreviousPage}
+          disabled={pageNumber <= 1}
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+        >
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </button>
+
+        {/* Right Arrow - Centered vertically */}
+        <button
+          onClick={goToNextPage}
+          disabled={pageNumber >= totalPages}
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+        >
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
+
+        {/* Zoom Controls - Top Right */}
+        <div className="absolute top-4 right-4 z-20 flex gap-2">
+          <button
+            onClick={zoomOut}
+            disabled={zoom <= 50}
+            className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-5 h-5 text-white" />
+          </button>
+          <div className="px-3 py-2 rounded-lg bg-black/50 backdrop-blur-sm text-white text-sm font-mono">
+            {zoom}%
+          </div>
+          <button
+            onClick={zoomIn}
+            disabled={zoom >= 200}
+            className="p-2 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all backdrop-blur-sm"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-5 h-5 text-white" />
+          </button>
+        </div>
+
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated z-20">
             <div className="text-center">
@@ -384,15 +420,6 @@ export default function PDFViewer({
               </>
             )}
           </div>
-        )}
-      </div>
-
-      {/* Line Number Indicator Footer */}
-      <div className="px-4 py-2 bg-bg-card border-t border-gray-800 text-xs text-gray-500 text-center">
-        {isCrossPage ? (
-          <>Lines {highlightStartLine} (Page {shownPageNumber}) - {highlightEndLine} (Page {endPage})</>
-        ) : (
-          <>Lines {highlightStartLine}-{highlightEndLine}</>
         )}
       </div>
     </div>

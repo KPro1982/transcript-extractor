@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, BookOpen, Upload, Shield } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown } from 'lucide-react'
 import { getJobStatus, getQAItems, getDocument } from '@/lib/api'
 import { useKeyboardNav } from '@/hooks/useKeyboardNav'
 import { useAuth } from '@/contexts/AuthContext'
@@ -41,6 +41,7 @@ export default function ResultsPage() {
   const [documentId, setDocumentId] = useState<string | null>(null)
   const [totalPages, setTotalPages] = useState(1)
   const [filename, setFilename] = useState<string>('')
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
 
   // Keyboard navigation hook
   const { 
@@ -184,48 +185,70 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-bg-base">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-bg-card border-b border-gray-800">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back</span>
-          </button>
-          
-          <div className="h-6 w-px bg-gray-700" />
-          
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-accent" />
-            <h1 className="font-serif text-lg truncate max-w-[300px]" title={filename}>
-              {filename}
-            </h1>
-          </div>
-        </div>
+    <div className="h-screen flex flex-col bg-bg-base relative">
+      {/* Collapsible Header */}
+      <div className="relative">
+        <header 
+          className={`bg-bg-card border-b border-gray-800 transition-all duration-300 overflow-hidden ${
+            headerCollapsed ? 'h-0 border-0' : 'h-auto'
+          }`}
+        >
+          <div className="flex items-center justify-between px-6 py-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/upload')}
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+              
+              <div className="h-6 w-px bg-gray-700" />
+              
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-accent" />
+                <h1 className="font-serif text-base truncate max-w-[300px]" title={filename}>
+                  {filename}
+                </h1>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-4">
-          {/* Stats */}
-          <div className="hidden md:flex items-center gap-4 text-sm text-gray-400">
-            <span>{qaItems.length} Q&A pairs</span>
-            <span className="text-gray-600">•</span>
-            <span>{totalPages} pages</span>
-          </div>
-          
-          <button
-            onClick={() => router.push('/upload')}
-            className="flex items-center gap-2 px-4 py-2 bg-bg-elevated hover:bg-accent/10 border border-gray-700 hover:border-accent/50 rounded-xl transition-all"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">New Document</span>
-          </button>
+            <div className="flex items-center gap-4">
+              {/* Stats */}
+              <div className="hidden md:flex items-center gap-4 text-sm text-gray-400">
+                <span>{qaItems.length} Q&A pairs</span>
+                <span className="text-gray-600">•</span>
+                <span>{totalPages} pages</span>
+              </div>
+              
+              <button
+                onClick={() => router.push('/upload')}
+                className="flex items-center gap-2 px-4 py-1.5 bg-bg-elevated hover:bg-accent/10 border border-gray-700 hover:border-accent/50 rounded-xl transition-all text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">New Document</span>
+              </button>
 
-          {/* User Menu with Sign Out */}
-          <UserMenu />
-        </div>
-      </header>
+              {/* User Menu with Sign Out */}
+              <UserMenu />
+            </div>
+          </div>
+        </header>
+
+        {/* Collapse Toggle Button */}
+        <button
+          onClick={() => setHeaderCollapsed(!headerCollapsed)}
+          className={`absolute left-1/2 -translate-x-1/2 z-30 px-3 py-1 bg-bg-card hover:bg-bg-elevated border-x border-b border-gray-800 rounded-b-lg transition-all ${
+            headerCollapsed ? 'top-0 border-t' : 'top-full -mt-px'
+          }`}
+        >
+          {headerCollapsed ? (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronUp className="w-4 h-4 text-gray-400" />
+          )}
+        </button>
+      </div>
 
       {/* Main Content - Side by Side */}
       <main className="flex-1 flex overflow-hidden">
@@ -242,6 +265,8 @@ export default function ResultsPage() {
               endPage={endPage}
               endPdfPageIndex={endPdfPageIndex}
               onPageChange={handlePageChange}
+              onNext={goToNext}
+              onPrevious={goToPrevious}
             />
           )}
         </div>
