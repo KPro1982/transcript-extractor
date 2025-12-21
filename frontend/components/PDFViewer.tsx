@@ -121,31 +121,32 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
+    // Scale dimensions by zoom factor to get actual displayed size
+    const scaledHeight = displayDimensions.height * (zoom / 100)
+
     // Calculate line positions based on legal transcript standard (25 lines/page)
     // Legal transcripts typically have:
-    // - Top margin: ~10-12% (header area)
-    // - Bottom margin: ~6-8% (footer area)
-    // - Line numbers are positioned at the start of each line (not centered)
-    const topMarginPercent = 0.10  // Reduced from 0.12 for better alignment
-    const bottomMarginPercent = 0.07  // Reduced from 0.08
-    const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
+    // - Top margin: ~12% (header area)
+    // - Bottom margin: ~8% (footer area)
+    const topMarginPercent = 0.12
+    const bottomMarginPercent = 0.08
+    const contentHeight = scaledHeight * (1 - topMarginPercent - bottomMarginPercent)
     const lineHeight = contentHeight / LINES_PER_PAGE
-    const topMargin = displayDimensions.height * topMarginPercent
+    const topMargin = scaledHeight * topMarginPercent
 
-    // Line numbers are typically positioned at the start of each line
+    // Line highlighting: center on the text line
     // Line 1 starts at topMargin, Line 2 at topMargin + lineHeight, etc.
-    // Adjust to center highlight on the line - moved down 0.5 lines
-    const startY = topMargin + (highlightStartLine - 1) * lineHeight + (lineHeight * 0.4)
+    const startY = topMargin + (highlightStartLine - 1) * lineHeight
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
-    // End position: start of endLine + most of line height (to cover the full line)
-    const endY = topMargin + (endLine - 1) * lineHeight + (lineHeight * 0.9)
+    // End position: start of endLine + full line height
+    const endY = topMargin + endLine * lineHeight
 
     return {
       position: 'absolute' as const,
       left: 0,
-      top: Math.max(0, startY), // Ensure not negative
+      top: Math.max(0, startY),
       height: Math.max(endY - startY, lineHeight * 0.8), // Minimum 80% of line height
       width: '100%', // Full width highlight
       backgroundColor: 'rgba(201, 166, 107, 0.2)', // Semi-transparent overlay
@@ -155,7 +156,7 @@ export default function PDFViewer({
       transition: 'all 0.3s ease-out',
       zIndex: 10
     }
-  }, [displayDimensions.height, highlightStartLine, highlightEndLine, isCrossPage])
+  }, [displayDimensions.height, highlightStartLine, highlightEndLine, isCrossPage, zoom])
   
   // Calculate highlight for second page (cross-page Q/A continuation)
   const calculateHighlightStyle2 = useCallback(() => {
@@ -163,19 +164,20 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
+    // Scale dimensions by zoom factor
+    const scaledHeight = displayDimensions2.height * (zoom / 100)
+
     // Wrapper shows 88% of image (hiding top 12% header)
     // Content area: 80% of full image (100% - 12% header - 8% footer)
-    // Within wrapper: content starts at top (0), bottom margin is 8% of full image
-    const fullHeight = displayDimensions2.height
-    const wrapperHeight = fullHeight * 0.88
+    const fullHeight = scaledHeight
     const contentHeight = fullHeight * 0.80  // 100% - 12% header - 8% footer
     const lineHeight = contentHeight / LINES_PER_PAGE
     // Top margin is 0 since header is already cropped
     const topMargin = 0
 
-    // Start from line 1 on second page, continue to highlightEndLine (between line numbers)
-    const startY = topMargin + (1 - 1.5) * lineHeight
-    const endY = topMargin + (highlightEndLine - 0.5) * lineHeight
+    // Start from line 1 on second page, continue to highlightEndLine
+    const startY = topMargin + (1 - 1) * lineHeight
+    const endY = topMargin + highlightEndLine * lineHeight
 
     return {
       position: 'absolute' as const,
@@ -190,7 +192,7 @@ export default function PDFViewer({
       transition: 'all 0.3s ease-out',
       zIndex: 10
     }
-  }, [displayDimensions2.height, highlightEndLine, isCrossPage])
+  }, [displayDimensions2.height, highlightEndLine, isCrossPage, zoom])
 
   // Scroll to highlight when it changes or image loads
   useEffect(() => {
@@ -198,13 +200,16 @@ export default function PDFViewer({
 
     // Small delay to ensure DOM is updated
     const timer = setTimeout(() => {
-      const topMarginPercent = 0.10  // Match highlight calculation
-      const bottomMarginPercent = 0.07
-      const contentHeight = displayDimensions.height * (1 - topMarginPercent - bottomMarginPercent)
+      // Scale dimensions by zoom factor
+      const scaledHeight = displayDimensions.height * (zoom / 100)
+      
+      const topMarginPercent = 0.12
+      const bottomMarginPercent = 0.08
+      const contentHeight = scaledHeight * (1 - topMarginPercent - bottomMarginPercent)
       const lineHeight = contentHeight / LINES_PER_PAGE
-      const topMargin = displayDimensions.height * topMarginPercent
+      const topMargin = scaledHeight * topMarginPercent
 
-      const startY = topMargin + (highlightStartLine - 1) * lineHeight + (lineHeight * 0.4)
+      const startY = topMargin + (highlightStartLine - 1) * lineHeight
       
       // Scroll to position the highlight about 1/4 from the top of the visible area
       const container = containerRef.current
@@ -220,7 +225,7 @@ export default function PDFViewer({
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [highlightStartLine, displayDimensions.height, loading])
+  }, [highlightStartLine, displayDimensions.height, loading, zoom])
 
   // Update dimensions on resize
   useEffect(() => {
@@ -265,20 +270,33 @@ export default function PDFViewer({
   const fitToPage = useCallback(() => {
     if (containerRef.current && imageRef.current) {
       const containerHeight = containerRef.current.clientHeight
+      const containerWidth = containerRef.current.clientWidth
       const imageHeight = imageRef.current.naturalHeight
       const imageWidth = imageRef.current.naturalWidth
-      const containerWidth = containerRef.current.clientWidth
       
-      // Calculate zoom to fit height
+      // Calculate zoom to fit height (fill container vertically)
       const heightZoom = (containerHeight / imageHeight) * 100
       // Calculate zoom to fit width
       const widthZoom = (containerWidth / imageWidth) * 100
       
-      // Use the smaller zoom to ensure entire page fits
+      // Use the smaller zoom to ensure entire page fits, but prioritize height
       const fitZoom = Math.min(heightZoom, widthZoom, 200)
       setZoom(Math.max(50, Math.round(fitZoom)))
     }
   }, [])
+
+  // Recalculate fit-to-page when container size changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (zoom !== 100) {
+        // Only auto-adjust if user has used fit-to-page before
+        // (You can track this with a separate state if needed)
+      }
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [zoom])
 
   const highlightStyle = calculateHighlightStyle()
   const highlightStyle2 = calculateHighlightStyle2()
@@ -343,7 +361,7 @@ export default function PDFViewer({
       {/* Scrollable PDF Content */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto relative"
+        className="flex-1 overflow-auto relative flex items-start justify-center"
       >
         <div 
           ref={contentRef}
@@ -351,10 +369,7 @@ export default function PDFViewer({
           style={{ 
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top center',
-            minHeight: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center'
+            width: 'fit-content'
           }}
         >
           {loading && (
@@ -376,7 +391,7 @@ export default function PDFViewer({
           )}
 
           {imageUrl && (
-            <div className="space-y-0 w-full">
+            <div className="space-y-0">
               {/* First Page */}
               <div className="relative">
                 {/* Line Highlight Indicator - Thick gold bar */}
