@@ -258,6 +258,28 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_processing_jobs_document_id ON processing_jobs(document_id);
             CREATE INDEX IF NOT EXISTS idx_processing_jobs_status ON processing_jobs(status);
             
+            -- Add num_chunks column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'processing_jobs' AND column_name = 'num_chunks'
+                ) THEN
+                    ALTER TABLE processing_jobs ADD COLUMN num_chunks INT DEFAULT 1;
+                END IF;
+            END $$;
+            
+            -- Add is_chunked column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'processing_jobs' AND column_name = 'is_chunked'
+                ) THEN
+                    ALTER TABLE processing_jobs ADD COLUMN is_chunked BOOLEAN DEFAULT FALSE;
+                END IF;
+            END $$;
+            
             -- Chunk jobs table for multi-worker parallel processing
             CREATE TABLE IF NOT EXISTS chunk_jobs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -42,9 +42,27 @@ export default function UploadPage() {
 
       // Redirect to processing page
       router.push(`/process/${jobId}`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error)
-      alert('Upload failed. Please try again.')
+      
+      // Extract error message from API response
+      let errorMessage = 'Upload failed. Please try again.'
+      
+      if (error?.response?.data?.detail) {
+        errorMessage = `Upload failed: ${error.response.data.detail}`
+      } else if (error?.response?.data?.message) {
+        errorMessage = `Upload failed: ${error.response.data.message}`
+      } else if (error?.message) {
+        errorMessage = `Upload failed: ${error.message}`
+      } else if (error?.response?.status === 0 || error?.code === 'ERR_NETWORK') {
+        errorMessage = 'Upload failed: Cannot connect to server. Please check your connection and try again.'
+      } else if (error?.response?.status === 500) {
+        errorMessage = 'Upload failed: Server error. Please check Railway logs and try again.'
+      } else if (error?.response?.status === 413) {
+        errorMessage = 'Upload failed: File too large. Please try a smaller file.'
+      }
+      
+      alert(errorMessage)
       setIsUploading(false)
     }
   }
