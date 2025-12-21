@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react'
 import { getPDFPageUrl } from '@/lib/api'
 
 interface PDFViewerProps {
@@ -58,6 +58,7 @@ export default function PDFViewer({
   const [displayDimensions, setDisplayDimensions] = useState({ width: 0, height: 0 })
   const [displayDimensions2, setDisplayDimensions2] = useState({ width: 0, height: 0 })
   const [zoom, setZoom] = useState(100) // Zoom percentage
+  const [fitMode, setFitMode] = useState<'page' | 'width' | null>(null) // Track current fit mode
   const containerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -142,8 +143,8 @@ export default function PDFViewer({
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
-    // End position: start of endLine + full line height
-    const endY = topMargin + endLine * lineHeight
+    // End position: end of endLine (reduce by 0.5 lines to not extend too far)
+    const endY = topMargin + (endLine - 0.5) * lineHeight
 
     return {
       position: 'absolute' as const,
@@ -264,10 +265,12 @@ export default function PDFViewer({
 
   const zoomIn = useCallback(() => {
     setZoom(prev => Math.min(prev + 10, 200))
+    setFitMode(null) // Clear fit mode on manual zoom
   }, [])
 
   const zoomOut = useCallback(() => {
     setZoom(prev => Math.max(prev - 10, 50))
+    setFitMode(null) // Clear fit mode on manual zoom
   }, [])
 
   const fitToPage = useCallback(() => {
@@ -279,14 +282,45 @@ export default function PDFViewer({
       
       // Calculate zoom to fit height (fill container vertically)
       const heightZoom = (containerHeight / imageHeight) * 100
+      
+      setZoom(Math.max(50, Math.min(Math.round(heightZoom), 200)))
+      setFitMode('page')
+    }
+  }, [])
+
+  const fitToWidth = useCallback(() => {
+    if (containerRef.current && imageRef.current) {
+      const containerWidth = containerRef.current.clientWidth
+      const imageWidth = imageRef.current.naturalWidth
+      
       // Calculate zoom to fit width
       const widthZoom = (containerWidth / imageWidth) * 100
       
-      // Use the smaller zoom to ensure entire page fits, but prioritize height
-      const fitZoom = Math.min(heightZoom, widthZoom, 200)
-      setZoom(Math.max(50, Math.round(fitZoom)))
+      setZoom(Math.max(50, Math.min(Math.round(widthZoom), 200)))
+      setFitMode('width')
+      
+      // After zoom is applied, scroll to position highlight 2 lines below top
+      setTimeout(() => {
+        if (containerRef.current && displayDimensions.height) {
+          const scaledHeight = displayDimensions.height * (widthZoom / 100)
+          const topMarginPercent = 0.12
+          const bottomMarginPercent = 0.08
+          const contentHeight = scaledHeight * (1 - topMarginPercent - bottomMarginPercent)
+          const lineHeight = contentHeight / LINES_PER_PAGE
+          const topMargin = scaledHeight * topMarginPercent
+          
+          // Position so highlight starts 2 lines below top of container
+          const highlightY = topMargin + (highlightStartLine - 1.5) * lineHeight
+          const scrollTarget = highlightY - (2 * lineHeight)
+          
+          containerRef.current.scrollTo({
+            top: Math.max(0, scrollTarget),
+            behavior: 'smooth'
+          })
+        }
+      }, 150)
     }
-  }, [])
+  }, [displayDimensions.height, highlightStartLine])
 
   // Recalculate fit-to-page when container size changes
   useEffect(() => {
@@ -346,10 +380,17 @@ export default function PDFViewer({
         </div>
         <button
           onClick={fitToPage}
-          className="p-2 rounded-lg bg-black/50 hover:bg-black/70 transition-all backdrop-blur-sm"
-          title="Fit to Page"
+          className={`p-2 rounded-lg ${fitMode === 'page' ? 'bg-accent/50' : 'bg-black/50 hover:bg-black/70'} transition-all backdrop-blur-sm`}
+          title="Fit to Page Height"
         >
           <Maximize2 className="w-5 h-5 text-white" />
+        </button>
+        <button
+          onClick={fitToWidth}
+          className={`p-2 rounded-lg ${fitMode === 'width' ? 'bg-accent/50' : 'bg-black/50 hover:bg-black/70'} transition-all backdrop-blur-sm`}
+          title="Fit to Width"
+        >
+          <Minimize2 className="w-5 h-5 text-white rotate-90" />
         </button>
         <button
           onClick={zoomIn}
