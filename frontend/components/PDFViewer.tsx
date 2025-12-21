@@ -323,25 +323,36 @@ export default function PDFViewer({
               )}
             </div>
             
-            {/* Second Page (for cross-page Q/A) */}
+            {/* Separator line and Second Page (for cross-page Q/A) */}
             {isCrossPage && imageUrl2 && (
-              <div 
-                className="relative"
-                style={displayDimensions.height ? {
-                  marginTop: `-${displayDimensions.height * 0.08}px`
-                } : undefined}
-              >
-                {/* Line Highlight Indicator for second page */}
-                {highlightStyle2.display !== 'none' && (
-                  <div 
-                    ref={highlightRef2}
-                    style={highlightStyle2} 
-                  />
-                )}
+              <>
+                {/* Black separator line */}
+                <div className="w-full h-px bg-black my-4" />
                 
-                {/* Wrapper to crop header when cross-page */}
-                {displayDimensions2.height ? (
-                  <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                <div className="relative">
+                  {/* Line Highlight Indicator for second page */}
+                  {highlightStyle2.display !== 'none' && (
+                    <div 
+                      ref={highlightRef2}
+                      style={highlightStyle2} 
+                    />
+                  )}
+                  
+                  {/* Wrapper to crop header when cross-page */}
+                  {displayDimensions2.height ? (
+                    <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                      <img
+                        ref={imageRef2}
+                        src={imageUrl2}
+                        alt={`Page ${endPage}`}
+                        onLoad={handleImageLoad2}
+                        onError={handleImageError}
+                        className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                        style={{ marginTop: `-${displayDimensions2.height * 0.12}px` }}
+                        draggable={false}
+                      />
+                    </div>
+                  ) : (
                     <img
                       ref={imageRef2}
                       src={imageUrl2}
@@ -349,22 +360,11 @@ export default function PDFViewer({
                       onLoad={handleImageLoad2}
                       onError={handleImageError}
                       className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                      style={{ marginTop: `-${displayDimensions2.height * 0.12}px` }}
                       draggable={false}
                     />
-                  </div>
-                ) : (
-                  <img
-                    ref={imageRef2}
-                    src={imageUrl2}
-                    alt={`Page ${endPage}`}
-                    onLoad={handleImageLoad2}
-                    onError={handleImageError}
-                    className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                    draggable={false}
-                  />
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
