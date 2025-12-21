@@ -305,13 +305,14 @@ export default function PDFViewer({
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                style={isCrossPage ? { clipPath: 'inset(0 0 8% 0)' } : undefined}
                 draggable={false}
               />
             </div>
             
             {/* Second Page (for cross-page Q/A) */}
             {isCrossPage && imageUrl2 && (
-              <div className="relative">
+              <div className="relative" style={{ marginTop: displayDimensions.height ? `-${displayDimensions.height * 0.08}px` : '-8%' }}>
                 {/* Line Highlight Indicator for second page */}
                 {highlightStyle2.display !== 'none' && (
                   <div 
@@ -328,6 +329,7 @@ export default function PDFViewer({
                   onLoad={handleImageLoad2}
                   onError={handleImageError}
                   className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                  style={{ clipPath: 'inset(12% 0 0 0)' }}
                   draggable={false}
                 />
               </div>
