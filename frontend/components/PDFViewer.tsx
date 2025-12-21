@@ -157,21 +157,25 @@ export default function PDFViewer({
       return { display: 'none' as const }
     }
 
-    const topMarginPercent = 0.10  // Match first page calculation
-    const bottomMarginPercent = 0.07
-    const contentHeight = displayDimensions2.height * (1 - topMarginPercent - bottomMarginPercent)
+    // Wrapper shows 88% of image (hiding top 12% header)
+    // Content area: 80% of full image (100% - 12% header - 8% footer)
+    // Within wrapper: content starts at top (0), bottom margin is 8% of full image
+    const fullHeight = displayDimensions2.height
+    const wrapperHeight = fullHeight * 0.88
+    const contentHeight = fullHeight * 0.80  // 100% - 12% header - 8% footer
     const lineHeight = contentHeight / LINES_PER_PAGE
-    const topMargin = displayDimensions2.height * topMarginPercent
+    // Top margin is 0 since header is already cropped
+    const topMargin = 0
 
-    // Start from line 1 on second page, continue to highlightEndLine
-    const startY = topMargin + (1 - 1) * lineHeight - (lineHeight * 0.1)
-    const endY = topMargin + (highlightEndLine - 1) * lineHeight + (lineHeight * 0.9)
+    // Start from line 1 on second page, continue to highlightEndLine (between line numbers)
+    const startY = topMargin + (1 - 1.5) * lineHeight
+    const endY = topMargin + (highlightEndLine - 0.5) * lineHeight
 
     return {
       position: 'absolute' as const,
       left: 0,
-      top: Math.max(0, startY),
-      height: Math.max(endY - startY, lineHeight * 0.8),
+      top: startY,
+      height: Math.max(endY - startY, lineHeight),
       width: '100%',
       backgroundColor: 'rgba(201, 166, 107, 0.2)',
       borderLeft: '4px solid #c9a66b',
@@ -303,40 +307,81 @@ export default function PDFViewer({
                 />
               )}
               
-              {/* PDF Page Image */}
-              <img
-                ref={imageRef}
-                src={imageUrl}
-                alt={`Page ${pageNumber}`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-                className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                draggable={false}
-              />
-            </div>
-            
-            {/* Second Page (for cross-page Q/A) */}
-            {isCrossPage && imageUrl2 && (
-              <div className="relative">
-                {/* Line Highlight Indicator for second page */}
-                {highlightStyle2.display !== 'none' && (
-                  <div 
-                    ref={highlightRef2}
-                    style={highlightStyle2} 
+              {/* Wrapper to crop footer when cross-page */}
+              {isCrossPage && displayDimensions.height ? (
+                <div className="overflow-hidden" style={{ height: `${displayDimensions.height * 0.92}px` }}>
+                  <img
+                    ref={imageRef}
+                    src={imageUrl}
+                    alt={`Page ${pageNumber}`}
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                    className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                    draggable={false}
                   />
-                )}
-                
-                {/* Second PDF Page Image */}
+                </div>
+              ) : (
                 <img
-                  ref={imageRef2}
-                  src={imageUrl2}
-                  alt={`Page ${endPage}`}
-                  onLoad={handleImageLoad2}
+                  ref={imageRef}
+                  src={imageUrl}
+                  alt={`Page ${pageNumber}`}
+                  onLoad={handleImageLoad}
                   onError={handleImageError}
                   className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
                   draggable={false}
                 />
-              </div>
+              )}
+            </div>
+            
+            {/* Separator line and Second Page (for cross-page Q/A) */}
+            {isCrossPage && imageUrl2 && (
+              <>
+                {/* Separator container - white background with black line to prevent brown band */}
+                <div 
+                  className="w-full bg-white flex items-center justify-center"
+                  style={displayDimensions2.height ? {
+                    height: `${displayDimensions2.height * 0.80 / LINES_PER_PAGE * 1.5}px`
+                  } : { height: '2rem' }}
+                >
+                  <div className="w-full h-0.5 bg-black" />
+                </div>
+                
+                <div className="relative">
+                  {/* Line Highlight Indicator for second page */}
+                  {highlightStyle2.display !== 'none' && (
+                    <div 
+                      ref={highlightRef2}
+                      style={highlightStyle2} 
+                    />
+                  )}
+                  
+                  {/* Wrapper to crop header when cross-page */}
+                  {displayDimensions2.height ? (
+                    <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                      <img
+                        ref={imageRef2}
+                        src={imageUrl2}
+                        alt={`Page ${endPage}`}
+                        onLoad={handleImageLoad2}
+                        onError={handleImageError}
+                        className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                        style={{ marginTop: `-${displayDimensions2.height * 0.104}px` }}
+                        draggable={false}
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      ref={imageRef2}
+                      src={imageUrl2}
+                      alt={`Page ${endPage}`}
+                      onLoad={handleImageLoad2}
+                      onError={handleImageError}
+                      className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                      draggable={false}
+                    />
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
