@@ -389,28 +389,6 @@ export default function SummaryDisplay({
         </div>
       </div>
 
-      {/* Keyboard Hints Footer */}
-      <div className="px-6 py-3 bg-bg-elevated border-t border-gray-800">
-        <div className="flex items-center justify-center gap-6 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-bg-card border border-gray-700 rounded text-gray-400">↑</kbd>
-            <span>Previous</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-bg-card border border-gray-700 rounded text-gray-400">↓</kbd>
-            <span>Next</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-bg-card border border-gray-700 rounded text-gray-400">Home</kbd>
-            <span>First</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-bg-card border border-gray-700 rounded text-gray-400">End</kbd>
-            <span>Last</span>
-          </span>
-        </div>
-      </div>
-
       {/* Learning Feedback Modal */}
       <LearningFeedbackModal
         isOpen={feedbackModalOpen}

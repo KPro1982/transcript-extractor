@@ -46,31 +46,45 @@ export default function ProcessPage() {
     }
   }, [progress.detailedProgress, avgTimePerPage])
 
-  // Update countdown every second
+  // Update countdown every second - count down continuously
   useEffect(() => {
     if (!progress.detailedProgress || progress.status === 'completed') {
       setCountdown('')
       return
     }
 
-    const updateCountdown = () => {
-      if (!progress.detailedProgress) return
-      
-      const { current, total } = progress.detailedProgress
+    // Store the initial calculation and start time
+    let initialRemaining = 0
+    let startTime = Date.now()
+    
+    const calculateInitial = () => {
+      const { current, total } = progress.detailedProgress!
       const remaining = total - current
-      const estimatedSeconds = remaining * avgTimePerPage
+      initialRemaining = remaining * avgTimePerPage
+      startTime = Date.now()
+    }
+    
+    calculateInitial()
+
+    const updateCountdown = () => {
+      // Calculate elapsed time since start
+      const elapsedSeconds = (Date.now() - startTime) / 1000
       
-      if (estimatedSeconds > 0 && remaining > 0) {
+      // Subtract elapsed time from initial estimate
+      const estimatedSeconds = Math.max(0, initialRemaining - elapsedSeconds)
+      
+      if (estimatedSeconds > 0) {
         const minutes = Math.floor(estimatedSeconds / 60)
         const seconds = Math.floor(estimatedSeconds % 60)
         setCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
       } else {
-        setCountdown('')
+        setCountdown('0:00')
       }
     }
 
     updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
+    // Update every 100ms for smooth countdown
+    const interval = setInterval(updateCountdown, 100)
     
     return () => clearInterval(interval)
   }, [progress.detailedProgress, avgTimePerPage, progress.status])
@@ -177,59 +191,8 @@ export default function ProcessPage() {
               </div>
             )}
           </div>
-
-          {/* Processing Steps */}
-          <div className="mt-8 space-y-3">
-            <ProcessingStep
-              label="PDF Extraction"
-              isActive={progress.progress >= 5 && progress.progress < 20}
-              isComplete={progress.progress >= 20}
-            />
-            <ProcessingStep
-              label="Q&A Parsing"
-              isActive={progress.progress >= 20 && progress.progress < 25}
-              isComplete={progress.progress >= 25}
-            />
-            <ProcessingStep
-              label="AI Summarization"
-              isActive={progress.progress >= 25 && progress.progress < 90}
-              isComplete={progress.progress >= 90}
-            />
-            <ProcessingStep
-              label="Saving Results"
-              isActive={progress.progress >= 90 && progress.progress < 100}
-              isComplete={progress.progress === 100}
-            />
-          </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-function ProcessingStep({
-  label,
-  isActive,
-  isComplete,
-}: {
-  label: string
-  isActive: boolean
-  isComplete: boolean
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className={`w-2 h-2 rounded-full ${
-          isComplete
-            ? 'bg-accent'
-            : isActive
-            ? 'bg-accent animate-pulse'
-            : 'bg-gray-700'
-        }`}
-      />
-      <span className={isComplete || isActive ? 'text-gray-300' : 'text-gray-600'}>
-        {label}
-      </span>
     </div>
   )
 }

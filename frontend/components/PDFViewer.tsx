@@ -135,9 +135,10 @@ export default function PDFViewer({
     const lineHeight = contentHeight / LINES_PER_PAGE
     const topMargin = height * topMarginPercent
 
-    // Line highlighting: center on the text line
+    // Line highlighting: position on the text line
     // Line 1 starts at topMargin, Line 2 at topMargin + lineHeight, etc.
-    const startY = topMargin + (highlightStartLine - 1) * lineHeight
+    // Move up 0.5 lines for better alignment
+    const startY = topMargin + (highlightStartLine - 1.5) * lineHeight
     
     // For cross-page Q/A, highlight to end of first page
     const endLine = isCrossPage ? LINES_PER_PAGE : highlightEndLine
@@ -211,7 +212,7 @@ export default function PDFViewer({
       const lineHeight = contentHeight / LINES_PER_PAGE
       const topMargin = scaledHeight * topMarginPercent
 
-      const startY = topMargin + (highlightStartLine - 1) * lineHeight
+      const startY = topMargin + (highlightStartLine - 1.5) * lineHeight
       
       // Scroll to position the highlight about 1/4 from the top of the visible area
       const container = containerRef.current
