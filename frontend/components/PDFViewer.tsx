@@ -330,15 +330,17 @@ export default function PDFViewer({
             {/* Separator line and Second Page (for cross-page Q/A) */}
             {isCrossPage && imageUrl2 && (
               <>
-                {/* Black separator line - no margin to prevent brown band showing through */}
-                <div className="w-full h-0.5 bg-black" />
-                
+                {/* Separator container - white background with black line to prevent brown band */}
                 <div 
-                  className="relative"
+                  className="w-full bg-white flex items-center justify-center"
                   style={displayDimensions2.height ? {
-                    marginTop: `${displayDimensions2.height * 0.80 / LINES_PER_PAGE * 1.5}px`
-                  } : undefined}
+                    height: `${displayDimensions2.height * 0.80 / LINES_PER_PAGE * 1.5}px`
+                  } : { height: '2rem' }}
                 >
+                  <div className="w-full h-0.5 bg-black" />
+                </div>
+                
+                <div className="relative">
                   {/* Line Highlight Indicator for second page */}
                   {highlightStyle2.display !== 'none' && (
                     <div 
