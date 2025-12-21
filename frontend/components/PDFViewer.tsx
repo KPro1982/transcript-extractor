@@ -359,7 +359,7 @@ export default function PDFViewer({
                         onLoad={handleImageLoad2}
                         onError={handleImageError}
                         className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                        style={{ marginTop: `-${displayDimensions2.height * 0.12}px` }}
+                        style={{ marginTop: `-${displayDimensions2.height * 0.104}px` }}
                         draggable={false}
                       />
                     </div>
