@@ -297,22 +297,40 @@ export default function PDFViewer({
                 />
               )}
               
-              {/* PDF Page Image */}
-              <img
-                ref={imageRef}
-                src={imageUrl}
-                alt={`Page ${pageNumber}`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-                className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                style={isCrossPage ? { clipPath: 'inset(0 0 8% 0)' } : undefined}
-                draggable={false}
-              />
+              {/* Wrapper to crop footer when cross-page */}
+              {isCrossPage && displayDimensions.height ? (
+                <div className="overflow-hidden" style={{ height: `${displayDimensions.height * 0.92}px` }}>
+                  <img
+                    ref={imageRef}
+                    src={imageUrl}
+                    alt={`Page ${pageNumber}`}
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                    className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                    draggable={false}
+                  />
+                </div>
+              ) : (
+                <img
+                  ref={imageRef}
+                  src={imageUrl}
+                  alt={`Page ${pageNumber}`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                  draggable={false}
+                />
+              )}
             </div>
             
             {/* Second Page (for cross-page Q/A) */}
             {isCrossPage && imageUrl2 && (
-              <div className="relative" style={{ marginTop: displayDimensions.height ? `-${displayDimensions.height * 0.08}px` : '-8%' }}>
+              <div 
+                className="relative"
+                style={displayDimensions.height ? {
+                  marginTop: `-${displayDimensions.height * 0.08}px`
+                } : undefined}
+              >
                 {/* Line Highlight Indicator for second page */}
                 {highlightStyle2.display !== 'none' && (
                   <div 
@@ -321,17 +339,31 @@ export default function PDFViewer({
                   />
                 )}
                 
-                {/* Second PDF Page Image */}
-                <img
-                  ref={imageRef2}
-                  src={imageUrl2}
-                  alt={`Page ${endPage}`}
-                  onLoad={handleImageLoad2}
-                  onError={handleImageError}
-                  className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-                  style={{ clipPath: 'inset(12% 0 0 0)' }}
-                  draggable={false}
-                />
+                {/* Wrapper to crop header when cross-page */}
+                {displayDimensions2.height ? (
+                  <div className="overflow-hidden" style={{ height: `${displayDimensions2.height * 0.88}px` }}>
+                    <img
+                      ref={imageRef2}
+                      src={imageUrl2}
+                      alt={`Page ${endPage}`}
+                      onLoad={handleImageLoad2}
+                      onError={handleImageError}
+                      className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                      style={{ marginTop: `-${displayDimensions2.height * 0.12}px` }}
+                      draggable={false}
+                    />
+                  </div>
+                ) : (
+                  <img
+                    ref={imageRef2}
+                    src={imageUrl2}
+                    alt={`Page ${endPage}`}
+                    onLoad={handleImageLoad2}
+                    onError={handleImageError}
+                    className={`w-full h-auto ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                    draggable={false}
+                  />
+                )}
               </div>
             )}
           </div>
