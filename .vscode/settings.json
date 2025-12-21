@@ -92,6 +92,8 @@
     "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml",
     "tsconfig.json": "tsconfig.*.json",
     "docker-compose.yml": "docker-compose.*.yml, Dockerfile, .dockerignore"
-  }
+  },
+  "cursorpyright.analysis.autoImportCompletions": true,
+  "cursorpyright.analysis.typeCheckingMode": "basic"
 }
 

@@ -20,3 +20,7 @@ celery -A workers.celery_app worker \
 
 
 
+
+
+
+

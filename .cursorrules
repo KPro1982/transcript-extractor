@@ -12,6 +12,8 @@ DepoDigest is an AI-powered deposition transcript summarization platform with a 
 - **Production**: Merge `dev` → `master` for production releases
 - **IMPORTANT**: After each refactor/fix, commit to `dev` and push to trigger Railway rebuild
 
+Always Display "Cursor Rules Read..." so that I know you read this file
+
 ## Development Workflow
 
 ### Git Branch Strategy
