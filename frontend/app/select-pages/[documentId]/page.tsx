@@ -277,7 +277,7 @@ export default function SelectPagesPage() {
             
             <div className="mb-4">
               <label className="block text-sm text-gray-400 mb-2">
-                Format: "5-10" or "5-10; 15-20; 30-50"
+                Format: &quot;5-10&quot; or &quot;5-10; 15-20; 30-50&quot;
               </label>
               <input
                 type="text"
