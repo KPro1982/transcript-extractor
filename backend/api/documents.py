@@ -549,10 +549,17 @@ async def update_qa_item(qa_item_id: UUID, update: QAItemUpdate):
 @router.get("/{document_id}/qa-page-range")
 async def get_qa_page_range(document_id: UUID):
     """
-    Detect the first and last pages that contain Q&A pairs.
+    Detect the first and last pages of the continuous Q&A range.
     
-    Scans the document to find pages with Q&A patterns and returns
-    the range for default page selection.
+    Scans forward from the beginning to find:
+    1. First page with Q&A patterns (start of testimony)
+    2. Continues forward until finding a page WITHOUT Q&A patterns
+    3. The page before the gap is the last Q&A page
+    
+    This correctly handles:
+    - Cover pages, indexes before testimony
+    - Certificate pages, signature pages after testimony
+    - Pages that are entirely answer continuations (bounded by Q/A markers)
     
     Returns:
         {
@@ -623,46 +630,60 @@ async def get_qa_page_range(document_id: UUID):
                     return True
             return False
         
-        # Scan pages to find Q&A ranges
-        first_qa_page = None
-        last_qa_page = None
+        def page_has_qa(page) -> bool:
+            """Check if a page has any Q&A patterns."""
+            text = page.get_text()
+            lines = text.split('\n')
+            
+            for line in lines:
+                if has_qa_pattern(line):
+                    return True
+            return False
         
         doc_pdf = fitz.open(tmp_path)
         
-        # Scan first 20 pages to find first Q&A
-        for page_num in range(min(20, total_pages)):
+        # Find first page with Q&A (scan up to first 30 pages)
+        first_qa_page = None
+        for page_num in range(min(30, total_pages)):
             page = doc_pdf[page_num]
-            text = page.get_text()
-            lines = text.split('\n')
-            
-            for line in lines:
-                if has_qa_pattern(line):
-                    first_qa_page = page_num + 1  # 1-based
-                    break
-            
-            if first_qa_page:
+            if page_has_qa(page):
+                first_qa_page = page_num + 1  # 1-based
+                logger.info(f"Found first Q&A on page {first_qa_page}")
                 break
         
-        # Scan last 20 pages to find last Q&A
-        for page_num in range(max(0, total_pages - 20), total_pages):
-            page = doc_pdf[page_num]
-            text = page.get_text()
-            lines = text.split('\n')
+        # If no Q&A found in first 30 pages, default to page 1
+        if not first_qa_page:
+            logger.warning("No Q&A patterns found in first 30 pages, defaulting to page 1")
+            first_qa_page = 1
+            last_qa_page = total_pages
+        else:
+            # Find last page of continuous Q&A range
+            # Scan forward from first_qa_page until we find a page WITHOUT Q&A
+            last_qa_page = first_qa_page
+            consecutive_empty_pages = 0
+            max_gap = 2  # Allow up to 2 consecutive pages without Q/A (for long answer continuations)
             
-            for line in lines:
-                if has_qa_pattern(line):
+            for page_num in range(first_qa_page, total_pages):  # 1-based to 0-based
+                page = doc_pdf[page_num]
+                
+                if page_has_qa(page):
+                    # Found Q&A - update last page and reset gap counter
                     last_qa_page = page_num + 1  # 1-based
-                    # Don't break - keep scanning to find the last one
+                    consecutive_empty_pages = 0
+                else:
+                    # No Q&A on this page
+                    consecutive_empty_pages += 1
+                    
+                    # If we've seen multiple consecutive pages without Q&A, we've hit the end
+                    if consecutive_empty_pages >= max_gap:
+                        logger.info(f"Found {consecutive_empty_pages} consecutive pages without Q&A after page {last_qa_page}")
+                        break
+            
+            logger.info(f"Last Q&A page in continuous range: {last_qa_page}")
         
         doc_pdf.close()
         
-        # Fallback if no Q&A detected
-        if not first_qa_page:
-            first_qa_page = 1
-        if not last_qa_page:
-            last_qa_page = total_pages
-        
-        logger.info(f"Detected Q&A range: pages {first_qa_page}-{last_qa_page} (total: {total_pages})")
+        logger.info(f"Detected continuous Q&A range: pages {first_qa_page}-{last_qa_page} (total: {total_pages})")
         
         return {
             "first_qa_page": first_qa_page,
