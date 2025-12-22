@@ -113,6 +113,23 @@ export const getQAPageRange = async (documentId: string): Promise<{
   return response.data
 }
 
+/**
+ * Update case information for a document.
+ */
+export const updateCaseInfo = async (
+  documentId: string,
+  caseInfo: {
+    case_name?: string
+    case_number?: string
+    deposition_date?: string
+    attorneys?: string[]
+    witness_name?: string
+  }
+) => {
+  const response = await api.patch(`/api/documents/${documentId}/case-info`, caseInfo)
+  return response.data
+}
+
 
 
 

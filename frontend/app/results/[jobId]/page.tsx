@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import PDFViewer from '@/components/PDFViewer'
 import SummaryDisplay from '@/components/SummaryDisplay'
 import UserMenu from '@/components/UserMenu'
+import CaseInfoPanel from '@/components/CaseInfoPanel'
 
 interface QAItem {
   id: string
@@ -42,6 +43,8 @@ export default function ResultsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [filename, setFilename] = useState<string>('')
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const [caseInfo, setCaseInfo] = useState<any>(null)
+  const [showCaseInfo, setShowCaseInfo] = useState(true)
 
   // Keyboard navigation hook
   const { 
@@ -94,6 +97,15 @@ export default function ResultsPage() {
         const docInfo = await getDocument(jobStatus.document_id)
         setTotalPages(docInfo.total_pages || 1)
         setFilename(docInfo.filename || 'Document')
+        
+        // Store case info
+        setCaseInfo({
+          case_name: docInfo.case_name,
+          case_number: docInfo.case_number,
+          deposition_date: docInfo.deposition_date,
+          attorneys: docInfo.attorneys,
+          witness_name: docInfo.witness_name
+        })
         
         // Fetch Q&A items with line ranges
         try {
@@ -233,6 +245,31 @@ export default function ResultsPage() {
               <UserMenu />
             </div>
           </div>
+
+          {/* Case Information - Collapsible */}
+          {caseInfo && (caseInfo.case_name || caseInfo.case_number || caseInfo.deposition_date || caseInfo.witness_name || (caseInfo.attorneys && caseInfo.attorneys.length > 0)) && (
+            <div className="px-6 pb-3">
+              <button
+                onClick={() => setShowCaseInfo(!showCaseInfo)}
+                className="w-full flex items-center justify-between text-xs text-gray-400 hover:text-gray-300 py-2 border-t border-gray-800"
+              >
+                <span>Case Information</span>
+                {showCaseInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+              
+              {showCaseInfo && (
+                <div className="mt-2">
+                  <CaseInfoPanel
+                    documentId={documentId || ''}
+                    caseInfo={caseInfo}
+                    onUpdate={setCaseInfo}
+                    editable={true}
+                    compact={true}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </header>
 
         {/* Collapse Toggle Button */}

@@ -113,10 +113,54 @@ async def init_db():
                 file_hash VARCHAR(64) UNIQUE NOT NULL,
                 s3_key VARCHAR(500) NOT NULL,
                 total_pages INT NOT NULL,
+                case_name TEXT,
+                case_number VARCHAR(100),
+                deposition_date VARCHAR(50),
+                attorneys TEXT[],
+                witness_name VARCHAR(255),
                 created_at TIMESTAMP DEFAULT NOW()
             );
             
             CREATE INDEX IF NOT EXISTS idx_documents_file_hash ON documents(file_hash);
+            
+            -- Add case info columns if they don't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'case_name'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN case_name TEXT;
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'case_number'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN case_number VARCHAR(100);
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'deposition_date'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN deposition_date VARCHAR(50);
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'attorneys'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN attorneys TEXT[];
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'witness_name'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN witness_name VARCHAR(255);
+                END IF;
+            END $$;
             
             CREATE TABLE IF NOT EXISTS qa_items (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

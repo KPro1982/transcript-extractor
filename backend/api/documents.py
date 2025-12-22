@@ -14,6 +14,7 @@ import fitz  # PyMuPDF
 from services.db_service import db_service
 from services.cache_service import cache_service
 from services.pdf_service import pdf_service
+from services.case_info_extractor import case_info_extractor
 from models.document import Document, DocumentCreate, DocumentResponse
 
 router = APIRouter()
@@ -80,6 +81,11 @@ async def upload_document(file: UploadFile = File(...)):
         # Extract basic PDF info
         pdf_info = await pdf_service.get_pdf_info(temp_path)
         
+        # Extract case information from first 10 pages
+        logger.info("Extracting case information...")
+        case_info = case_info_extractor.extract_case_info(temp_path, max_pages=10)
+        logger.info(f"Case info extracted: {case_info}")
+        
         # Store PDF content in Redis for worker access (24hr TTL)
         # This allows workers in different containers to access the file
         await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
@@ -87,14 +93,22 @@ async def upload_document(file: UploadFile = File(...)):
         # Always create a new document entry (database was cleared above)
         doc_id = await db_service.fetchval(
             """
-            INSERT INTO documents (filename, file_hash, s3_key, total_pages)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO documents (
+                filename, file_hash, s3_key, total_pages,
+                case_name, case_number, deposition_date, attorneys, witness_name
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
             """,
             file.filename,
             file_hash,
             f"documents/{file_hash}.pdf",
-            pdf_info["total_pages"]
+            pdf_info["total_pages"],
+            case_info.get('case_name'),
+            case_info.get('case_number'),
+            case_info.get('deposition_date'),
+            case_info.get('attorneys', []),
+            case_info.get('witness_name')
         )
         
         doc_data = {
@@ -117,7 +131,12 @@ async def upload_document(file: UploadFile = File(...)):
             "document_id": str(doc_id),
             "filename": file.filename,
             "total_pages": pdf_info["total_pages"],
-            "file_hash": file_hash
+            "file_hash": file_hash,
+            "case_name": case_info.get('case_name'),
+            "case_number": case_info.get('case_number'),
+            "deposition_date": case_info.get('deposition_date'),
+            "attorneys": case_info.get('attorneys', []),
+            "witness_name": case_info.get('witness_name')
         }
         
     except Exception as e:
@@ -147,6 +166,11 @@ async def get_document(document_id: UUID):
         "filename": doc["filename"],
         "total_pages": doc["total_pages"],
         "file_hash": doc["file_hash"],
+        "case_name": doc.get("case_name"),
+        "case_number": doc.get("case_number"),
+        "deposition_date": doc.get("deposition_date"),
+        "attorneys": doc.get("attorneys"),
+        "witness_name": doc.get("witness_name"),
         "created_at": doc["created_at"].isoformat()
     }
 
@@ -543,6 +567,112 @@ async def update_qa_item(qa_item_id: UUID, update: QAItemUpdate):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update QA item: {str(e)}"
+        )
+
+
+class CaseInfoUpdate(BaseModel):
+    """Model for updating case information."""
+    case_name: Optional[str] = None
+    case_number: Optional[str] = None
+    deposition_date: Optional[str] = None
+    attorneys: Optional[List[str]] = None
+    witness_name: Optional[str] = None
+
+
+@router.patch("/{document_id}/case-info")
+async def update_case_info(document_id: UUID, update: CaseInfoUpdate):
+    """
+    Update case information for a document.
+    
+    Args:
+        document_id: UUID of the document to update
+        update: Fields to update (any subset of case info fields)
+    
+    Returns:
+        Updated document with case info
+    """
+    try:
+        # Check if document exists
+        doc = await db_service.fetchrow(
+            "SELECT id FROM documents WHERE id = $1",
+            document_id
+        )
+        
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        # Build dynamic UPDATE query for provided fields
+        update_fields = []
+        update_values = []
+        param_num = 1
+        
+        if update.case_name is not None:
+            update_fields.append(f"case_name = ${param_num}")
+            update_values.append(update.case_name)
+            param_num += 1
+        
+        if update.case_number is not None:
+            update_fields.append(f"case_number = ${param_num}")
+            update_values.append(update.case_number)
+            param_num += 1
+        
+        if update.deposition_date is not None:
+            update_fields.append(f"deposition_date = ${param_num}")
+            update_values.append(update.deposition_date)
+            param_num += 1
+        
+        if update.attorneys is not None:
+            update_fields.append(f"attorneys = ${param_num}")
+            update_values.append(update.attorneys)
+            param_num += 1
+        
+        if update.witness_name is not None:
+            update_fields.append(f"witness_name = ${param_num}")
+            update_values.append(update.witness_name)
+            param_num += 1
+        
+        if not update_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields provided to update"
+            )
+        
+        # Execute update
+        update_values.append(document_id)
+        query = f"""
+            UPDATE documents
+            SET {', '.join(update_fields)}
+            WHERE id = ${param_num}
+            RETURNING *
+        """
+        
+        updated_doc = await db_service.fetchrow(query, *update_values)
+        
+        logger.info(f"Updated case info for document {document_id}")
+        
+        return {
+            "document_id": str(updated_doc["id"]),
+            "filename": updated_doc["filename"],
+            "total_pages": updated_doc["total_pages"],
+            "file_hash": updated_doc["file_hash"],
+            "case_name": updated_doc.get("case_name"),
+            "case_number": updated_doc.get("case_number"),
+            "deposition_date": updated_doc.get("deposition_date"),
+            "attorneys": updated_doc.get("attorneys"),
+            "witness_name": updated_doc.get("witness_name"),
+            "created_at": updated_doc["created_at"].isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update case info: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update case info: {str(e)}"
         )
 
 

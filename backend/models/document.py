@@ -34,6 +34,11 @@ class DocumentResponse(BaseModel):
     filename: str
     total_pages: int
     file_hash: str
+    case_name: Optional[str] = None
+    case_number: Optional[str] = None
+    deposition_date: Optional[str] = None
+    attorneys: Optional[List[str]] = None
+    witness_name: Optional[str] = None
     created_at: Optional[str] = None
 
 

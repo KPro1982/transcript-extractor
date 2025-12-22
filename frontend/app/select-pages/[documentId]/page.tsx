@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import { Loader2, ChevronLeft, ChevronRight, Plus, X, Play, FileText, BookOpen } from 'lucide-react'
 import { getDocument, getPDFPage, startJob, getQAPageRange } from '@/lib/api'
+import CaseInfoPanel from '@/components/CaseInfoPanel'
 
 interface PageRange {
   start: number
@@ -22,6 +23,7 @@ export default function SelectPagesPage() {
   const [loadingPage, setLoadingPage] = useState(false)
   const [totalPages, setTotalPages] = useState(0)
   const [documentName, setDocumentName] = useState('')
+  const [caseInfo, setCaseInfo] = useState<any>(null)
 
   // Range selection state
   const [rangeInput, setRangeInput] = useState('')
@@ -68,6 +70,15 @@ export default function SelectPagesPage() {
       const doc = await getDocument(documentId)
       setDocumentName(doc.filename)
       setTotalPages(doc.total_pages)
+      
+      // Store case info
+      setCaseInfo({
+        case_name: doc.case_name,
+        case_number: doc.case_number,
+        deposition_date: doc.deposition_date,
+        attorneys: doc.attorneys,
+        witness_name: doc.witness_name
+      })
       
       if (doc.total_pages > 0) {
         loadPDFPage(1)
@@ -317,6 +328,16 @@ export default function SelectPagesPage() {
               Choose specific page ranges to process. This saves time and cost by excluding cover pages, indexes, etc.
             </p>
           </div>
+
+          {/* Case Information */}
+          {caseInfo && (
+            <CaseInfoPanel
+              documentId={documentId}
+              caseInfo={caseInfo}
+              onUpdate={setCaseInfo}
+              editable={true}
+            />
+          )}
 
           {/* Range Input */}
           <div className="bg-bg-card border border-gray-800 rounded-2xl p-6 mb-6">
