@@ -101,6 +101,18 @@ export const getPDFPage = async (documentId: string, pageNumber: number): Promis
   }
 }
 
+/**
+ * Get the first and last pages that contain Q&A pairs for smart page selection.
+ */
+export const getQAPageRange = async (documentId: string): Promise<{
+  first_qa_page: number
+  last_qa_page: number
+  total_pages: number
+}> => {
+  const response = await api.get(`/api/documents/${documentId}/qa-page-range`)
+  return response.data
+}
+
 
 
 

@@ -1,6 +1,7 @@
 """Document upload and management endpoints."""
 import hashlib
 import logging
+import re
 from typing import List, Optional
 from uuid import UUID
 
@@ -8,6 +9,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 import aiofiles
+import fitz  # PyMuPDF
 
 from services.db_service import db_service
 from services.cache_service import cache_service
@@ -542,6 +544,138 @@ async def update_qa_item(qa_item_id: UUID, update: QAItemUpdate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update QA item: {str(e)}"
         )
+
+
+@router.get("/{document_id}/qa-page-range")
+async def get_qa_page_range(document_id: UUID):
+    """
+    Detect the first and last pages that contain Q&A pairs.
+    
+    Scans the document to find pages with Q&A patterns and returns
+    the range for default page selection.
+    
+    Returns:
+        {
+            "first_qa_page": int,
+            "last_qa_page": int,
+            "total_pages": int
+        }
+    """
+    # Get document to find file hash
+    doc = await db_service.fetchrow(
+        "SELECT file_hash, total_pages FROM documents WHERE id = $1",
+        document_id
+    )
+    
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    file_hash = doc["file_hash"]
+    total_pages = doc["total_pages"]
+    
+    # Get PDF from Redis cache
+    pdf_content = await cache_service.get_pdf_content(file_hash)
+    if not pdf_content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF content not found in cache. Please re-upload the document."
+        )
+    
+    # Save to temporary file for PyMuPDF
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+        tmp_path = tmp_file.name
+        tmp_file.write(pdf_content)
+    
+    try:
+        # Q/A detection patterns (same as in pdf_service.py)
+        question_patterns = [
+            re.compile(r'^[·\s]*Q\.[·\s]*', re.IGNORECASE),
+            re.compile(r'^\s*Q\.\s*', re.IGNORECASE),
+            re.compile(r'^\s*Q:\s*', re.IGNORECASE),
+            re.compile(r'^Q\s+[A-Z]', re.IGNORECASE),
+            re.compile(r'^\s*QUESTION[:\s]+', re.IGNORECASE),
+            re.compile(r'^BY\s+M[RS]\.\s+\w+:', re.IGNORECASE),
+        ]
+        
+        answer_patterns = [
+            re.compile(r'^[·\s]*A\.[·\s]*', re.IGNORECASE),
+            re.compile(r'^\s*A\.\s*', re.IGNORECASE),
+            re.compile(r'^\s*A:\s*', re.IGNORECASE),
+            re.compile(r'^A\s+[A-Z]', re.IGNORECASE),
+            re.compile(r'^\s*ANSWER[:\s]+', re.IGNORECASE),
+            re.compile(r'^[·\s]*THE\s+WITNESS:[·\s]*', re.IGNORECASE),
+        ]
+        
+        def has_qa_pattern(text: str) -> bool:
+            """Check if text matches Q&A patterns."""
+            text = text.strip()
+            if not text:
+                return False
+            
+            for pattern in question_patterns + answer_patterns:
+                if pattern.match(text):
+                    return True
+            return False
+        
+        # Scan pages to find Q&A ranges
+        first_qa_page = None
+        last_qa_page = None
+        
+        doc_pdf = fitz.open(tmp_path)
+        
+        # Scan first 20 pages to find first Q&A
+        for page_num in range(min(20, total_pages)):
+            page = doc_pdf[page_num]
+            text = page.get_text()
+            lines = text.split('\n')
+            
+            for line in lines:
+                if has_qa_pattern(line):
+                    first_qa_page = page_num + 1  # 1-based
+                    break
+            
+            if first_qa_page:
+                break
+        
+        # Scan last 20 pages to find last Q&A
+        for page_num in range(max(0, total_pages - 20), total_pages):
+            page = doc_pdf[page_num]
+            text = page.get_text()
+            lines = text.split('\n')
+            
+            for line in lines:
+                if has_qa_pattern(line):
+                    last_qa_page = page_num + 1  # 1-based
+                    # Don't break - keep scanning to find the last one
+        
+        doc_pdf.close()
+        
+        # Fallback if no Q&A detected
+        if not first_qa_page:
+            first_qa_page = 1
+        if not last_qa_page:
+            last_qa_page = total_pages
+        
+        logger.info(f"Detected Q&A range: pages {first_qa_page}-{last_qa_page} (total: {total_pages})")
+        
+        return {
+            "first_qa_page": first_qa_page,
+            "last_qa_page": last_qa_page,
+            "total_pages": total_pages
+        }
+        
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
 
 
 

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
-import { Loader2, ChevronLeft, ChevronRight, Plus, X, Play, FileText } from 'lucide-react'
-import { getDocument, getPDFPage, startJob } from '@/lib/api'
+import { Loader2, ChevronLeft, ChevronRight, Plus, X, Play, FileText, BookOpen } from 'lucide-react'
+import { getDocument, getPDFPage, startJob, getQAPageRange } from '@/lib/api'
 
 interface PageRange {
   start: number
@@ -28,6 +28,8 @@ export default function SelectPagesPage() {
   const [pageRanges, setPageRanges] = useState<PageRange[]>([])
   const [parseError, setParseError] = useState('')
   const [starting, setStarting] = useState(false)
+  const [loadingQARange, setLoadingQARange] = useState(false)
+  const [qaPageRange, setQAPageRange] = useState<{ first: number, last: number } | null>(null)
 
   // Load document info and first page
   useEffect(() => {
@@ -69,10 +71,36 @@ export default function SelectPagesPage() {
       
       if (doc.total_pages > 0) {
         loadPDFPage(1)
+        // Load Q/A page range for smart defaults
+        loadQAPageRange()
       }
     } catch (error) {
       console.error('Failed to load document:', error)
       alert('Failed to load document')
+    }
+  }
+
+  const loadQAPageRange = async () => {
+    try {
+      setLoadingQARange(true)
+      const range = await getQAPageRange(documentId)
+      setQAPageRange({ first: range.first_qa_page, last: range.last_qa_page })
+      
+      // Set default range input
+      setRangeInput(`${range.first_qa_page}-${range.last_qa_page}`)
+      
+      // Auto-parse to show preview
+      try {
+        const ranges = parseRangeInput(`${range.first_qa_page}-${range.last_qa_page}`)
+        setPageRanges(ranges)
+      } catch (err) {
+        // Ignore parsing errors on initial load
+      }
+    } catch (error) {
+      console.error('Failed to load Q/A page range:', error)
+      // Non-critical - just don't set default
+    } finally {
+      setLoadingQARange(false)
     }
   }
 
@@ -161,6 +189,25 @@ export default function SelectPagesPage() {
   const handleAddToEnd = () => {
     setRangeInput(`${currentPage}-${totalPages}`)
     setParseError('')
+  }
+
+  const handleJumpToFirstQA = () => {
+    if (qaPageRange) {
+      jumpToPage(qaPageRange.first)
+    }
+  }
+
+  const handleJumpToLastQA = () => {
+    if (qaPageRange) {
+      jumpToPage(qaPageRange.last)
+    }
+  }
+
+  const handleSetQARange = () => {
+    if (qaPageRange) {
+      setRangeInput(`${qaPageRange.first}-${qaPageRange.last}`)
+      setParseError('')
+    }
   }
 
   const removeRange = (index: number) => {
@@ -308,21 +355,57 @@ export default function SelectPagesPage() {
               </button>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddCurrentPage}
-                className="flex-1 px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Current Page ({currentPage})
-              </button>
-              <button
-                onClick={handleAddToEnd}
-                className="flex-1 px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Page {currentPage} to End
-              </button>
+            <div className="space-y-2">
+              {/* Q/A Detection Buttons */}
+              {qaPageRange && (
+                <button
+                  onClick={handleSetQARange}
+                  disabled={loadingQARange}
+                  className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all flex items-center justify-center gap-2 font-medium"
+                  title={`Detected Q&A on pages ${qaPageRange.first}-${qaPageRange.last}`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Q&A Pages ({qaPageRange.first}-{qaPageRange.last})
+                </button>
+              )}
+              
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleJumpToFirstQA}
+                  disabled={!qaPageRange || loadingQARange}
+                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                  title={qaPageRange ? `Jump to first Q&A (page ${qaPageRange.first})` : 'Detecting Q&A pages...'}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  First Q&A
+                </button>
+                <button
+                  onClick={handleJumpToLastQA}
+                  disabled={!qaPageRange || loadingQARange}
+                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                  title={qaPageRange ? `Jump to last Q&A (page ${qaPageRange.last})` : 'Detecting Q&A pages...'}
+                >
+                  Last Q&A
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleAddCurrentPage}
+                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Current ({currentPage})
+                </button>
+                <button
+                  onClick={handleAddToEnd}
+                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  {currentPage} to End
+                </button>
+              </div>
             </div>
           </div>
 
