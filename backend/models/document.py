@@ -1,6 +1,6 @@
 """Document data models."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from uuid import UUID
 
