@@ -51,8 +51,12 @@ export default function CaseInfoPanel({
         .map(a => a.trim())
         .filter(a => a.length > 0)
       
+      // Convert null to undefined for API compatibility
       const updatedData = {
-        ...editedInfo,
+        case_name: editedInfo.case_name ?? undefined,
+        case_number: editedInfo.case_number ?? undefined,
+        deposition_date: editedInfo.deposition_date ?? undefined,
+        witness_name: editedInfo.witness_name ?? undefined,
         attorneys: attorneys.length > 0 ? attorneys : undefined
       }
       
