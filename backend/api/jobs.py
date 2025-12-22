@@ -1,10 +1,10 @@
 """Job processing and status endpoints."""
 import logging
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from services.db_service import db_service, persistent_db_service
 from services.cache_service import cache_service
@@ -21,11 +21,84 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+class PageRange(BaseModel):
+    """A single page range."""
+    start: int
+    end: int
+    
+    @field_validator('start', 'end')
+    @classmethod
+    def validate_positive(cls, v):
+        if v < 1:
+            raise ValueError('Page numbers must be positive')
+        return v
+    
+    @field_validator('end')
+    @classmethod
+    def validate_end_after_start(cls, v, info):
+        if 'start' in info.data and v < info.data['start']:
+            raise ValueError('End page must be >= start page')
+        return v
+
+
 class JobRequest(BaseModel):
     """Request to start document processing."""
     document_id: UUID
     first_page: int = 1
     last_page: Optional[int] = None
+    page_ranges: Optional[List[PageRange]] = None  # New: support multiple ranges
+
+
+def validate_page_ranges(ranges: List[PageRange], total_pages: int) -> None:
+    """
+    Validate page ranges for overlaps and bounds.
+    
+    Args:
+        ranges: List of page ranges to validate
+        total_pages: Total number of pages in document
+        
+    Raises:
+        HTTPException: If validation fails
+    """
+    if not ranges:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one page range is required"
+        )
+    
+    # Check all pages are within document bounds
+    for r in ranges:
+        if r.start > total_pages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Start page {r.start} exceeds document length ({total_pages} pages)"
+            )
+        if r.end > total_pages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"End page {r.end} exceeds document length ({total_pages} pages)"
+            )
+    
+    # Check for overlaps
+    sorted_ranges = sorted(ranges, key=lambda r: r.start)
+    for i in range(len(sorted_ranges) - 1):
+        if sorted_ranges[i].end >= sorted_ranges[i + 1].start:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Overlapping ranges: {sorted_ranges[i].start}-{sorted_ranges[i].end} and {sorted_ranges[i + 1].start}-{sorted_ranges[i + 1].end}"
+            )
+
+
+def merge_ranges_to_first_last(ranges: List[PageRange]) -> tuple[int, int]:
+    """
+    Merge multiple page ranges into overall first and last page.
+    Used for backward compatibility with single-range processing.
+    """
+    if not ranges:
+        return 1, None
+    
+    sorted_ranges = sorted(ranges, key=lambda r: r.start)
+    return sorted_ranges[0].start, sorted_ranges[-1].end
 
 
 class JobResponse(BaseModel):
@@ -47,11 +120,15 @@ class JobStatus(BaseModel):
 @router.post("/start", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def start_job(request: JobRequest, user_id: Optional[str] = None):
     """
-    Start processing a document with automatic chunking support.
+    Start processing a document with automatic chunking support and optional page ranges.
     
     If document is large enough and multiple API keys are available,
     the document will be split into chunks and processed in parallel
     across multiple workers for maximum speed.
+    
+    Supports:
+    - Single range via first_page/last_page (backward compat)
+    - Multiple ranges via page_ranges parameter
     """
     # Verify document exists
     doc = await db_service.fetchrow(
@@ -67,13 +144,28 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
     
     total_pages = doc['total_pages']
     
+    # Handle page_ranges parameter if provided
+    if request.page_ranges:
+        validate_page_ranges(request.page_ranges, total_pages)
+        first_page, last_page = merge_ranges_to_first_last(request.page_ranges)
+        
+        # Log the ranges for debugging
+        ranges_str = "; ".join([f"{r.start}-{r.end}" for r in request.page_ranges])
+        logger.info(f"Processing page ranges: {ranges_str}")
+    else:
+        # Use traditional first_page/last_page
+        first_page = request.first_page
+        last_page = request.last_page if request.last_page else total_pages
+    
     # Estimate Q&A pairs for chunking decision (rough: 5 pairs per page)
-    estimated_qa_pairs = total_pages * 5
+    # Only count pages that will be processed
+    pages_to_process = last_page - first_page + 1
+    estimated_qa_pairs = pages_to_process * 5
     
     # Decide if we should use chunking
     use_chunking = await should_use_chunking(estimated_qa_pairs)
     
-    if use_chunking and total_pages >= 100:  # Also require minimum pages
+    if use_chunking and pages_to_process >= 100:  # Also require minimum pages
         # Create parent job for chunked processing
         job_id = await db_service.fetchval(
             """
@@ -85,7 +177,7 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
         )
         
         # Calculate optimal number of chunks
-        num_chunks = calculate_optimal_chunks(total_pages, settings.available_worker_keys)
+        num_chunks = calculate_optimal_chunks(pages_to_process, settings.available_worker_keys)
         
         # Update parent job with chunk count
         await db_service.execute(
@@ -98,8 +190,9 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
         chunk_jobs = await create_chunk_jobs(
             str(job_id),
             str(request.document_id),
-            total_pages,
-            num_chunks
+            pages_to_process,
+            num_chunks,
+            first_page_offset=first_page  # Start from specified first page
         )
         
         # Dispatch chunk tasks to workers
@@ -151,12 +244,12 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
             process_document_task.delay(
                 str(job_id),
                 str(request.document_id),
-                request.first_page,
-                request.last_page,
+                first_page,
+                last_page,
                 user_id
             )
             
-            logger.info(f"Job {job_id} queued (standard) for document {doc['filename']}")
+            logger.info(f"Job {job_id} queued (standard) for document {doc['filename']} (pages {first_page}-{last_page})")
             
             return {
                 "job_id": str(job_id),

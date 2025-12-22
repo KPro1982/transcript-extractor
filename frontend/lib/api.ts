@@ -24,12 +24,26 @@ export const uploadDocument = async (file: File) => {
   return response.data
 }
 
-export const startJob = async (documentId: string, firstPage: number = 1, lastPage?: number) => {
-  const response = await api.post('/api/jobs/start', {
+export const startJob = async (
+  documentId: string, 
+  firstPage: number = 1, 
+  lastPage?: number,
+  pageRanges?: Array<{start: number, end: number}>
+) => {
+  const payload: any = {
     document_id: documentId,
     first_page: firstPage,
-    last_page: lastPage,
-  })
+  }
+  
+  if (lastPage) {
+    payload.last_page = lastPage
+  }
+  
+  if (pageRanges && pageRanges.length > 0) {
+    payload.page_ranges = pageRanges
+  }
+  
+  const response = await api.post('/api/jobs/start', payload)
   
   return response.data
 }

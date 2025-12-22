@@ -36,12 +36,8 @@ export default function UploadPage() {
       const uploadResult = await uploadDocument(file)
       const documentId = uploadResult.document_id
 
-      // Start processing job
-      const jobResult = await startJob(documentId)
-      const jobId = jobResult.job_id
-
-      // Redirect to processing page
-      router.push(`/process/${jobId}`)
+      // Redirect to page selection
+      router.push(`/select-pages/${documentId}`)
     } catch (error: any) {
       console.error('Upload failed:', error)
       
