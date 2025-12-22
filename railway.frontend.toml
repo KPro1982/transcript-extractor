@@ -16,3 +16,9 @@ startCommand = "node server.js"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 
+# These variables are needed at BUILD time for Next.js
+# Railway will inject them as build args
+[build.env]
+NEXT_PUBLIC_API_URL = "https://backend-production-e4c7.up.railway.app"
+NEXT_PUBLIC_WS_URL = "wss://backend-production-e4c7.up.railway.app"
+
