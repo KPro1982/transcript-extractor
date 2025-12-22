@@ -1,5 +1,5 @@
 """Main FastAPI application entry point."""
-# Deploy trigger: Dec 19, 2025 - Cache clearing on upload implemented
+# Deploy trigger: Dec 21, 2025 - Reset to master baseline
 import logging
 from contextlib import asynccontextmanager
 
