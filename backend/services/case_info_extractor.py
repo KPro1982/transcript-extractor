@@ -198,6 +198,11 @@ class CaseInfoExtractor:
             match = pattern.search(text[:2000])  # Look in first section
             if match:
                 name = match.group(1).strip()
+                
+                # Skip if it contains v. or vs. (it's a case name, not witness name)
+                if re.search(r'\bv\.|\bvs\.|\bvs\b|\bv\b', name, re.IGNORECASE):
+                    continue
+                
                 # Clean up name (remove extra spaces, convert to title case)
                 name = re.sub(r'\s+', ' ', name)
                 name = ' '.join(word.capitalize() for word in name.split())
