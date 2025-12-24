@@ -60,8 +60,9 @@ export function ChatPanel({
   const createNewSession = async () => {
     setLoadingSession(true);
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/chat/sessions', {
+      const response = await fetch(`${apiUrl}/api/chat/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,8 +90,9 @@ export function ChatPanel({
     
     setLoadingSession(true);
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/chat/sessions/${sessionId}`, {
+      const response = await fetch(`${apiUrl}/api/chat/sessions/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -126,8 +128,9 @@ export function ChatPanel({
     
     setIsLoading(true);
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/chat/sessions/${sessionId}/messages`, {
+      const response = await fetch(`${apiUrl}/api/chat/sessions/${sessionId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
