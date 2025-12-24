@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
-from api import health, documents, jobs, websocket, cache, auth, bug_reports, learning_feedback, user_settings
+from api import health, documents, jobs, websocket, cache, auth, bug_reports, learning_feedback, user_settings, chat
 from services.cache_service import cache_service
 from services.db_service import init_db, init_persistent_db
 
@@ -79,6 +79,7 @@ app.include_router(bug_reports.router, prefix="/api", tags=["bug-reports"])
 app.include_router(learning_feedback.router, prefix="/api", tags=["learning-feedback"])
 app.include_router(user_settings.router, prefix="/api", tags=["user-settings"])
 app.include_router(cache.router, prefix="/api", tags=["cache"])
+app.include_router(chat.router, tags=["chat"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])

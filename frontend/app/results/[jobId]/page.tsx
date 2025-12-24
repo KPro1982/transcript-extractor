@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { getJobStatus, getQAItems, getDocument } from '@/lib/api'
 import { useKeyboardNav } from '@/hooks/useKeyboardNav'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,6 +10,7 @@ import PDFViewer from '@/components/PDFViewer'
 import SummaryDisplay from '@/components/SummaryDisplay'
 import UserMenu from '@/components/UserMenu'
 import CaseInfoPanel from '@/components/CaseInfoPanel'
+import { ChatPanel } from '@/components/chat/ChatPanel'
 
 interface QAItem {
   id: string
@@ -45,6 +46,7 @@ export default function ResultsPage() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [caseInfo, setCaseInfo] = useState<any>(null)
   const [showCaseInfo, setShowCaseInfo] = useState(true)
+  const [chatOpen, setChatOpen] = useState(false)
 
   // Keyboard navigation hook
   const { 
@@ -233,6 +235,20 @@ export default function ResultsPage() {
                 <span>{totalPages} pages</span>
               </div>
               
+              {/* Chat Button */}
+              <button
+                onClick={() => setChatOpen(!chatOpen)}
+                className={`flex items-center gap-2 px-4 py-1.5 border rounded-xl transition-all text-sm ${
+                  chatOpen
+                    ? 'bg-blue-500 border-blue-500 text-white'
+                    : 'bg-bg-elevated hover:bg-accent/10 border-gray-700 hover:border-accent/50'
+                }`}
+                title="Chat with deposition"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Chat</span>
+              </button>
+              
               <button
                 onClick={() => router.push('/upload')}
                 className="flex items-center gap-2 px-4 py-1.5 bg-bg-elevated hover:bg-accent/10 border border-gray-700 hover:border-accent/50 rounded-xl transition-all text-sm"
@@ -327,6 +343,24 @@ export default function ResultsPage() {
           style={{ width: `${((currentIndex + 1) / qaItems.length) * 100}%` }}
         />
       </div>
+      
+      {/* Chat Panel */}
+      {documentId && (
+        <ChatPanel
+          documentId={documentId}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+          onCitationClick={(qaItemId, page, line) => {
+            // Find the Q&A item and navigate to it
+            const itemIndex = qaItems.findIndex(item => item.id === qaItemId);
+            if (itemIndex !== -1) {
+              setCurrentIndex(itemIndex);
+            }
+            // Optional: close chat after clicking citation
+            // setChatOpen(false);
+          }}
+        />
+      )}
     </div>
   )
 }

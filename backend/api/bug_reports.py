@@ -92,7 +92,7 @@ async def create_bug_report(
         # Add first message
         await persistent_db_service.execute(
             """
-            INSERT INTO chat_messages (bug_report_id, sender_id, message, is_admin_message)
+            INSERT INTO bug_report_messages (bug_report_id, sender_id, message, is_admin_message)
             VALUES ($1, $2, $3, FALSE)
             """,
             str(bug_report['id']), user.id, report.message
@@ -141,9 +141,9 @@ async def list_bug_reports(
                 SELECT 
                     br.id, br.user_id, br.title, br.type, br.status, br.created_at, br.updated_at,
                     u.name as user_name, u.email as user_email,
-                    (SELECT COUNT(*) FROM chat_messages cm 
+                    (SELECT COUNT(*) FROM bug_report_messages cm 
                      WHERE cm.bug_report_id = br.id AND cm.is_admin_message = FALSE AND cm.read_at IS NULL) as unread_count,
-                    (SELECT message FROM chat_messages cm 
+                    (SELECT message FROM bug_report_messages cm 
                      WHERE cm.bug_report_id = br.id ORDER BY created_at DESC LIMIT 1) as last_message
                 FROM bug_reports br
                 JOIN users u ON br.user_id = u.id
@@ -161,9 +161,9 @@ async def list_bug_reports(
                 SELECT 
                     br.id, br.user_id, br.title, br.type, br.status, br.created_at, br.updated_at,
                     u.name as user_name, u.email as user_email,
-                    (SELECT COUNT(*) FROM chat_messages cm 
+                    (SELECT COUNT(*) FROM bug_report_messages cm 
                      WHERE cm.bug_report_id = br.id AND cm.is_admin_message = TRUE AND cm.read_at IS NULL) as unread_count,
-                    (SELECT message FROM chat_messages cm 
+                    (SELECT message FROM bug_report_messages cm 
                      WHERE cm.bug_report_id = br.id ORDER BY created_at DESC LIMIT 1) as last_message
                 FROM bug_reports br
                 JOIN users u ON br.user_id = u.id
@@ -228,7 +228,7 @@ async def get_bug_report(
         messages = await persistent_db_service.fetch(
             """
             SELECT cm.*, u.name as sender_name, u.picture as sender_picture
-            FROM chat_messages cm
+            FROM bug_report_messages cm
             JOIN users u ON cm.sender_id = u.id
             WHERE cm.bug_report_id = $1
             ORDER BY cm.created_at ASC
@@ -241,7 +241,7 @@ async def get_bug_report(
             # Admin marks user messages as read
             await persistent_db_service.execute(
                 """
-                UPDATE chat_messages 
+                UPDATE bug_report_messages 
                 SET read_at = NOW() 
                 WHERE bug_report_id = $1 AND is_admin_message = FALSE AND read_at IS NULL
                 """,
@@ -251,7 +251,7 @@ async def get_bug_report(
             # User marks admin messages as read
             await persistent_db_service.execute(
                 """
-                UPDATE chat_messages 
+                UPDATE bug_report_messages 
                 SET read_at = NOW() 
                 WHERE bug_report_id = $1 AND is_admin_message = TRUE AND read_at IS NULL
                 """,
@@ -315,7 +315,7 @@ async def send_message(
         # Create message
         msg = await persistent_db_service.fetchrow(
             """
-            INSERT INTO chat_messages (bug_report_id, sender_id, message, is_admin_message)
+            INSERT INTO bug_report_messages (bug_report_id, sender_id, message, is_admin_message)
             VALUES ($1, $2, $3, $4)
             RETURNING id, bug_report_id, sender_id, message, screenshot_url, is_admin_message, read_at, created_at
             """,

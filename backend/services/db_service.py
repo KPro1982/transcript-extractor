@@ -399,8 +399,25 @@ async def init_persistent_db():
             CREATE INDEX IF NOT EXISTS idx_bug_reports_user_id ON bug_reports(user_id);
             CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);
             
-            -- Chat messages table
-            CREATE TABLE IF NOT EXISTS chat_messages (
+            -- Bug report chat messages table (for admin-user communication)
+            -- Rename old chat_messages table if it exists
+            DO $$ 
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'chat_messages' 
+                    AND NOT EXISTS (
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_name = 'bug_report_messages'
+                    )
+                ) THEN
+                    ALTER TABLE chat_messages RENAME TO bug_report_messages;
+                    ALTER INDEX IF EXISTS idx_chat_messages_bug_report_id RENAME TO idx_bug_report_messages_bug_report_id;
+                    ALTER INDEX IF EXISTS idx_chat_messages_sender_id RENAME TO idx_bug_report_messages_sender_id;
+                END IF;
+            END $$;
+            
+            CREATE TABLE IF NOT EXISTS bug_report_messages (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 bug_report_id UUID REFERENCES bug_reports(id) ON DELETE CASCADE,
                 sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -411,8 +428,35 @@ async def init_persistent_db():
                 created_at TIMESTAMP DEFAULT NOW()
             );
             
-            CREATE INDEX IF NOT EXISTS idx_chat_messages_bug_report_id ON chat_messages(bug_report_id);
-            CREATE INDEX IF NOT EXISTS idx_chat_messages_sender_id ON chat_messages(sender_id);
+            CREATE INDEX IF NOT EXISTS idx_bug_report_messages_bug_report_id ON bug_report_messages(bug_report_id);
+            CREATE INDEX IF NOT EXISTS idx_bug_report_messages_sender_id ON bug_report_messages(sender_id);
+            
+            -- Chat sessions table (for chat-with-depo feature)
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                document_id UUID NOT NULL,  -- References ephemeral DB documents table
+                title VARCHAR(255) DEFAULT 'New Chat',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_document ON chat_sessions(document_id);
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(user_id, updated_at DESC);
+            
+            -- Chat messages table (for chat-with-depo feature)
+            CREATE TABLE IF NOT EXISTS depo_chat_messages (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+                role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                citations JSONB,  -- Array of {qa_item_id, page, line, text_snippet}
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_depo_chat_messages_session ON depo_chat_messages(session_id);
+            CREATE INDEX IF NOT EXISTS idx_depo_chat_messages_created ON depo_chat_messages(session_id, created_at ASC);
             
             -- Learning feedback table
             CREATE TABLE IF NOT EXISTS learning_feedback (
