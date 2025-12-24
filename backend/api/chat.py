@@ -24,7 +24,7 @@ from models.chat_models import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+router = APIRouter(tags=["chat"])
 
 
 @router.post("/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
