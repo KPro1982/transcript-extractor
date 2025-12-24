@@ -1,5 +1,5 @@
 """Main FastAPI application entry point."""
-# Deploy trigger: Dec 21, 2025 - Reset to master baseline
+# Deploy trigger: Dec 24, 2025 - Chat feature deployment
 import logging
 from contextlib import asynccontextmanager
 
