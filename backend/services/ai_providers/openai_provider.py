@@ -297,7 +297,7 @@ CRITICAL REQUIREMENTS - READ CAREFULLY:
 3. The "results" array MUST contain EXACTLY {num_items} objects - NO MORE, NO LESS
 4. DO NOT skip any numbered items
 5. DO NOT combine multiple Q&A into one summary
-6. Each object must have: {{"summary": "...", "topic": "...", "event_date": "...", "people": [...]}}
+6. Each object must have: {{"summary": "...", "topics": ["..."], "event_date": "...", "people": [...]}}
 
 Summary rules:
 - Transform each Q&A into a narrative statement (DO NOT repeat the question)
@@ -329,7 +329,12 @@ PEOPLE EXTRACTION (CRITICAL):
 - Return as JSON array: [{{"name": "...", "role": "...", "context": "..."}}, ...]
 - If NO people mentioned explicitly, return empty array []
 
-Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
+TOPIC CLASSIFICATION (CRITICAL):
+- Assign 1 to 3 topics per Q&A (use minimum number that captures content)
+- Available topics: Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
+- Return as JSON array: ["Medical Treatment", "Damages & Injuries"]
+- If only one topic applies, return single-item array: ["Incident Description"]
+- Most Q&A should have just 1 topic; only use multiple if content spans distinct areas
 
 EXAMPLE JSON for 2 inputs:
 Input:
@@ -341,8 +346,8 @@ A: Yes, she did and tried to visit but couldn't make it.
 
 Example JSON Output (MUST have exactly 2 items):
 {{"results": [
-  {{"summary": "The witness testified they worked at ABC Corp from 2020 to 2022.", "topic": "Employment History", "event_date": "2020-2022", "people": []}},
-  {{"summary": "The witness stated that Emily Lasam reached out after the accident and attempted to visit.", "topic": "Witness Statements", "event_date": null, "people": [{{"name": "Emily Lasam", "role": "other", "context": "friend who reached out"}}]}}
+  {{"summary": "The witness testified they worked at ABC Corp from 2020 to 2022.", "topics": ["Employment History"], "event_date": "2020-2022", "people": []}},
+  {{"summary": "The witness stated that Emily Lasam reached out after the accident and attempted to visit.", "topics": ["Witness Statements"], "event_date": null, "people": [{{"name": "Emily Lasam", "role": "other", "context": "friend who reached out"}}]}}
 ]}}
 
 IMPORTANT: Return your response in JSON format with a "results" array.
@@ -434,19 +439,30 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                     summary_text = r.get("summary", "")
                     if not summary_text:
                         self.logger.warning(f"Result {i} has empty summary: {r}")
+                    
+                    # Handle topics - ensure it's an array
+                    topics = r.get("topics", r.get("topic"))
+                    if isinstance(topics, str):
+                        topics = [topics]
+                    elif not isinstance(topics, list):
+                        topics = ["Other"]
+                    # Validate topics array is not empty
+                    if not topics:
+                        topics = ["Other"]
+                    
                     normalized.append({
                         "summary": summary_text,
-                        "topic": r.get("topic", "Other"),
+                        "topics": topics,
                         "event_date": r.get("event_date", None),  # Extract date if provided
                         "people": r.get("people", [])  # Extract people if provided
                     })
                 elif isinstance(r, str):
                     if not r.strip():
                         self.logger.warning(f"Result {i} is empty string")
-                    normalized.append({"summary": r, "topic": "Other", "event_date": None})
+                    normalized.append({"summary": r, "topics": ["Other"], "event_date": None, "people": []})
                 else:
                     self.logger.warning(f"Result {i} has unexpected type {type(r)}: {r}")
-                    normalized.append({"summary": "", "topic": "Other", "event_date": None})
+                    normalized.append({"summary": "", "topics": ["Other"], "event_date": None, "people": []})
             
             if len(normalized) == num_items:
                 # Check if any summaries are empty
@@ -483,7 +499,12 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                         for part in parts:
                             part = part.strip()
                             if part:
-                                split_normalized.append({"summary": part, "topic": normalized[0].get("topic", "Other"), "event_date": normalized[0].get("event_date")})
+                                split_normalized.append({
+                                    "summary": part, 
+                                    "topics": normalized[0].get("topics", ["Other"]), 
+                                    "event_date": normalized[0].get("event_date"),
+                                    "people": normalized[0].get("people", [])
+                                })
                         # If we got the right number, use it
                         if len(split_normalized) == num_items:
                             self.logger.info(f"✅ Successfully split combined summary into {num_items} parts")

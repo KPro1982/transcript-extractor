@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag, BookOpen } from 'lucide-react'
+import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag, BookOpen, FileStack } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import UserMenu from '@/components/UserMenu'
 import PeopleReport from '@/components/reports/PeopleReport'
@@ -10,22 +10,24 @@ import ChronologicalReport from '@/components/reports/ChronologicalReport'
 import PageLineReport from '@/components/reports/PageLineReport'
 import TopicsReport from '@/components/reports/TopicsReport'
 import NarrativeReport from '@/components/reports/NarrativeReport'
+import CombinedReport from '@/components/reports/CombinedReport'
 
-type TabType = 'narrative' | 'page-line' | 'topics' | 'people' | 'chronological'
+type TabType = 'combined' | 'narrative' | 'page-line' | 'topics' | 'people' | 'chronological'
 
 export default function ReportsPage() {
   const params = useParams()
   const router = useRouter()
   const documentId = params?.documentId as string
-  const [activeTab, setActiveTab] = useState<TabType>('narrative')
+  const [activeTab, setActiveTab] = useState<TabType>('combined')
   const [loading, setLoading] = useState(false)
 
   const tabs = [
-    { id: 'narrative' as TabType, label: 'Narrative Report', icon: BookOpen },
-    { id: 'page-line' as TabType, label: 'Page/Line Report', icon: FileText },
-    { id: 'topics' as TabType, label: 'Topics Report', icon: Tag },
-    { id: 'people' as TabType, label: 'People Report', icon: Users },
-    { id: 'chronological' as TabType, label: 'Chronological Report', icon: Calendar }
+    { id: 'combined' as TabType, label: 'Combined Report', icon: FileStack },
+    { id: 'narrative' as TabType, label: 'Narrative', icon: BookOpen },
+    { id: 'page-line' as TabType, label: 'Page/Line', icon: FileText },
+    { id: 'topics' as TabType, label: 'Topics', icon: Tag },
+    { id: 'people' as TabType, label: 'People', icon: Users },
+    { id: 'chronological' as TabType, label: 'Chronological', icon: Calendar }
   ]
 
   return (
@@ -81,6 +83,7 @@ export default function ReportsPage() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {activeTab === 'combined' && <CombinedReport documentId={documentId} />}
           {activeTab === 'narrative' && <NarrativeReport documentId={documentId} />}
           {activeTab === 'page-line' && <PageLineReport documentId={documentId} />}
           {activeTab === 'topics' && <TopicsReport documentId={documentId} />}

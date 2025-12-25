@@ -336,17 +336,22 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
             
             # Get summary and verify it's not empty
             summary_text = item.get('summary', '') or ''
-            topic_text = item.get('topic', 'Other') or 'Other'
+            # Handle topics - get from topics array or fallback to topic string
+            topics_list = item.get('topics', [])
+            if not topics_list and 'topic' in item:
+                topics_list = [item['topic']]
+            if not topics_list:
+                topics_list = ['Other']
             event_date = item.get('event_date', None)  # Extract event_date from AI response
             
             # Log first few items to debug page/line data
             if idx < 3:
-                logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if summary_text else 'no'}, event_date={event_date}, summary_preview={summary_text[:100] if summary_text else 'EMPTY'}..., question={item['question'][:50]}...")
+                logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if summary_text else 'no'}, event_date={event_date}, topics={topics_list}, summary_preview={summary_text[:100] if summary_text else 'EMPTY'}..., question={item['question'][:50]}...")
             
             try:
                 qa_item_id = await db_service.fetchval(
                     """
-                    INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic, event_date)
+                    INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topics, event_date)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                     RETURNING id
                     """,
@@ -359,7 +364,7 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                     item['question'],
                     item['answer'],
                     summary_text,
-                    topic_text,
+                    topics_list,
                     event_date
                 )
                 
@@ -716,21 +721,26 @@ async def _process_chunk_async(
             answer_end_page = item.get('answer_end_page', printed_page_num)
             answer_end_line = item.get('answer_end_line', line_num)
             summary_text = item.get('summary', '') or ''
-            topic_text = item.get('topic', 'Other') or 'Other'
+            # Handle topics - get from topics array or fallback to topic string
+            topics_list = item.get('topics', [])
+            if not topics_list and 'topic' in item:
+                topics_list = [item['topic']]
+            if not topics_list:
+                topics_list = ['Other']
             event_date = item.get('event_date', None)
             
             qa_item_id = await db_service.fetchval(
                 """
                 INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, 
                                           answer_end_page, answer_end_line, question, answer, 
-                                          summary, topic, event_date)
+                                          summary, topics, event_date)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING id
                 """,
                 document_id, printed_page_num, line_num, pdf_page_idx,
                 answer_end_page, answer_end_line,
                 item['question'], item['answer'],
-                summary_text, topic_text, event_date
+                summary_text, topics_list, event_date
             )
             
             # Extract and store people mentioned in this Q&A

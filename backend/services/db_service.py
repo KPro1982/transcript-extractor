@@ -248,7 +248,7 @@ async def init_db():
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 summary TEXT DEFAULT '',
-                topic VARCHAR(255) DEFAULT 'Other',
+                topics TEXT[] DEFAULT ARRAY['Other']::TEXT[],
                 created_at TIMESTAMP DEFAULT NOW()
             );
             
@@ -273,6 +273,32 @@ async def init_db():
                     WHERE table_name = 'final_qa_items' AND column_name = 'event_date'
                 ) THEN
                     ALTER TABLE final_qa_items ADD COLUMN event_date VARCHAR(50);
+                END IF;
+            END $$;
+            
+            -- Migrate topic column from VARCHAR to TEXT[] array (migration)
+            DO $$ 
+            BEGIN
+                -- Check if topic is still VARCHAR (not yet migrated)
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'final_qa_items' 
+                    AND column_name = 'topic' 
+                    AND data_type = 'character varying'
+                ) THEN
+                    -- Migrate existing data to array format
+                    ALTER TABLE final_qa_items 
+                    ALTER COLUMN topic TYPE TEXT[] 
+                    USING CASE 
+                        WHEN topic IS NULL OR topic = '' THEN ARRAY['Other']::TEXT[]
+                        ELSE ARRAY[topic]::TEXT[]
+                    END;
+                    
+                    -- Set default for new rows
+                    ALTER TABLE final_qa_items 
+                    ALTER COLUMN topic SET DEFAULT ARRAY['Other']::TEXT[];
+                    
+                    RAISE NOTICE 'Migrated topic column to TEXT[] array';
                 END IF;
             END $$;
             

@@ -5,17 +5,22 @@ import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { useJobProgress } from '@/hooks/useWebSocket'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 import { api } from '@/lib/api'
+import CompletionModal from '@/components/CompletionModal'
 
 export default function ProcessPage() {
   const router = useRouter()
   const params = useParams()
   const jobId = params?.jobId as string
+  const isAdmin = useIsAdmin()
 
   const { progress, isConnected, error } = useJobProgress(jobId)
   const [avgTimePerPage, setAvgTimePerPage] = useState(1.5) // Default 1.5s per page
   const [estimatedCompletion, setEstimatedCompletion] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<string>('')
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [documentId, setDocumentId] = useState<string | null>(null)
 
   // Fetch average processing time on mount
   useEffect(() => {
@@ -90,13 +95,16 @@ export default function ProcessPage() {
   }, [progress.detailedProgress, avgTimePerPage, progress.status])
 
   useEffect(() => {
-    // Redirect to results when complete
+    // Show modal when complete instead of auto-redirecting
     if (progress.status === 'completed') {
-      setTimeout(() => {
-        router.push(`/results/${jobId}`)
-      }, 2000)
+      // Extract document_id from progress result if available
+      const docId = (progress as any).document_id || (progress as any).result?.document_id
+      if (docId) {
+        setDocumentId(docId)
+      }
+      setShowCompletionModal(true)
     }
-  }, [progress.status, jobId, router])
+  }, [progress.status])
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
@@ -140,8 +148,8 @@ export default function ProcessPage() {
               />
             </div>
 
-            {/* Detailed Q&A Progress */}
-            {progress.detailedProgress && (
+            {/* Detailed Q&A Progress - Only show for admins */}
+            {isAdmin && progress.detailedProgress && (
               <div className="mt-4 pt-4 border-t border-gray-800">
                 <div className="text-center space-y-2">
                   <div className="text-2xl font-mono font-bold text-accent">
@@ -176,23 +184,34 @@ export default function ProcessPage() {
             )}
           </div>
 
-          {/* Status Info */}
-          <div className="mt-8 pt-8 border-t border-gray-800">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-400">Connection Status</span>
-              <span className={isConnected ? 'text-green-500' : 'text-gray-500'}>
-                {isConnected ? '● Connected' : '○ Disconnected'}
-              </span>
-            </div>
-
-            {error && (
-              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <p className="text-red-400 text-sm">{error}</p>
+          {/* Status Info - Only show connection status for admins */}
+          {isAdmin && (
+            <div className="mt-8 pt-8 border-t border-gray-800">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400">Connection Status</span>
+                <span className={isConnected ? 'text-green-500' : 'text-gray-500'}>
+                  {isConnected ? '● Connected' : '○ Disconnected'}
+                </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Completion Modal */}
+      {showCompletionModal && documentId && (
+        <CompletionModal
+          jobId={jobId}
+          documentId={documentId}
+          onClose={() => setShowCompletionModal(false)}
+        />
+      )}
     </div>
   )
 }

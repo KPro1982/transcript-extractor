@@ -50,15 +50,14 @@ export default function NarrativeReport({ documentId }: { documentId: string }) 
   }
 
   const renderNarrativeWithCitations = (narrative: string, citations: Record<string, Citation>) => {
-    // Split narrative by citation markers [1], [2], etc.
-    const parts = narrative.split(/(\[\d+\])/g)
+    // Split narrative by citation markers [page:line] or [page:line-page:line]
+    const citationRegex = /(\[\d+:\d+(?:-\d+(?::\d+)?)?\])/g
+    const parts = narrative.split(citationRegex)
     
     return parts.map((part, idx) => {
       // Check if part is a citation marker
-      const citationMatch = part.match(/\[(\d+)\]/)
-      if (citationMatch) {
-        const citationKey = part
-        const citation = citations[citationKey]
+      if (citationRegex.test(part)) {
+        const citation = citations[part]
         
         if (citation) {
           return (
