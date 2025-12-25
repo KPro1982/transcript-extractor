@@ -1,4 +1,4 @@
-"""Reports API endpoints for people, chronological, and page/line reports."""
+"""Reports API endpoints for people, chronological, page/line, and topic reports."""
 import logging
 from typing import List, Dict
 from uuid import UUID
@@ -170,6 +170,94 @@ async def get_page_line_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate page/line report: {str(e)}"
+        )
+
+
+@router.get("/{document_id}/reports/topics")
+async def get_topics_report(
+    document_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get topics report: Q&A items grouped by topic.
+    
+    Returns topics with their associated Q&A items and counts.
+    """
+    try:
+        # Get all Q&A items grouped by topic
+        rows = await db_service.fetch(
+            """
+            SELECT 
+                topic,
+                COUNT(*) as count
+            FROM final_qa_items
+            WHERE document_id = $1
+            GROUP BY topic
+            ORDER BY count DESC, topic
+            """,
+            document_id
+        )
+        
+        topics_list = []
+        for row in rows:
+            topic = row["topic"]
+            count = row["count"]
+            
+            # Get Q&A items for this topic
+            qa_rows = await db_service.fetch(
+                """
+                SELECT 
+                    id,
+                    page_number,
+                    line_number,
+                    answer_end_page,
+                    answer_end_line,
+                    question,
+                    answer,
+                    summary,
+                    event_date
+                FROM final_qa_items
+                WHERE document_id = $1 AND topic = $2
+                ORDER BY page_number, line_number
+                """,
+                document_id,
+                topic
+            )
+            
+            qa_items = [
+                {
+                    "id": str(qa_row["id"]),
+                    "page": qa_row["page_number"],
+                    "line": qa_row["line_number"],
+                    "answer_end_page": qa_row["answer_end_page"],
+                    "answer_end_line": qa_row["answer_end_line"],
+                    "page_line_ref": format_page_line_reference(
+                        qa_row["page_number"],
+                        qa_row["line_number"],
+                        qa_row["answer_end_page"],
+                        qa_row["answer_end_line"]
+                    ),
+                    "question": qa_row["question"],
+                    "answer": qa_row["answer"],
+                    "summary": qa_row["summary"],
+                    "event_date": qa_row["event_date"]
+                }
+                for qa_row in qa_rows
+            ]
+            
+            topics_list.append({
+                "topic": topic,
+                "count": count,
+                "qa_items": qa_items
+            })
+        
+        return {"topics": topics_list, "total": len(topics_list)}
+        
+    except Exception as e:
+        logger.error(f"Failed to get topics report for document {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate topics report: {str(e)}"
         )
 
 
