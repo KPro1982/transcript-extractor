@@ -287,6 +287,43 @@ class CacheService:
             logger.debug(f"Published {event_type} update for job {job_id[:8]}...")
         except Exception as e:
             logger.error(f"Failed to publish job update: {e}")
+    
+    async def get(self, key: str) -> Optional[str]:
+        """Generic get method for any Redis key."""
+        if not self.redis:
+            return None
+        try:
+            return await self.redis.get(key)
+        except Exception as e:
+            logger.error(f"Cache get error for key {key}: {e}")
+            return None
+    
+    async def set(self, key: str, value: str, ex: Optional[int] = None):
+        """Generic set method for any Redis key.
+        
+        Args:
+            key: Redis key
+            value: Value to store (string)
+            ex: Optional expiration time in seconds
+        """
+        if not self.redis:
+            return
+        try:
+            if ex:
+                await self.redis.setex(key, timedelta(seconds=ex), value)
+            else:
+                await self.redis.set(key, value)
+        except Exception as e:
+            logger.error(f"Cache set error for key {key}: {e}")
+    
+    async def delete(self, key: str):
+        """Delete a key from Redis."""
+        if not self.redis:
+            return
+        try:
+            await self.redis.delete(key)
+        except Exception as e:
+            logger.error(f"Cache delete error for key {key}: {e}")
 
 
 # Global cache service instance

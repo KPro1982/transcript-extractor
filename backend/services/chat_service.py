@@ -19,7 +19,11 @@ class ChatService:
     """Handle chat interactions with deposition RAG."""
     
     def __init__(self):
-        self.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # Use primary API key (openai_api_key_1 or openai_api_key fallback)
+        api_key = settings.openai_api_key_1 or settings.openai_api_key
+        if not api_key:
+            raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY_1 or OPENAI_API_KEY.")
+        self.openai_client = AsyncOpenAI(api_key=api_key)
         self.model = "gpt-4o-mini"  # Use same model as summarization
         self.max_tokens = 1000
         self.temperature = 0.3  # More deterministic for legal analysis
