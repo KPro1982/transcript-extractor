@@ -27,7 +27,7 @@ export default function CompletionModal({ jobId, documentId, onClose }: Completi
           </div>
           <h2 className="text-3xl font-serif font-bold mb-2">Processing Complete!</h2>
           <p className="text-gray-400">
-            Your deposition has been processed successfully. Choose how you'd like to proceed:
+            Your deposition has been processed successfully. Choose how you&apos;d like to proceed:
           </p>
         </div>
 
