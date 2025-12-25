@@ -54,8 +54,12 @@ app = FastAPI(
 )
 
 # CORS configuration
-cors_origins = settings.allowed_origins + [settings.frontend_url]
+# Combine allowed origins with frontend URL, ensuring no duplicates
+cors_origins = list(set(settings.allowed_origins + [settings.frontend_url]))
+# Filter out None/empty values and ensure trailing slashes are handled
+cors_origins = [origin.rstrip('/') for origin in cors_origins if origin]
 logger.info(f"Configuring CORS with origins: {cors_origins}")
+logger.info(f"Frontend URL from settings: {settings.frontend_url}")
 
 # Add SessionMiddleware (required for OAuth)
 app.add_middleware(
@@ -70,6 +74,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Include routers
