@@ -1,15 +1,21 @@
-"""Reports API endpoints for people, chronological, page/line, and topic reports."""
+"""Reports API endpoints for people, chronological, page/line, topic, and narrative reports."""
 import logging
+import json
 from typing import List, Dict
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from openai import AsyncOpenAI
 
 from api.auth import get_current_user, User
 from services.db_service import db_service
 from services.people_extraction_service import people_extraction_service
+from config import settings
 
 router = APIRouter(prefix="/api/documents", tags=["reports"])
 logger = logging.getLogger(__name__)
+
+# Initialize OpenAI client for narrative generation
+openai_client = AsyncOpenAI(api_key=settings.openai_api_key_1 or settings.openai_api_key)
 
 
 @router.get("/{document_id}/reports/people")
@@ -281,4 +287,173 @@ def format_page_line_reference(
         return f"Page {page}, Lines {line}-{answer_end_line}"
     else:
         return f"Page {page}, Line {line}"
+
+
+@router.get("/{document_id}/reports/narrative")
+async def get_narrative_report(
+    document_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get narrative report: AI-generated narrative for each topic with inline citations.
+    
+    Returns topics with AI-generated narratives that include clickable citations.
+    """
+    try:
+        # Get all topics with their Q&A items
+        rows = await db_service.fetch(
+            """
+            SELECT 
+                topic,
+                COUNT(*) as count
+            FROM final_qa_items
+            WHERE document_id = $1
+            GROUP BY topic
+            ORDER BY 
+                CASE topic
+                    WHEN 'Background & Education' THEN 1
+                    WHEN 'Employment History' THEN 2
+                    WHEN 'Incident Description' THEN 3
+                    WHEN 'Medical Treatment' THEN 4
+                    WHEN 'Damages & Injuries' THEN 5
+                    WHEN 'Timeline & Chronology' THEN 6
+                    WHEN 'Documents & Evidence' THEN 7
+                    WHEN 'Witness Statements' THEN 8
+                    WHEN 'Expert Opinions' THEN 9
+                    ELSE 10
+                END,
+                count DESC
+            """,
+            document_id
+        )
+        
+        narratives = []
+        
+        for row in rows:
+            topic = row["topic"]
+            
+            # Get Q&A items for this topic
+            qa_rows = await db_service.fetch(
+                """
+                SELECT 
+                    id,
+                    page_number,
+                    line_number,
+                    answer_end_page,
+                    answer_end_line,
+                    summary,
+                    event_date
+                FROM final_qa_items
+                WHERE document_id = $1 AND topic = $2
+                ORDER BY page_number, line_number
+                """,
+                document_id,
+                topic
+            )
+            
+            if not qa_rows:
+                continue
+            
+            # Format summaries with citations for AI
+            summaries_with_citations = []
+            citation_map = {}  # Map citation IDs to full citation info
+            
+            for idx, qa_row in enumerate(qa_rows, 1):
+                citation_id = f"[{idx}]"
+                page_line_ref = format_page_line_reference(
+                    qa_row["page_number"],
+                    qa_row["line_number"],
+                    qa_row["answer_end_page"],
+                    qa_row["answer_end_line"]
+                )
+                
+                summaries_with_citations.append(
+                    f"{citation_id} {qa_row['summary']}"
+                )
+                
+                citation_map[citation_id] = {
+                    "id": str(qa_row["id"]),
+                    "page": qa_row["page_number"],
+                    "line": qa_row["line_number"],
+                    "page_line_ref": page_line_ref,
+                    "summary": qa_row["summary"]
+                }
+            
+            # Generate narrative using AI
+            narrative_text = await generate_narrative_for_topic(
+                topic,
+                summaries_with_citations
+            )
+            
+            narratives.append({
+                "topic": topic,
+                "narrative": narrative_text,
+                "citations": citation_map,
+                "item_count": len(qa_rows)
+            })
+        
+        return {"narratives": narratives, "total": len(narratives)}
+        
+    except Exception as e:
+        logger.error(f"Failed to generate narrative report for document {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate narrative report: {str(e)}"
+        )
+
+
+async def generate_narrative_for_topic(topic: str, summaries: List[str]) -> str:
+    """
+    Generate a narrative summary for a topic using AI.
+    
+    Args:
+        topic: The topic name
+        summaries: List of summaries with citation IDs (e.g., "[1] The witness testified...")
+        
+    Returns:
+        Narrative text with inline citations
+    """
+    try:
+        summaries_text = "\n".join(summaries)
+        
+        system_prompt = f"""You are a legal assistant creating a narrative summary for the topic: {topic}.
+
+You will receive numbered summaries from a deposition transcript. Your task is to:
+1. Synthesize the information into a coherent narrative paragraph or section
+2. Include the citation numbers [1], [2], etc. inline where the information appears
+3. Write in third person past tense
+4. Organize information logically (chronologically or thematically)
+5. DO NOT add information not present in the summaries
+6. Keep citations in the EXACT format [1], [2], etc.
+
+Example:
+Input summaries:
+[1] The witness testified they worked at ABC Corp from 2020 to 2022.
+[2] The witness stated they started on January 15, 2020.
+[3] The witness mentioned their role was sales manager.
+
+Output narrative:
+The witness testified that they worked at ABC Corp from 2020 to 2022 [1], starting on January 15, 2020 [2]. During this time, they served as a sales manager [3].
+
+Write a clear, professional narrative that incorporates all the provided information with proper citations."""
+
+        user_prompt = f"Topic: {topic}\n\nSummaries:\n{summaries_text}\n\nCreate a narrative summary with inline citations:"
+        
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        narrative = response.choices[0].message.content.strip()
+        return narrative
+        
+    except Exception as e:
+        logger.error(f"Failed to generate narrative for topic {topic}: {e}")
+        # Fallback: return summaries as bullet points
+        return "\n\n".join(summaries)
 

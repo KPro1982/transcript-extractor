@@ -2,24 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag } from 'lucide-react'
+import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag, BookOpen } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import UserMenu from '@/components/UserMenu'
 import PeopleReport from '@/components/reports/PeopleReport'
 import ChronologicalReport from '@/components/reports/ChronologicalReport'
 import PageLineReport from '@/components/reports/PageLineReport'
 import TopicsReport from '@/components/reports/TopicsReport'
+import NarrativeReport from '@/components/reports/NarrativeReport'
 
-type TabType = 'page-line' | 'people' | 'chronological' | 'topics'
+type TabType = 'narrative' | 'page-line' | 'topics' | 'people' | 'chronological'
 
 export default function ReportsPage() {
   const params = useParams()
   const router = useRouter()
   const documentId = params?.documentId as string
-  const [activeTab, setActiveTab] = useState<TabType>('page-line')
+  const [activeTab, setActiveTab] = useState<TabType>('narrative')
   const [loading, setLoading] = useState(false)
 
   const tabs = [
+    { id: 'narrative' as TabType, label: 'Narrative Report', icon: BookOpen },
     { id: 'page-line' as TabType, label: 'Page/Line Report', icon: FileText },
     { id: 'topics' as TabType, label: 'Topics Report', icon: Tag },
     { id: 'people' as TabType, label: 'People Report', icon: Users },
@@ -79,6 +81,7 @@ export default function ReportsPage() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {activeTab === 'narrative' && <NarrativeReport documentId={documentId} />}
           {activeTab === 'page-line' && <PageLineReport documentId={documentId} />}
           {activeTab === 'topics' && <TopicsReport documentId={documentId} />}
           {activeTab === 'people' && <PeopleReport documentId={documentId} />}
