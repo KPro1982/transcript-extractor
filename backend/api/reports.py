@@ -408,17 +408,6 @@ async def get_narrative_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate narrative report: {str(e)}"
         )
-                "item_count": len(qa_rows)
-            })
-        
-        return {"narratives": narratives, "total": len(narratives)}
-        
-    except Exception as e:
-        logger.error(f"Failed to generate narrative report for document {document_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate narrative report: {str(e)}"
-        )
 
 
 async def generate_narrative_for_topic(topic: str, summaries: List[str]) -> str:
