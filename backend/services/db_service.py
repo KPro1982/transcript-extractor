@@ -337,11 +337,23 @@ async def init_db():
                 progress INT DEFAULT 0,
                 error_message TEXT,
                 items_processed INT DEFAULT 0,
+                retry_count INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT NOW(),
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
                 UNIQUE(parent_job_id, chunk_index)
             );
+            
+            -- Add retry_count column if it doesn't exist (for existing databases)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'chunk_jobs' AND column_name = 'retry_count'
+                ) THEN
+                    ALTER TABLE chunk_jobs ADD COLUMN retry_count INT DEFAULT 0;
+                END IF;
+            END $$;
             
             CREATE INDEX IF NOT EXISTS idx_chunk_jobs_parent ON chunk_jobs(parent_job_id);
             CREATE INDEX IF NOT EXISTS idx_chunk_jobs_status ON chunk_jobs(status);

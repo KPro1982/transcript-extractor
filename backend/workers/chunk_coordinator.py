@@ -211,7 +211,7 @@ async def mark_chunk_complete(chunk_job_id: str):
         chunk_job_id
     )
     
-    logger.info(f"Chunk {chunk_job_id[:8]}... marked complete")
+    logger.info(f"Chunk {str(chunk_job_id)[:8]}... marked complete")
     
     # Check if all chunks are complete
     await check_and_complete_parent(chunk_job_id)
@@ -234,14 +234,95 @@ async def mark_chunk_failed(chunk_job_id: str, error_message: str):
         chunk_job_id
     )
     
-    logger.error(f"Chunk {chunk_job_id[:8]}... failed: {error_message}")
+    logger.error(f"Chunk {str(chunk_job_id)[:8]}... failed: {error_message}")
     
     # Also check parent (may need to fail parent job)
     await check_and_complete_parent(chunk_job_id)
 
 
+async def retry_failed_chunk(chunk_job_id: str):
+    """Retry a failed chunk job.
+    
+    Args:
+        chunk_job_id: Chunk job ID to retry
+        
+    Returns:
+        True if retry was dispatched, False otherwise
+    """
+    from workers.tasks import process_document_chunk_task
+    
+    # Get chunk info
+    chunk_info = await db_service.fetchrow(
+        """
+        SELECT document_id, first_page, last_page, retry_count, worker_id, parent_job_id
+        FROM chunk_jobs
+        WHERE id = $1
+        """,
+        chunk_job_id
+    )
+    
+    if not chunk_info:
+        logger.error(f"Chunk {str(chunk_job_id)[:8]}... not found for retry")
+        return False
+    
+    current_retry_count = chunk_info['retry_count'] or 0
+    max_retries = 2  # Maximum 2 retries (3 total attempts)
+    
+    if current_retry_count >= max_retries:
+        logger.error(f"Chunk {str(chunk_job_id)[:8]}... exceeded max retries ({current_retry_count}/{max_retries})")
+        return False
+    
+    # Get user_id from parent job if available
+    user_id = None
+    if chunk_info['parent_job_id']:
+        user_id_result = await db_service.fetchval(
+            "SELECT user_id FROM processing_jobs WHERE id = $1",
+            chunk_info['parent_job_id']
+        )
+        if user_id_result:
+            user_id = str(user_id_result)
+    
+    # Increment retry count and reset status
+    new_retry_count = current_retry_count + 1
+    await db_service.execute(
+        """
+        UPDATE chunk_jobs
+        SET status = 'pending', error_message = NULL, progress = 0, retry_count = $1, started_at = NULL
+        WHERE id = $2
+        """,
+        new_retry_count,
+        chunk_job_id
+    )
+    
+    logger.info(f"Retrying chunk {str(chunk_job_id)[:8]}... (attempt {new_retry_count}/{max_retries + 1})")
+    
+    # Dispatch retry task
+    try:
+        process_document_chunk_task.delay(
+            str(chunk_job_id),
+            str(chunk_info['document_id']),
+            chunk_info['first_page'],
+            chunk_info['last_page'],
+            user_id
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to dispatch retry for chunk {str(chunk_job_id)[:8]}...: {e}")
+        await db_service.execute(
+            """
+            UPDATE chunk_jobs
+            SET status = 'failed', error_message = $1
+            WHERE id = $2
+            """,
+            f"Retry dispatch failed: {str(e)}",
+            chunk_job_id
+        )
+        return False
+
+
 async def check_and_complete_parent(chunk_job_id: str):
     """Check if all chunks are complete and finalize parent job.
+    Automatically retries failed chunks before marking parent as failed.
     
     Args:
         chunk_job_id: Any chunk job ID
@@ -260,31 +341,73 @@ async def check_and_complete_parent(chunk_job_id: str):
     
     # Get all chunk statuses
     chunks = await db_service.fetch(
-        "SELECT status, error_message FROM chunk_jobs WHERE parent_job_id = $1",
+        """
+        SELECT id, status, error_message, retry_count 
+        FROM chunk_jobs 
+        WHERE parent_job_id = $1
+        """,
         parent_job_id
     )
     
     all_complete = all(c['status'] == 'completed' for c in chunks)
-    any_failed = any(c['status'] == 'failed' for c in chunks)
+    failed_chunks = [c for c in chunks if c['status'] == 'failed']
     
-    if any_failed:
-        # Mark parent as failed
-        failed_errors = [c['error_message'] for c in chunks if c['status'] == 'failed']
+    # Try to retry failed chunks
+    if failed_chunks:
+        retried_any = False
+        for failed_chunk in failed_chunks:
+            retry_count = failed_chunk.get('retry_count', 0) or 0
+            max_retries = 2
+            
+            if retry_count < max_retries:
+                chunk_id_str = str(failed_chunk['id'])
+                logger.info(f"Attempting to retry failed chunk {chunk_id_str[:8]}... (retry {retry_count + 1}/{max_retries + 1})")
+                if await retry_failed_chunk(chunk_id_str):
+                    retried_any = True
+        
+        # If we retried any chunks, wait for them to complete before finalizing
+        if retried_any:
+            retryable_count = len([c for c in failed_chunks if (c.get('retry_count', 0) or 0) < 2])
+            logger.info(f"Retried {retryable_count} failed chunks for parent job {str(parent_job_id)[:8]}...")
+            return  # Exit early, will be called again when retried chunks complete
+    
+    # Check again after potential retries
+    chunks = await db_service.fetch(
+        """
+        SELECT id, status, error_message, retry_count 
+        FROM chunk_jobs 
+        WHERE parent_job_id = $1
+        """,
+        parent_job_id
+    )
+    
+    all_complete = all(c['status'] == 'completed' for c in chunks)
+    failed_chunks = [c for c in chunks if c['status'] == 'failed']
+    
+    if failed_chunks:
+        # All retries exhausted - mark parent as failed
+        failed_errors = [c['error_message'] for c in failed_chunks if c['error_message']]
+        error_summary = f"One or more chunks failed after retries: {'; '.join(failed_errors[:3])}"
+        if len(failed_errors) > 3:
+            error_summary += f" (and {len(failed_errors) - 3} more)"
+        
         await db_service.execute(
             """
             UPDATE processing_jobs
             SET status = 'failed', error_message = $1, completed_at = NOW()
             WHERE id = $2
             """,
-            f"One or more chunks failed: {'; '.join(failed_errors)}",
+            error_summary,
             parent_job_id
         )
         
         await cache_service.publish_job_update(
             str(parent_job_id),
             "error",
-            {"error_message": "Processing failed in one or more chunks"}
+            {"error_message": "Processing failed in one or more chunks after retries"}
         )
+        
+        logger.error(f"Parent job {str(parent_job_id)[:8]}... failed: {len(failed_chunks)} chunks failed after retries")
         
     elif all_complete:
         # All chunks complete - finalize parent job
@@ -302,7 +425,7 @@ async def check_and_complete_parent(chunk_job_id: str):
             parent_job_id
         )
         
-        logger.info(f"Parent job {parent_job_id[:8]}... completed: {total_items} items processed")
+        logger.info(f"Parent job {str(parent_job_id)[:8]}... completed: {total_items} items processed")
         
         await cache_service.publish_job_update(
             str(parent_job_id),
