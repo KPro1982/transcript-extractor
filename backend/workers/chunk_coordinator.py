@@ -65,15 +65,18 @@ async def create_chunk_jobs(
     parent_job_id: str,
     document_id: str,
     total_pages: int,
-    num_chunks: int
+    num_chunks: int,
+    first_page_offset: int = 0
 ) -> List[dict]:
     """Create chunk jobs for parallel processing.
     
     Args:
         parent_job_id: Parent processing job ID
         document_id: Document to process
-        total_pages: Total pages in document
+        total_pages: Total pages in document (relative to offset)
         num_chunks: Number of chunks to create
+        first_page_offset: Offset to add to calculated page numbers (default: 0)
+                          Used when processing doesn't start from page 1
         
     Returns:
         List of chunk job records
@@ -82,8 +85,13 @@ async def create_chunk_jobs(
     chunk_jobs = []
     
     for i in range(num_chunks):
-        first_page = i * pages_per_chunk + 1
-        last_page = (i + 1) * pages_per_chunk if i < num_chunks - 1 else total_pages
+        # Calculate relative page numbers (starting from 1)
+        relative_first = i * pages_per_chunk + 1
+        relative_last = (i + 1) * pages_per_chunk if i < num_chunks - 1 else total_pages
+        
+        # Apply offset to get actual page numbers
+        first_page = relative_first + first_page_offset - 1
+        last_page = relative_last + first_page_offset - 1
         
         # Create chunk job record
         chunk_job_id = await db_service.fetchval(
