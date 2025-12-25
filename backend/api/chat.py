@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 
-from api.auth import get_current_user
+from api.auth import get_current_user, User
 from services.db_service import persistent_db_service, db_service
 from services.chat_service import chat_service
 from models.chat_models import (
@@ -30,7 +30,7 @@ router = APIRouter(tags=["chat"])
 @router.post("/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_chat_session(
     request: ChatSessionCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Create a new chat session for a document.
@@ -43,7 +43,7 @@ async def create_chat_session(
         ChatSessionResponse with session details
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Verify document exists in ephemeral DB
         doc = await db_service.fetchrow(
@@ -92,7 +92,7 @@ async def create_chat_session(
 @router.get("/sessions", response_model=ChatSessionsListResponse)
 async def list_chat_sessions(
     document_id: UUID,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Get all chat sessions for a document (for current user).
@@ -105,7 +105,7 @@ async def list_chat_sessions(
         ChatSessionsListResponse with list of sessions
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Get sessions with message counts
         rows = await persistent_db_service.fetch(
@@ -151,7 +151,7 @@ async def list_chat_sessions(
 @router.get("/sessions/{session_id}", response_model=ChatSessionWithMessages)
 async def get_chat_session(
     session_id: UUID,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Get a specific chat session with all messages.
@@ -164,7 +164,7 @@ async def get_chat_session(
         ChatSessionWithMessages with full message history
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Get session
         session = await persistent_db_service.fetchrow(
@@ -235,7 +235,7 @@ async def get_chat_session(
 async def update_chat_session(
     session_id: UUID,
     update: ChatSessionUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Update chat session metadata (title).
@@ -249,7 +249,7 @@ async def update_chat_session(
         Updated ChatSessionResponse
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Verify ownership
         session = await persistent_db_service.fetchrow(
@@ -311,7 +311,7 @@ async def update_chat_session(
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_chat_session(
     session_id: UUID,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Delete a chat session and all its messages.
@@ -321,7 +321,7 @@ async def delete_chat_session(
         current_user: Authenticated user from JWT
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Delete session (messages will cascade)
         result = await persistent_db_service.execute(
@@ -355,7 +355,7 @@ async def delete_chat_session(
 async def send_chat_message(
     session_id: UUID,
     request: ChatMessageRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Send a message and get AI response.
@@ -369,7 +369,7 @@ async def send_chat_message(
         ChatMessageResponse with AI response and citations
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Verify session ownership
         session = await persistent_db_service.fetchrow(
@@ -419,7 +419,7 @@ async def send_chat_message(
 @router.get("/sessions/{session_id}/messages", response_model=list[ChatMessage])
 async def get_chat_messages(
     session_id: UUID,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Get all messages for a session.
@@ -432,7 +432,7 @@ async def get_chat_messages(
         List of ChatMessage objects
     """
     try:
-        user_id = UUID(current_user["user_id"])
+        user_id = UUID(current_user.id)
         
         # Verify session ownership
         session = await persistent_db_service.fetchrow(
