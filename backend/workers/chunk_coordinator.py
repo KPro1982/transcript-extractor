@@ -272,16 +272,6 @@ async def retry_failed_chunk(chunk_job_id: str):
         logger.error(f"Chunk {str(chunk_job_id)[:8]}... exceeded max retries ({current_retry_count}/{max_retries})")
         return False
     
-    # Get user_id from parent job if available
-    user_id = None
-    if chunk_info['parent_job_id']:
-        user_id_result = await db_service.fetchval(
-            "SELECT user_id FROM processing_jobs WHERE id = $1",
-            chunk_info['parent_job_id']
-        )
-        if user_id_result:
-            user_id = str(user_id_result)
-    
     # Increment retry count and reset status
     new_retry_count = current_retry_count + 1
     await db_service.execute(
@@ -296,14 +286,13 @@ async def retry_failed_chunk(chunk_job_id: str):
     
     logger.info(f"Retrying chunk {str(chunk_job_id)[:8]}... (attempt {new_retry_count}/{max_retries + 1})")
     
-    # Dispatch retry task
+    # Dispatch retry task (user_id not needed for chunk processing)
     try:
         process_document_chunk_task.delay(
             str(chunk_job_id),
             str(chunk_info['document_id']),
             chunk_info['first_page'],
-            chunk_info['last_page'],
-            user_id
+            chunk_info['last_page']
         )
         return True
     except Exception as e:

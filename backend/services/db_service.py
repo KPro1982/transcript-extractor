@@ -276,29 +276,51 @@ async def init_db():
                 END IF;
             END $$;
             
-            -- Migrate topic column from VARCHAR to TEXT[] array (migration)
+            -- Migrate topic/topics column from VARCHAR to TEXT[] array (migration)
             DO $$ 
             BEGIN
-                -- Check if topic is still VARCHAR (not yet migrated)
+                -- Check if 'topic' (singular) exists and is VARCHAR
                 IF EXISTS (
                     SELECT 1 FROM information_schema.columns 
                     WHERE table_name = 'final_qa_items' 
                     AND column_name = 'topic' 
                     AND data_type = 'character varying'
                 ) THEN
-                    -- Migrate existing data to array format
+                    -- Migrate existing data to array format and rename to topics
                     ALTER TABLE final_qa_items 
-                    ALTER COLUMN topic TYPE TEXT[] 
+                    RENAME COLUMN topic TO topics;
+                    
+                    ALTER TABLE final_qa_items 
+                    ALTER COLUMN topics TYPE TEXT[] 
                     USING CASE 
-                        WHEN topic IS NULL OR topic = '' THEN ARRAY['Other']::TEXT[]
-                        ELSE ARRAY[topic]::TEXT[]
+                        WHEN topics IS NULL OR topics = '' THEN ARRAY['Other']::TEXT[]
+                        ELSE ARRAY[topics]::TEXT[]
                     END;
                     
                     -- Set default for new rows
                     ALTER TABLE final_qa_items 
-                    ALTER COLUMN topic SET DEFAULT ARRAY['Other']::TEXT[];
+                    ALTER COLUMN topics SET DEFAULT ARRAY['Other']::TEXT[];
                     
-                    RAISE NOTICE 'Migrated topic column to TEXT[] array';
+                    RAISE NOTICE 'Migrated topic column to topics TEXT[] array';
+                    
+                -- Check if 'topics' exists but is still VARCHAR (edge case)
+                ELSIF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'final_qa_items' 
+                    AND column_name = 'topics' 
+                    AND data_type = 'character varying'
+                ) THEN
+                    ALTER TABLE final_qa_items 
+                    ALTER COLUMN topics TYPE TEXT[] 
+                    USING CASE 
+                        WHEN topics IS NULL OR topics = '' THEN ARRAY['Other']::TEXT[]
+                        ELSE ARRAY[topics]::TEXT[]
+                    END;
+                    
+                    ALTER TABLE final_qa_items 
+                    ALTER COLUMN topics SET DEFAULT ARRAY['Other']::TEXT[];
+                    
+                    RAISE NOTICE 'Converted topics column to TEXT[] array';
                 END IF;
             END $$;
             
