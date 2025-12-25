@@ -286,6 +286,32 @@ async def init_db():
             
             CREATE INDEX IF NOT EXISTS idx_summary_cache_last_accessed ON summary_cache(last_accessed);
             
+            -- People mentioned in depositions
+            CREATE TABLE IF NOT EXISTS people_mentioned (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                normalized_name VARCHAR(255) NOT NULL,
+                display_name VARCHAR(255) NOT NULL,
+                role VARCHAR(50),
+                context TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(document_id, normalized_name)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_people_mentioned_document ON people_mentioned(document_id);
+            CREATE INDEX IF NOT EXISTS idx_people_mentioned_normalized ON people_mentioned(normalized_name);
+            
+            -- Junction table linking Q&A items to people mentioned
+            CREATE TABLE IF NOT EXISTS qa_people (
+                qa_item_id UUID REFERENCES final_qa_items(id) ON DELETE CASCADE,
+                people_id UUID REFERENCES people_mentioned(id) ON DELETE CASCADE,
+                mention_context TEXT,
+                PRIMARY KEY (qa_item_id, people_id)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_qa_people_qa ON qa_people(qa_item_id);
+            CREATE INDEX IF NOT EXISTS idx_qa_people_person ON qa_people(people_id);
+            
             CREATE TABLE IF NOT EXISTS processing_jobs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 document_id UUID REFERENCES documents(id) ON DELETE CASCADE,

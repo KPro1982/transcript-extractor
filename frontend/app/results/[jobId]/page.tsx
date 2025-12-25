@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown, MessageSquare, FileText } from 'lucide-react'
 import { getJobStatus, getQAItems, getDocument } from '@/lib/api'
 import { useKeyboardNav } from '@/hooks/useKeyboardNav'
 import { useAuth } from '@/contexts/AuthContext'
@@ -234,6 +234,17 @@ export default function ResultsPage() {
                 <span className="text-gray-600">•</span>
                 <span>{totalPages} pages</span>
               </div>
+              
+              {/* Reports Button */}
+              {documentId && (
+                <button
+                  onClick={() => router.push(`/reports/${documentId}`)}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent/10 hover:bg-accent/20 border border-accent/30 rounded-lg transition-colors text-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Reports</span>
+                </button>
+              )}
               
               {/* Chat Button */}
               <button

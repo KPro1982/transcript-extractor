@@ -11,6 +11,7 @@ from services.pdf_service import pdf_service
 from services.ai_service import ai_service
 from services.db_service import db_service, init_db
 from services.cache_service import cache_service
+from services.people_extraction_service import people_extraction_service
 from workers.chunk_coordinator import (
     update_chunk_progress, 
     mark_chunk_complete, 
@@ -343,10 +344,11 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                 logger.info(f"Saving final Q&A {idx+1}: printed_page={printed_page_num}, pdf_index={pdf_page_idx}, line={line_num}, answer_end={answer_end_page}:{answer_end_line}, summary={'yes' if summary_text else 'no'}, event_date={event_date}, summary_preview={summary_text[:100] if summary_text else 'EMPTY'}..., question={item['question'][:50]}...")
             
             try:
-                await db_service.execute(
+                qa_item_id = await db_service.fetchval(
                     """
                     INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, answer_end_page, answer_end_line, question, answer, summary, topic, event_date)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    RETURNING id
                     """,
                     document_id,
                     printed_page_num,
@@ -360,6 +362,18 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                     topic_text,
                     event_date
                 )
+                
+                # Extract and store people mentioned in this Q&A
+                people_data = item.get('people', [])
+                if people_data:
+                    witness_name = doc.get('witness_name')
+                    await people_extraction_service.extract_and_store_people(
+                        document_id,
+                        qa_item_id,
+                        people_data,
+                        witness_name
+                    )
+                
             except Exception as e:
                 logger.error(f"Failed to save final Q&A {idx+1}: {e}")
                 logger.error(f"Q&A data: page={printed_page_num}, line={line_num}, summary_length={len(summary_text)}")
@@ -705,18 +719,30 @@ async def _process_chunk_async(
             topic_text = item.get('topic', 'Other') or 'Other'
             event_date = item.get('event_date', None)
             
-            await db_service.execute(
+            qa_item_id = await db_service.fetchval(
                 """
                 INSERT INTO final_qa_items (document_id, page_number, line_number, pdf_page_index, 
                                           answer_end_page, answer_end_line, question, answer, 
                                           summary, topic, event_date)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                RETURNING id
                 """,
                 document_id, printed_page_num, line_num, pdf_page_idx,
                 answer_end_page, answer_end_line,
                 item['question'], item['answer'],
                 summary_text, topic_text, event_date
             )
+            
+            # Extract and store people mentioned in this Q&A
+            people_data = item.get('people', [])
+            if people_data:
+                witness_name = doc.get('witness_name')
+                await people_extraction_service.extract_and_store_people(
+                    document_id,
+                    qa_item_id,
+                    people_data,
+                    witness_name
+                )
         
         # Mark chunk complete
         await mark_chunk_complete(chunk_job_id)

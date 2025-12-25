@@ -297,7 +297,7 @@ CRITICAL REQUIREMENTS - READ CAREFULLY:
 3. The "results" array MUST contain EXACTLY {num_items} objects - NO MORE, NO LESS
 4. DO NOT skip any numbered items
 5. DO NOT combine multiple Q&A into one summary
-6. Each object must have: {{"summary": "...", "topic": "...", "event_date": "..."}}
+6. Each object must have: {{"summary": "...", "topic": "...", "event_date": "...", "people": [...]}}
 
 Summary rules:
 - Transform each Q&A into a narrative statement (DO NOT repeat the question)
@@ -315,6 +315,20 @@ DATE EXTRACTION (CRITICAL):
 - Examples: "from 2020 to 2022" → "2020-2022", "August 2022" → "2022-08", "beginning of employment" → extract the employment start date if mentioned
 - If NO date mentioned, use null
 
+PEOPLE EXTRACTION (CRITICAL):
+- Extract ALL people mentioned in each Q&A pair
+- Identify their role:
+  * "witness" - the deponent/person being deposed (use full name from witness metadata if available)
+  * "attorney" - lawyers mentioned
+  * "other" - any other third parties mentioned
+- For each person, provide:
+  * name: Full name when available (e.g., "Hannah Craven", "John Smith")
+  * role: One of "witness", "attorney", "other"
+  * context: Brief context of how they were mentioned (e.g., "the witness", "questioning attorney", "friend", "employer")
+- Normalize names: "Hannah" = "Hannah Craven" = "Ms. Craven" (use full name when known)
+- Return as JSON array: [{{"name": "...", "role": "...", "context": "..."}}, ...]
+- If NO people mentioned explicitly, return empty array []
+
 Topics (pick one per Q&A): Background & Education, Employment History, Incident Description, Medical Treatment, Damages & Injuries, Timeline & Chronology, Documents & Evidence, Witness Statements, Expert Opinions, Other
 
 EXAMPLE JSON for 2 inputs:
@@ -322,13 +336,13 @@ Input:
 1. Q: Where did you work?
 A: ABC Corp from 2020 to 2022.
 
-2. Q: When did you start?
-A: January 15, 2020.
+2. Q: Did Emily Lasam reach out after the accident?
+A: Yes, she did and tried to visit but couldn't make it.
 
 Example JSON Output (MUST have exactly 2 items):
 {{"results": [
-  {{"summary": "The witness testified they worked at ABC Corp from 2020 to 2022.", "topic": "Employment History", "event_date": "2020-2022"}},
-  {{"summary": "The witness stated they started on January 15, 2020.", "topic": "Employment History", "event_date": "2020-01-15"}}
+  {{"summary": "The witness testified they worked at ABC Corp from 2020 to 2022.", "topic": "Employment History", "event_date": "2020-2022", "people": []}},
+  {{"summary": "The witness stated that Emily Lasam reached out after the accident and attempted to visit.", "topic": "Witness Statements", "event_date": null, "people": [{{"name": "Emily Lasam", "role": "other", "context": "friend who reached out"}}]}}
 ]}}
 
 IMPORTANT: Return your response in JSON format with a "results" array.
@@ -423,7 +437,8 @@ VERIFICATION: Count the number of items in your "results" array. It MUST equal {
                     normalized.append({
                         "summary": summary_text,
                         "topic": r.get("topic", "Other"),
-                        "event_date": r.get("event_date", None)  # Extract date if provided
+                        "event_date": r.get("event_date", None),  # Extract date if provided
+                        "people": r.get("people", [])  # Extract people if provided
                     })
                 elif isinstance(r, str):
                     if not r.strip():
