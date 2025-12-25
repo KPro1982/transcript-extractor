@@ -26,7 +26,8 @@ class ChatService:
             raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY_1 or OPENAI_API_KEY.")
         self.openai_client = AsyncOpenAI(api_key=api_key)
         self.model = "gpt-4o-mini"  # Use same model as summarization
-        self.max_tokens = 1000
+        self.default_max_tokens = 2000  # Default for relevance queries
+        self.exhaustive_max_tokens = 4000  # Higher limit for exhaustive queries
         self.temperature = 0.3  # More deterministic for legal analysis
         
         # Initialize RAG search service
@@ -100,6 +101,14 @@ class ChatService:
                 query_type=query_type
             )
             
+            # Determine max_tokens based on query type
+            if query_type == "exhaustive":
+                max_response_tokens = self.exhaustive_max_tokens
+                logger.info(f"Using exhaustive query max_tokens: {max_response_tokens}")
+            else:
+                max_response_tokens = self.default_max_tokens
+                logger.info(f"Using relevance query max_tokens: {max_response_tokens}")
+            
             # Prepare messages for OpenAI
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -120,11 +129,11 @@ class ChatService:
             })
             
             # Call OpenAI
-            logger.info(f"Calling OpenAI for session {session_id}")
+            logger.info(f"Calling OpenAI for session {session_id} with max_tokens={max_response_tokens}")
             response = await self.openai_client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=self.max_tokens,
+                max_tokens=max_response_tokens,
                 temperature=self.temperature
             )
             
