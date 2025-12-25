@@ -10,6 +10,7 @@ from openai import AsyncOpenAI
 from config import settings
 from services.db_service import persistent_db_service
 from services.deposition_context_builder import context_builder
+from services.rag_search_service import RAGSearchService, detect_query_type
 from models.chat_models import Citation
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,12 @@ class ChatService:
         self.model = "gpt-4o-mini"  # Use same model as summarization
         self.max_tokens = 1000
         self.temperature = 0.3  # More deterministic for legal analysis
+        
+        # Initialize RAG search service
+        self.rag_search = RAGSearchService()
+        
+        # Token budget for context (~8K tokens)
+        self.context_token_budget = 8000
     
     async def generate_response(
         self,
@@ -72,14 +79,25 @@ class ChatService:
             # Load document context
             context = await context_builder.build_full_context(document_id)
             
+            # Use RAG search to find relevant Q&A items
+            relevant_qas = await self.rag_search.search_relevant_qa_items(
+                context["qa_items"],
+                user_message,
+                max_results=50
+            )
+            
+            logger.info(f"RAG search found {len(relevant_qas)} relevant Q&A items")
+            
             # Load recent chat history (last 10 messages)
             history = await self._load_chat_history(session_id, limit=10)
             
-            # Build prompt (basic version without RAG semantic search for now)
+            # Build prompt with RAG-searched Q&A items
             system_prompt = self._build_system_prompt()
+            query_type = detect_query_type(user_message)
             context_prompt = self._build_context_prompt(
                 context["metadata"],
-                context["qa_items"][:30]  # Use first 30 Q&As for now
+                relevant_qas,
+                query_type=query_type
             )
             
             # Prepare messages for OpenAI
@@ -113,8 +131,8 @@ class ChatService:
             # Extract response
             assistant_content = response.choices[0].message.content
             
-            # Extract citations (basic pattern matching for now)
-            citations = self._extract_citations(assistant_content, context["qa_items"])
+            # Extract citations with enhanced support for question/answer distinction
+            citations = self._extract_citations(assistant_content, relevant_qas)
             
             # Save assistant message
             assistant_msg_id = await self._save_message(
@@ -157,23 +175,35 @@ class ChatService:
 Your responsibilities:
 - Answer questions about the deposition accurately and thoroughly
 - ALWAYS provide citations with page and line numbers for your statements
+- For queries asking to "list all occurrences" or "all references", provide a comprehensive list with page/line citations for EVERY match
 - Identify patterns such as conflicts, corrections, and refusals to answer
 - Provide strategic insights for trial preparation
 - Be precise, concise, and professional
 
 Citation Rules:
-- Format citations as [Page X, Line Y]
+- Format citations as [Page X, Line Y] for single locations
+- Format multi-page citations as [Page X, Line Y - Page Z, Line W] when answers span pages
+- Format line ranges as [Page X, Lines Y-Z] when within the same page
 - When referencing testimony, include a brief quote
 - Cite multiple sources when applicable
+- Clearly indicate whether information comes from the question (Q:) or answer (A:)
 
 Remember: Accuracy is paramount. If you're unsure, say so and explain why."""
     
     def _build_context_prompt(
         self,
         metadata: Dict,
-        relevant_qas: List[Dict]
+        relevant_qas: List[Dict],
+        query_type: str = "relevance"
     ) -> str:
-        """Build context section with metadata and relevant Q&As."""
+        """
+        Build context section with metadata and relevant Q&As.
+        
+        Args:
+            metadata: Document metadata
+            relevant_qas: List of relevant Q&A items from RAG search
+            query_type: "exhaustive" or "relevance"
+        """
         lines = ["DOCUMENT INFORMATION:"]
         
         if metadata.get("case_name"):
@@ -185,20 +215,124 @@ Remember: Accuracy is paramount. If you're unsure, say so and explain why."""
         lines.append(f"Total Pages: {metadata['total_pages']}")
         lines.append("")
         
-        lines.append("RELEVANT Q&A ITEMS:")
+        if query_type == "exhaustive":
+            lines.append(f"ALL MATCHING Q&A ITEMS ({len(relevant_qas)} total):")
+        else:
+            lines.append(f"RELEVANT Q&A ITEMS ({len(relevant_qas)} items):")
         lines.append("")
         
-        for idx, qa in enumerate(relevant_qas[:20], 1):  # Limit to top 20
-            lines.append(f"[Q&A #{idx} - Page {qa['page']}, Line {qa['line']}]")
-            lines.append(f"Topic: {qa['topic']}")
-            if qa.get('event_date'):
-                lines.append(f"Date Reference: {qa['event_date']}")
-            if qa['summary']:
-                lines.append(f"Summary: {qa['summary']}")
-            lines.append(f"Question: {qa['question'][:200]}...")
-            lines.append(f"Answer: {qa['answer'][:200]}...")
-            lines.append("---")
+        # Track token usage
+        current_tokens = self.rag_search.count_tokens("\n".join(lines))
+        max_context_tokens = self.context_token_budget
+        
+        # Format Q&A items based on query type
+        items_added = 0
+        for idx, qa in enumerate(relevant_qas, 1):
+            if query_type == "exhaustive":
+                # Compact format for exhaustive queries
+                item_text = self._format_qa_item_compact(qa, idx)
+            else:
+                # Full format for relevance queries
+                item_text = self._format_qa_item_full(qa, idx)
+            
+            item_tokens = self.rag_search.count_tokens(item_text)
+            
+            # Check if adding this item would exceed budget
+            if current_tokens + item_tokens > max_context_tokens:
+                logger.warning(
+                    f"Token budget reached: {current_tokens}/{max_context_tokens} tokens. "
+                    f"Included {items_added}/{len(relevant_qas)} items."
+                )
+                break
+            
+            lines.append(item_text)
+            current_tokens += item_tokens
+            items_added += 1
+        
+        if items_added < len(relevant_qas):
             lines.append("")
+            lines.append(f"(Note: Showing {items_added} of {len(relevant_qas)} matching items due to token limits)")
+        
+        return "\n".join(lines)
+    
+    def _format_qa_item_compact(self, qa: Dict, idx: int) -> str:
+        """
+        Format Q&A item in compact format for exhaustive queries.
+        
+        Args:
+            qa: Q&A item dictionary
+            idx: Item index
+            
+        Returns:
+            Formatted string
+        """
+        page = qa.get("page", 0)
+        line = qa.get("line", 0)
+        answer_end_page = qa.get("answer_end_page")
+        answer_end_line = qa.get("answer_end_line")
+        
+        # Build citation string
+        if answer_end_page and answer_end_page != page:
+            citation = f"[Page {page}, Line {line} - Page {answer_end_page}, Line {answer_end_line}]"
+        elif answer_end_line and answer_end_line != line:
+            citation = f"[Page {page}, Lines {line}-{answer_end_line}]"
+        else:
+            citation = f"[Page {page}, Line {line}]"
+        
+        question = qa.get("question", "")
+        answer = qa.get("answer", "")
+        
+        # Truncate for compact format (keep it brief)
+        question_preview = question[:150] + "..." if len(question) > 150 else question
+        answer_preview = answer[:200] + "..." if len(answer) > 200 else answer
+        
+        lines = [
+            f"[Q&A #{idx} - {citation}]",
+            f"Q: {question_preview}",
+            f"A: {answer_preview}",
+            "---"
+        ]
+        
+        return "\n".join(lines)
+    
+    def _format_qa_item_full(self, qa: Dict, idx: int) -> str:
+        """
+        Format Q&A item in full format for relevance queries.
+        
+        Args:
+            qa: Q&A item dictionary
+            idx: Item index
+            
+        Returns:
+            Formatted string
+        """
+        page = qa.get("page", 0)
+        line = qa.get("line", 0)
+        answer_end_page = qa.get("answer_end_page")
+        answer_end_line = qa.get("answer_end_line")
+        
+        # Build citation string
+        if answer_end_page and answer_end_page != page:
+            citation = f"[Page {page}, Line {line} - Page {answer_end_page}, Line {answer_end_line}]"
+        elif answer_end_line and answer_end_line != line:
+            citation = f"[Page {page}, Lines {line}-{answer_end_line}]"
+        else:
+            citation = f"[Page {page}, Line {line}]"
+        
+        lines = [
+            f"[Q&A #{idx} - {citation}]",
+            f"Topic: {qa.get('topic', 'Other')}"
+        ]
+        
+        if qa.get('event_date'):
+            lines.append(f"Date Reference: {qa['event_date']}")
+        
+        if qa.get('summary'):
+            lines.append(f"Summary: {qa['summary']}")
+        
+        lines.append(f"Q: {qa.get('question', '')}")
+        lines.append(f"A: {qa.get('answer', '')}")
+        lines.append("---")
         
         return "\n".join(lines)
     
@@ -208,33 +342,120 @@ Remember: Accuracy is paramount. If you're unsure, say so and explain why."""
         qa_items: List[Dict]
     ) -> List[Dict]:
         """
-        Extract citations from AI response.
-        For now, use basic pattern matching: [Page X, Line Y]
+        Extract citations from AI response with enhanced support for:
+        - Multi-page citations
+        - Question vs answer source distinction
+        - Line range citations
         """
         import re
         citations = []
+        seen_citations = set()  # Avoid duplicates
         
-        # Pattern: [Page 5, Line 12] or [Page 5, Ln 12] or [Pg 5, Line 12]
-        pattern = r'\[(?:Page|Pg)\s+(\d+),\s+(?:Line|Ln)\s+(\d+)\]'
+        # Pattern 1: Single page/line [Page 5, Line 12]
+        # Pattern 2: Line range [Page 5, Lines 12-15]
+        # Pattern 3: Multi-page [Page 5, Line 12 - Page 6, Line 5]
+        pattern1 = r'\[(?:Page|Pg)\s+(\d+),\s+(?:Line|Ln)\s+(\d+)\]'
+        pattern2 = r'\[(?:Page|Pg)\s+(\d+),\s+Lines\s+(\d+)-(\d+)\]'
+        pattern3 = r'\[(?:Page|Pg)\s+(\d+),\s+(?:Line|Ln)\s+(\d+)\s*-\s*(?:Page|Pg)\s+(\d+),\s+(?:Line|Ln)\s+(\d+)\]'
         
-        matches = re.findall(pattern, response_text, re.IGNORECASE)
-        
-        for page_str, line_str in matches:
+        # Match single page/line
+        for page_str, line_str in re.findall(pattern1, response_text, re.IGNORECASE):
             page = int(page_str)
             line = int(line_str)
+            citation_key = (page, line)
+            
+            if citation_key in seen_citations:
+                continue
             
             # Find matching Q&A item
-            for qa in qa_items:
-                if qa['page'] == page and qa['line'] == line:
-                    citations.append({
-                        "qa_item_id": qa['qa_item_id'],
-                        "page": page,
-                        "line": line,
-                        "text_snippet": qa['answer'][:100]
-                    })
-                    break
+            qa_match = self._find_qa_by_page_line(qa_items, page, line)
+            if qa_match:
+                citations.append({
+                    "qa_item_id": qa_match['qa_item_id'],
+                    "page": page,
+                    "line": line,
+                    "answer_end_page": qa_match.get("answer_end_page"),
+                    "answer_end_line": qa_match.get("answer_end_line"),
+                    "source_type": "answer",  # Default to answer
+                    "text_snippet": qa_match.get('answer', '')[:100],
+                    "is_multi_page": qa_match.get("answer_end_page") and qa_match.get("answer_end_page") != page
+                })
+                seen_citations.add(citation_key)
+        
+        # Match line range
+        for page_str, line_start_str, line_end_str in re.findall(pattern2, response_text, re.IGNORECASE):
+            page = int(page_str)
+            line_start = int(line_start_str)
+            line_end = int(line_end_str)
+            citation_key = (page, line_start, line_end)
+            
+            if citation_key in seen_citations:
+                continue
+            
+            # Find matching Q&A item (match by start line)
+            qa_match = self._find_qa_by_page_line(qa_items, page, line_start)
+            if qa_match:
+                citations.append({
+                    "qa_item_id": qa_match['qa_item_id'],
+                    "page": page,
+                    "line": line_start,
+                    "answer_end_page": page,
+                    "answer_end_line": line_end,
+                    "source_type": "answer",
+                    "text_snippet": qa_match.get('answer', '')[:100],
+                    "is_multi_page": False
+                })
+                seen_citations.add(citation_key)
+        
+        # Match multi-page
+        for page1_str, line1_str, page2_str, line2_str in re.findall(pattern3, response_text, re.IGNORECASE):
+            page1 = int(page1_str)
+            line1 = int(line1_str)
+            page2 = int(page2_str)
+            line2 = int(line2_str)
+            citation_key = (page1, line1, page2, line2)
+            
+            if citation_key in seen_citations:
+                continue
+            
+            # Find matching Q&A item
+            qa_match = self._find_qa_by_page_line(qa_items, page1, line1)
+            if qa_match:
+                citations.append({
+                    "qa_item_id": qa_match['qa_item_id'],
+                    "page": page1,
+                    "line": line1,
+                    "answer_end_page": page2,
+                    "answer_end_line": line2,
+                    "source_type": "answer",
+                    "text_snippet": qa_match.get('answer', '')[:100],
+                    "is_multi_page": True
+                })
+                seen_citations.add(citation_key)
         
         return citations
+    
+    def _find_qa_by_page_line(
+        self,
+        qa_items: List[Dict],
+        page: int,
+        line: int
+    ) -> Optional[Dict]:
+        """
+        Find Q&A item by page and line number.
+        
+        Args:
+            qa_items: List of Q&A items
+            page: Page number
+            line: Line number
+            
+        Returns:
+            Matching Q&A item or None
+        """
+        for qa in qa_items:
+            if qa.get('page') == page and qa.get('line') == line:
+                return qa
+        return None
     
     async def _save_message(
         self,
