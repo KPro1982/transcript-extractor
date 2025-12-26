@@ -440,34 +440,34 @@ async def init_db():
                 -- Check if cluster_jobs exists but chunk_jobs doesn't
                 IF EXISTS (
                     SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'cluster_jobs'
+                    WHERE table_schema = 'public' AND table_name = 'cluster_jobs'
                 ) AND NOT EXISTS (
                     SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'chunk_jobs'
+                    WHERE table_schema = 'public' AND table_name = 'chunk_jobs'
                 ) THEN
                     -- Rename table
-                    ALTER TABLE cluster_jobs RENAME TO chunk_jobs;
+                    ALTER TABLE public.cluster_jobs RENAME TO chunk_jobs;
                     
                     -- Rename indexes if they exist
                     IF EXISTS (
                         SELECT 1 FROM pg_indexes 
-                        WHERE indexname = 'idx_cluster_jobs_parent'
+                        WHERE schemaname = 'public' AND indexname = 'idx_cluster_jobs_parent'
                     ) THEN
-                        ALTER INDEX idx_cluster_jobs_parent RENAME TO idx_chunk_jobs_parent;
+                        ALTER INDEX public.idx_cluster_jobs_parent RENAME TO idx_chunk_jobs_parent;
                     END IF;
                     
                     IF EXISTS (
                         SELECT 1 FROM pg_indexes 
-                        WHERE indexname = 'idx_cluster_jobs_status'
+                        WHERE schemaname = 'public' AND indexname = 'idx_cluster_jobs_status'
                     ) THEN
-                        ALTER INDEX idx_cluster_jobs_status RENAME TO idx_chunk_jobs_status;
+                        ALTER INDEX public.idx_cluster_jobs_status RENAME TO idx_chunk_jobs_status;
                     END IF;
                     
                     IF EXISTS (
                         SELECT 1 FROM pg_indexes 
-                        WHERE indexname = 'idx_cluster_jobs_document'
+                        WHERE schemaname = 'public' AND indexname = 'idx_cluster_jobs_document'
                     ) THEN
-                        ALTER INDEX idx_cluster_jobs_document RENAME TO idx_chunk_jobs_document;
+                        ALTER INDEX public.idx_cluster_jobs_document RENAME TO idx_chunk_jobs_document;
                     END IF;
                     
                     RAISE NOTICE 'Migrated cluster_jobs table back to chunk_jobs';
@@ -475,19 +475,19 @@ async def init_db():
                 -- If both exist, migrate data and drop cluster_jobs
                 ELSIF EXISTS (
                     SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'cluster_jobs'
+                    WHERE table_schema = 'public' AND table_name = 'cluster_jobs'
                 ) AND EXISTS (
                     SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'chunk_jobs'
+                    WHERE table_schema = 'public' AND table_name = 'chunk_jobs'
                 ) THEN
                     -- Check if cluster_jobs has data and chunk_jobs is empty
-                    IF (SELECT COUNT(*) FROM cluster_jobs) > 0 AND (SELECT COUNT(*) FROM chunk_jobs) = 0 THEN
-                        INSERT INTO chunk_jobs SELECT * FROM cluster_jobs;
+                    IF (SELECT COUNT(*) FROM public.cluster_jobs) > 0 AND (SELECT COUNT(*) FROM public.chunk_jobs) = 0 THEN
+                        INSERT INTO public.chunk_jobs SELECT * FROM public.cluster_jobs;
                         RAISE NOTICE 'Migrated data from cluster_jobs to chunk_jobs';
                     END IF;
                     
                     -- Drop cluster_jobs table
-                    DROP TABLE cluster_jobs CASCADE;
+                    DROP TABLE public.cluster_jobs CASCADE;
                     RAISE NOTICE 'Dropped cluster_jobs table after migration';
                 END IF;
             END $$;
