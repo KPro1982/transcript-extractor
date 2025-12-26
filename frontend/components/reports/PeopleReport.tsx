@@ -20,6 +20,13 @@ interface Person {
     mention_context: string
   }>
   count: number
+  contradictions?: Array<{
+    id: string
+    contradiction_type: string
+    severity: number
+    explanation: string
+  }>
+  contradiction_count?: number
 }
 
 export default function PeopleReport({ documentId }: { documentId: string }) {
@@ -90,6 +97,9 @@ export default function PeopleReport({ documentId }: { documentId: string }) {
                   <h3 className="text-lg font-semibold">{person.person.normalized_name}</h3>
                   <p className="text-sm text-gray-400">
                     {person.person.role} · {person.count} mentions
+                    {person.contradiction_count && person.contradiction_count > 0 && (
+                      <span className="ml-2 text-red-400">· ⚠️ {person.contradiction_count} contradictions</span>
+                    )}
                   </p>
                 </div>
               </div>

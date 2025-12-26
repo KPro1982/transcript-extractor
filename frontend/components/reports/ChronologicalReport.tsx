@@ -12,8 +12,18 @@ interface QAItem {
   event_date: string
 }
 
+interface ChronologicalReportData {
+  items: QAItem[]
+  contradictions?: Array<{
+    id: string
+    severity: number
+    explanation: string
+  }>
+  contradiction_count?: number
+}
+
 export default function ChronologicalReport({ documentId }: { documentId: string }) {
-  const [items, setItems] = useState<QAItem[]>([])
+  const [reportData, setReportData] = useState<ChronologicalReportData>({ items: [] })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,13 +44,15 @@ export default function ChronologicalReport({ documentId }: { documentId: string
       if (!response.ok) throw new Error('Failed to fetch chronological report')
       
       const data = await response.json()
-      setItems(data.items || [])
+      setReportData(data)
     } catch (error) {
       console.error('Error fetching chronological report:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  const items = reportData.items || []
 
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading chronological report...</div>
@@ -62,6 +74,14 @@ export default function ChronologicalReport({ documentId }: { documentId: string
 
   return (
     <div className="space-y-6">
+      {reportData.contradiction_count && reportData.contradiction_count > 0 && (
+        <div className="bg-red-900 bg-opacity-20 border border-red-700 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-red-400">
+            <span className="font-semibold">⚠️ {reportData.contradiction_count} contradictions detected</span>
+            <span className="text-sm text-gray-400">- See Contradictions tab for details</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Timeline ({items.length} events)</h2>
       </div>

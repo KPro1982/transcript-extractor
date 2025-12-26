@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag, BookOpen, FileStack } from 'lucide-react'
+import { FileText, Users, Calendar, ArrowLeft, Loader2, Download, Tag, BookOpen, FileStack, AlertTriangle } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import UserMenu from '@/components/UserMenu'
 import PeopleReport from '@/components/reports/PeopleReport'
@@ -11,8 +11,16 @@ import PageLineReport from '@/components/reports/PageLineReport'
 import TopicsReport from '@/components/reports/TopicsReport'
 import NarrativeReport from '@/components/reports/NarrativeReport'
 import CombinedReport from '@/components/reports/CombinedReport'
+import ContradictionsReport from '@/components/reports/ContradictionsReport'
 
-type TabType = 'combined' | 'narrative' | 'page-line' | 'topics' | 'people' | 'chronological'
+type TabType = 'combined' | 'narrative' | 'page-line' | 'topics' | 'people' | 'chronological' | 'contradictions'
+
+interface Tab {
+  id: TabType
+  label: string
+  icon: any
+  badge?: number
+}
 
 export default function ReportsPage() {
   const params = useParams()
@@ -20,14 +28,41 @@ export default function ReportsPage() {
   const documentId = params?.documentId as string
   const [activeTab, setActiveTab] = useState<TabType>('combined')
   const [loading, setLoading] = useState(false)
+  const [contradictions, setContradictions] = useState<any[]>([])
 
-  const tabs = [
-    { id: 'combined' as TabType, label: 'Combined Report', icon: FileStack },
-    { id: 'narrative' as TabType, label: 'Narrative', icon: BookOpen },
-    { id: 'page-line' as TabType, label: 'Page/Line', icon: FileText },
-    { id: 'topics' as TabType, label: 'Topics', icon: Tag },
-    { id: 'people' as TabType, label: 'People', icon: Users },
-    { id: 'chronological' as TabType, label: 'Chronological', icon: Calendar }
+  // Fetch contradictions on mount
+  useEffect(() => {
+    fetchContradictions()
+  }, [documentId])
+
+  const fetchContradictions = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const token = localStorage.getItem('access_token')
+      
+      const response = await fetch(`${apiUrl}/api/documents/${documentId}/contradictions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setContradictions(data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching contradictions:', error)
+    }
+  }
+
+  const tabs: Tab[] = [
+    { id: 'combined', label: 'Combined Report', icon: FileStack },
+    { id: 'contradictions', label: 'Contradictions', icon: AlertTriangle, badge: contradictions.length },
+    { id: 'narrative', label: 'Narrative', icon: BookOpen },
+    { id: 'page-line', label: 'Page/Line', icon: FileText },
+    { id: 'topics', label: 'Topics', icon: Tag },
+    { id: 'people', label: 'People', icon: Users },
+    { id: 'chronological', label: 'Chronological', icon: Calendar }
   ]
 
   return (
@@ -65,7 +100,7 @@ export default function ReportsPage() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      flex items-center gap-2 px-6 py-3 border-b-2 transition-colors
+                      flex items-center gap-2 px-6 py-3 border-b-2 transition-colors relative
                       ${activeTab === tab.id
                         ? 'border-accent text-white'
                         : 'border-transparent text-gray-400 hover:text-white'
@@ -74,6 +109,11 @@ export default function ReportsPage() {
                   >
                     <Icon className="w-4 h-4" />
                     {tab.label}
+                    {tab.badge !== undefined && tab.badge > 0 && (
+                      <span className="ml-1 px-2 py-0.5 bg-red-600 text-white text-xs font-semibold rounded-full">
+                        {tab.badge}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -84,6 +124,7 @@ export default function ReportsPage() {
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-8">
           {activeTab === 'combined' && <CombinedReport documentId={documentId} />}
+          {activeTab === 'contradictions' && <ContradictionsReport contradictions={contradictions} />}
           {activeTab === 'narrative' && <NarrativeReport documentId={documentId} />}
           {activeTab === 'page-line' && <PageLineReport documentId={documentId} />}
           {activeTab === 'topics' && <TopicsReport documentId={documentId} />}

@@ -51,9 +51,27 @@ interface PageLineItem {
   topics_list?: string[]
 }
 
+interface Contradiction {
+  id: string
+  contradiction_type: string
+  severity: number
+  confidence: number
+  explanation: string
+  claim_a: {
+    page: number
+    line: number
+  }
+  claim_b: {
+    page: number
+    line: number
+  }
+}
+
 interface CombinedReportData {
   cover_page: CoverPage
   table_of_contents: TOCItem[]
+  contradictions?: Contradiction[]
+  contradictions_count?: number
   narrative_report: { narratives: Narrative[] }
   people_report: { people: PersonNarrative[] }
   page_line_report: { items: PageLineItem[] }
@@ -192,6 +210,52 @@ export default function CombinedReport({ documentId }: { documentId: string }) {
           ))}
         </div>
       </div>
+
+      {/* Contradictions Section */}
+      {report.contradictions && report.contradictions.length > 0 && (
+        <div 
+          ref={(el) => { sectionRefs.current['Contradictions'] = el }}
+          className="bg-bg-card border border-red-900 rounded-lg p-8 print:border-0 print:break-inside-avoid"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-serif font-bold text-red-400">⚠️ Contradictions Detected</h2>
+            <span className="px-3 py-1 bg-red-900 text-red-200 rounded-full text-sm font-semibold">
+              {report.contradictions_count || report.contradictions.length} found
+            </span>
+          </div>
+          <p className="text-gray-300 mb-4">
+            The following contradictions were identified in the testimony. Review these carefully for impeachment opportunities.
+          </p>
+          <div className="space-y-4">
+            {report.contradictions.slice(0, 5).map((contr, idx) => (
+              <div key={contr.id} className="p-4 bg-bg-secondary border border-gray-700 rounded-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="font-semibold text-red-300">#{idx + 1}</span>
+                  <div className="flex gap-2">
+                    <span className="px-2 py-1 text-xs bg-red-900 text-red-200 rounded">
+                      Severity: {contr.severity}/100
+                    </span>
+                    <span className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded">
+                      {contr.contradiction_type.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-300 mb-2">{contr.explanation}</p>
+                <div className="flex gap-4 text-xs text-gray-400">
+                  <span>Page {contr.claim_a.page}, Line {contr.claim_a.line}</span>
+                  <span>vs</span>
+                  <span>Page {contr.claim_b.page}, Line {contr.claim_b.line}</span>
+                </div>
+              </div>
+            ))}
+            {report.contradictions.length > 5 && (
+              <p className="text-center text-sm text-gray-400 pt-2">
+                + {report.contradictions.length - 5} more contradictions (see Contradictions tab for full details)
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Narrative Report */}
       {report.narrative_report?.narratives && report.narrative_report.narratives.length > 0 && (

@@ -203,12 +203,15 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                 raise
         
         async def process_from_queue():
-            """Consumer: Process Q&A pairs as they become available."""
+            """Consumer: Extract claims and generate summaries from claims."""
             nonlocal summarized_items
             
-            await send_job_update(job_id, "processing", 20, message="Starting AI summarization...")
+            await send_job_update(job_id, "processing", 20, message="Starting claim extraction and summarization...")
             
             processed_count = 0
+            
+            # Import claim extraction service
+            from services.claim_extraction_service import claim_extraction_service
             
             while True:
                 # Get next batch from queue
@@ -261,13 +264,110 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
                     processed_count += len(batch)
                     continue
                 
-                # Process batch with AI (only final Q/As)
+                # NEW: Extract claims from Q&A pairs first
                 try:
-                    summarized_batch = await ai_service.summarize_batch_parallel(
-                        final_batch,
-                        progress_callback=batch_progress_callback,
-                        user_id=user_id
-                    )
+                    logger.info(f"Extracting claims from {len(final_batch)} Q&A pairs...")
+                    
+                    # Extract claims from each Q&A
+                    batch_claims = []
+                    for qa in final_batch:
+                        claims = await claim_extraction_service.extract_claims_from_qa(
+                            qa,
+                            document_id,
+                            witness_name
+                        )
+                        batch_claims.extend(claims)
+                    
+                    logger.info(f"Extracted {len(batch_claims)} total claims from batch")
+                    
+                    # Normalize entities and cluster by event
+                    if batch_claims:
+                        batch_claims = await claim_extraction_service.normalize_entities(
+                            batch_claims,
+                            document_id,
+                            witness_name
+                        )
+                        batch_claims = await claim_extraction_service.cluster_claims_by_event(
+                            batch_claims,
+                            document_id
+                        )
+                        
+                        # Store claims in database
+                        claim_ids = await claim_extraction_service.store_claims(batch_claims)
+                        logger.info(f"Stored {len(claim_ids)} claims in database")
+                    
+                    # Generate summaries FROM CLAIMS (not raw Q&A)
+                    # Group claims by Q&A item
+                    qa_claims_map = {}
+                    for claim in batch_claims:
+                        qa_id = claim.get('qa_item_id')
+                        if qa_id:
+                            if qa_id not in qa_claims_map:
+                                qa_claims_map[qa_id] = []
+                            qa_claims_map[qa_id].append(claim)
+                    
+                    # Generate summaries from claims
+                    summarized_batch = []
+                    for qa in final_batch:
+                        qa_id = qa.get('id')
+                        qa_claims = qa_claims_map.get(qa_id, [])
+                        
+                        if qa_claims:
+                            # Build claims text for summarization
+                            claims_text = "\n".join([
+                                f"- {claim['subject']} {claim['predicate']} {claim.get('object', '')}"
+                                for claim in qa_claims
+                            ])
+                            
+                            # Use AI to generate summary from claims
+                            summary_prompt = f"""Given these atomic facts extracted from testimony:
+
+{claims_text}
+
+Generate a concise summary sentence (1-2 sentences max) that captures the key information."""
+                            
+                            try:
+                                # Use existing AI service but with claims as input
+                                summary_result = await ai_service.summarize_batch_parallel(
+                                    [{'question': '', 'answer': claims_text, **qa}],
+                                    progress_callback=batch_progress_callback,
+                                    user_id=user_id
+                                )
+                                
+                                if summary_result:
+                                    summarized_qa = summary_result[0]
+                                    summarized_batch.append(summarized_qa)
+                                else:
+                                    # Fallback: use first claim as summary
+                                    summarized_batch.append({
+                                        **qa,
+                                        'summary': f"{qa_claims[0]['subject']} {qa_claims[0]['predicate']} {qa_claims[0].get('object', '')}",
+                                        'topic': 'Other'
+                                    })
+                            except Exception as e:
+                                logger.error(f"Failed to generate summary from claims: {e}")
+                                # Fallback: use original Q&A summarization
+                                original_summary = await ai_service.summarize_batch_parallel(
+                                    [qa],
+                                    progress_callback=batch_progress_callback,
+                                    user_id=user_id
+                                )
+                                if original_summary:
+                                    summarized_batch.append(original_summary[0])
+                                else:
+                                    summarized_batch.append({**qa, 'summary': '', 'topic': 'Other'})
+                        else:
+                            # No claims extracted, use original Q&A for summarization
+                            logger.warning(f"No claims extracted for Q&A at page {qa.get('page')}, falling back to raw Q&A")
+                            original_summary = await ai_service.summarize_batch_parallel(
+                                [qa],
+                                progress_callback=batch_progress_callback,
+                                user_id=user_id
+                            )
+                            if original_summary:
+                                summarized_batch.append(original_summary[0])
+                            else:
+                                summarized_batch.append({**qa, 'summary': '', 'topic': 'Other'})
                     
                     # Add summarized final Q/As to results
                     for summarized_qa in summarized_batch:
@@ -444,7 +544,25 @@ async def _process_document_async(job_id: str, document_id: str, first_page: int
         
         await send_job_update(job_id, "processing", 95, message="Finalizing...")
         
-        # Step 5: Mark job as complete (100% progress)
+        # Step 5: Detect contradictions asynchronously (non-blocking)
+        try:
+            logger.info(f"Starting contradiction detection for document {document_id}...")
+            from services.contradiction_service import contradiction_service
+            
+            # Run contradiction detection in the background
+            contradictions = await contradiction_service.detect_contradictions(UUID(document_id))
+            
+            if contradictions:
+                # Store contradictions
+                await contradiction_service.store_contradictions(contradictions)
+                logger.info(f"Detected and stored {len(contradictions)} contradictions")
+            else:
+                logger.info("No contradictions detected")
+        except Exception as e:
+            # Don't fail the job if contradiction detection fails
+            logger.error(f"Contradiction detection failed (non-critical): {e}", exc_info=True)
+        
+        # Step 6: Mark job as complete (100% progress)
         await db_service.execute(
             "UPDATE processing_jobs SET status = 'completed', progress = 100, completed_at = NOW() WHERE id = $1",
             job_id

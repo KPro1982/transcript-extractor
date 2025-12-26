@@ -18,6 +18,63 @@ logger = logging.getLogger(__name__)
 openai_client = AsyncOpenAI(api_key=settings.openai_api_key_1 or settings.openai_api_key)
 
 
+async def get_contradictions_for_document(document_id: UUID) -> List[Dict]:
+    """Helper function to get contradictions for a document."""
+    try:
+        contradictions = await db_service.fetch(
+            """
+            SELECT 
+                c.id, c.document_id, c.claim_a_id, c.claim_b_id,
+                c.contradiction_type, c.severity, c.confidence,
+                c.explanation, c.requires_human_review, c.suggested_followups,
+                ca.subject as claim_a_subject, ca.predicate as claim_a_predicate,
+                ca.object as claim_a_object, ca.page_number as claim_a_page,
+                ca.line_number as claim_a_line, ca.raw_quote as claim_a_quote,
+                cb.subject as claim_b_subject, cb.predicate as claim_b_predicate,
+                cb.object as claim_b_object, cb.page_number as claim_b_page,
+                cb.line_number as claim_b_line, cb.raw_quote as claim_b_quote
+            FROM contradictions c
+            JOIN claims ca ON c.claim_a_id = ca.id
+            JOIN claims cb ON c.claim_b_id = cb.id
+            WHERE c.document_id = $1
+            ORDER BY c.severity DESC
+            """,
+            document_id
+        )
+        
+        return [
+            {
+                "id": str(contr["id"]),
+                "contradiction_type": contr["contradiction_type"],
+                "severity": contr["severity"],
+                "confidence": contr["confidence"],
+                "explanation": contr["explanation"],
+                "requires_human_review": contr["requires_human_review"],
+                "suggested_followups": contr["suggested_followups"] or [],
+                "claim_a": {
+                    "subject": contr["claim_a_subject"],
+                    "predicate": contr["claim_a_predicate"],
+                    "object": contr["claim_a_object"],
+                    "page": contr["claim_a_page"],
+                    "line": contr["claim_a_line"],
+                    "quote": contr["claim_a_quote"]
+                },
+                "claim_b": {
+                    "subject": contr["claim_b_subject"],
+                    "predicate": contr["claim_b_predicate"],
+                    "object": contr["claim_b_object"],
+                    "page": contr["claim_b_page"],
+                    "line": contr["claim_b_line"],
+                    "quote": contr["claim_b_quote"]
+                }
+            }
+            for contr in contradictions
+        ]
+    except Exception as e:
+        logger.error(f"Failed to fetch contradictions: {e}")
+        return []
+
+
 @router.get("/{document_id}/reports/people")
 async def get_people_report(
     document_id: UUID,
@@ -35,7 +92,10 @@ async def get_people_report(
         if not people:
             return {"people": []}
         
-        # For each person, get their Q&A items
+        # Get contradictions for document
+        contradictions = await get_contradictions_for_document(document_id)
+        
+        # For each person, get their Q&A items and related contradictions
         result = []
         for person in people:
             person_id = UUID(person["id"])
@@ -44,10 +104,23 @@ async def get_people_report(
                 person_id
             )
             
+            # Find contradictions involving this person
+            person_name = person.get("display_name", "").lower()
+            person_contradictions = []
+            for contr in contradictions:
+                # Check if person is mentioned in either claim
+                if (person_name in contr["claim_a"]["subject"].lower() or
+                    person_name in str(contr["claim_a"]["object"]).lower() or
+                    person_name in contr["claim_b"]["subject"].lower() or
+                    person_name in str(contr["claim_b"]["object"]).lower()):
+                    person_contradictions.append(contr)
+            
             result.append({
                 "person": person,
                 "qa_items": qa_items,
-                "count": len(qa_items)
+                "count": len(qa_items),
+                "contradictions": person_contradictions,
+                "contradiction_count": len(person_contradictions)
             })
         
         # Sort by count (most mentions first)
@@ -92,6 +165,9 @@ async def get_chronological_report(
             document_id
         )
         
+        # Get contradictions
+        contradictions = await get_contradictions_for_document(document_id)
+        
         items = [
             {
                 "id": str(row["id"]),
@@ -106,7 +182,12 @@ async def get_chronological_report(
             for row in rows
         ]
         
-        return {"items": items, "total": len(items)}
+        return {
+            "items": items,
+            "total": len(items),
+            "contradictions": contradictions,
+            "contradiction_count": len(contradictions)
+        }
         
     except Exception as e:
         logger.error(f"Failed to get chronological report for document {document_id}: {e}", exc_info=True)
@@ -669,12 +750,21 @@ async def get_combined_report(
         page_line_response = await get_page_line_report(document_id, current_user)
         page_line_data = page_line_response if isinstance(page_line_response, dict) else {"items": []}
         
+        # Get contradictions data
+        contradictions = await get_contradictions_for_document(document_id)
+        
         # Generate table of contents
         toc = []
         toc.append({"section": "Cover Page", "page": 1})
         toc.append({"section": "Table of Contents", "page": 2})
         
         current_page = 3
+        
+        # Add contradictions section to TOC if any exist
+        if contradictions:
+            toc.append({"section": "Contradictions", "page": current_page})
+            current_page += 1
+        
         if narrative_data.get("narratives"):
             toc.append({"section": "Narrative Report", "page": current_page})
             for idx, narrative in enumerate(narrative_data["narratives"]):
@@ -693,6 +783,8 @@ async def get_combined_report(
         return {
             "cover_page": cover_page,
             "table_of_contents": toc,
+            "contradictions": contradictions,
+            "contradictions_count": len(contradictions),
             "narrative_report": narrative_data,
             "people_report": people_data,
             "page_line_report": page_line_data

@@ -1,5 +1,5 @@
 """Main FastAPI application entry point."""
-# Deploy trigger: Dec 24, 2025 - Chat feature deployment
+# Deploy trigger: Dec 25, 2025 - Contradiction detection MVP deployment
 import logging
 from contextlib import asynccontextmanager
 
@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
-from api import health, documents, jobs, websocket, cache, auth, bug_reports, learning_feedback, user_settings, chat, reports
+from api import health, documents, jobs, websocket, cache, auth, bug_reports, learning_feedback, user_settings, chat, reports, claims, contradictions
 from services.cache_service import cache_service
 from services.db_service import init_db, init_persistent_db
 
@@ -86,6 +86,8 @@ app.include_router(user_settings.router, prefix="/api", tags=["user-settings"])
 app.include_router(cache.router, prefix="/api", tags=["cache"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(reports.router)
+app.include_router(claims.router, tags=["claims"])
+app.include_router(contradictions.router, tags=["contradictions"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])

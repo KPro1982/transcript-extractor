@@ -491,6 +491,78 @@ async def init_db():
                     RAISE NOTICE 'Dropped cluster_jobs table after migration';
                 END IF;
             END $$;
+            
+            -- Claims table: atomic facts extracted from Q&A pairs
+            CREATE TABLE IF NOT EXISTS claims (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                qa_item_id UUID REFERENCES final_qa_items(id) ON DELETE CASCADE,
+                subject TEXT NOT NULL,
+                predicate TEXT NOT NULL,
+                object TEXT,
+                time VARCHAR(255),
+                location TEXT,
+                polarity VARCHAR(50),
+                certainty INT CHECK (certainty >= 0 AND certainty <= 100),
+                modality VARCHAR(50),
+                scope JSONB,
+                explicit_date VARCHAR(255),
+                inferred_date VARCHAR(255),
+                date_source VARCHAR(50),
+                date_anchor VARCHAR(255),
+                page_number INT NOT NULL,
+                line_number INT NOT NULL,
+                answer_end_page INT,
+                answer_end_line INT,
+                raw_quote TEXT NOT NULL,
+                normalized_subject TEXT,
+                normalized_object TEXT,
+                event_id VARCHAR(255),
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_claims_document ON claims(document_id);
+            CREATE INDEX IF NOT EXISTS idx_claims_qa_item ON claims(qa_item_id);
+            CREATE INDEX IF NOT EXISTS idx_claims_subject_predicate ON claims(document_id, subject, predicate);
+            CREATE INDEX IF NOT EXISTS idx_claims_event ON claims(document_id, event_id);
+            CREATE INDEX IF NOT EXISTS idx_claims_normalized_subject ON claims(document_id, normalized_subject);
+            CREATE INDEX IF NOT EXISTS idx_claims_explicit_date ON claims(document_id, explicit_date);
+            CREATE INDEX IF NOT EXISTS idx_claims_inferred_date ON claims(document_id, inferred_date);
+            
+            -- Claim entities table: entity tracking for coreference resolution
+            CREATE TABLE IF NOT EXISTS claim_entities (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                claim_id UUID REFERENCES claims(id) ON DELETE CASCADE,
+                entity_type VARCHAR(50) NOT NULL,
+                entity_value TEXT NOT NULL,
+                normalized_value TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_claim_entities_claim ON claim_entities(claim_id);
+            CREATE INDEX IF NOT EXISTS idx_claim_entities_type ON claim_entities(entity_type);
+            CREATE INDEX IF NOT EXISTS idx_claim_entities_normalized ON claim_entities(normalized_value);
+            
+            -- Contradictions table: detected contradictions between claims
+            CREATE TABLE IF NOT EXISTS contradictions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                claim_a_id UUID REFERENCES claims(id) ON DELETE CASCADE,
+                claim_b_id UUID REFERENCES claims(id) ON DELETE CASCADE,
+                contradiction_type VARCHAR(100) NOT NULL,
+                severity INT CHECK (severity >= 0 AND severity <= 100),
+                confidence INT CHECK (confidence >= 0 AND confidence <= 100),
+                explanation TEXT,
+                requires_human_review BOOLEAN DEFAULT FALSE,
+                suggested_followups TEXT[],
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_contradictions_document ON contradictions(document_id);
+            CREATE INDEX IF NOT EXISTS idx_contradictions_severity ON contradictions(document_id, severity DESC);
+            CREATE INDEX IF NOT EXISTS idx_contradictions_type ON contradictions(document_id, contradiction_type);
+            CREATE INDEX IF NOT EXISTS idx_contradictions_claim_a ON contradictions(claim_a_id);
+            CREATE INDEX IF NOT EXISTS idx_contradictions_claim_b ON contradictions(claim_b_id);
         """)
         
         logger.info("Ephemeral database tables initialized")
