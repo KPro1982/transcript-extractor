@@ -6,6 +6,7 @@ export interface JobProgress {
   status: string
   progress: number
   message?: string
+  document_id?: string
   detailedProgress?: {
     current: number
     total: number
@@ -73,6 +74,7 @@ export function useJobProgress(jobId: string | null) {
             status: 'completed',
             progress: 100,
             message: 'Processing complete',
+            document_id: data.data?.document_id,
           })
         } else if (data.type === 'error') {
           setError(data.data.error_message)

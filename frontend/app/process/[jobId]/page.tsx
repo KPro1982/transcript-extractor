@@ -97,14 +97,30 @@ export default function ProcessPage() {
   useEffect(() => {
     // Show modal when complete instead of auto-redirecting
     if (progress.status === 'completed') {
-      // Extract document_id from progress result if available
-      const docId = (progress as any).document_id || (progress as any).result?.document_id
+      // Extract document_id from progress if available
+      const docId = progress.document_id
       if (docId) {
         setDocumentId(docId)
+        setShowCompletionModal(true)
+      } else {
+        // If document_id not available, fetch it from job status
+        const fetchDocumentId = async () => {
+          try {
+            const response = await api.get(`/api/jobs/${jobId}`)
+            if (response.data?.document_id) {
+              setDocumentId(response.data.document_id)
+              setShowCompletionModal(true)
+            }
+          } catch (error) {
+            console.error('Failed to fetch document_id:', error)
+            // Still show modal even if we can't get document_id
+            setShowCompletionModal(true)
+          }
+        }
+        fetchDocumentId()
       }
-      setShowCompletionModal(true)
     }
-  }, [progress.status])
+  }, [progress.status, progress.document_id, jobId])
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
