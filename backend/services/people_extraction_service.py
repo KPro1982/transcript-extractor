@@ -181,7 +181,7 @@ class PeopleExtractionService:
                 f.question,
                 f.answer,
                 f.summary,
-                f.topic,
+                f.topics,
                 f.event_date,
                 qp.mention_context
             FROM final_qa_items f
