@@ -201,7 +201,7 @@ class PeopleExtractionService:
                 "question": row["question"],
                 "answer": row["answer"],
                 "summary": row["summary"],
-                "topic": row["topic"],
+                "topic": row["topics"][0] if row["topics"] and len(row["topics"]) > 0 else "Other",
                 "event_date": row["event_date"],
                 "mention_context": row["mention_context"]
             }
