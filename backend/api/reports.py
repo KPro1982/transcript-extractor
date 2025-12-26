@@ -578,13 +578,23 @@ async def get_people_narrative_report(
                     citation_id += f"-{qa['answer_end_line']}"
                 citation_id += "]"
                 
+                # Generate page_line_ref if not present
+                page_line_ref = qa.get('page_line_ref')
+                if not page_line_ref:
+                    page_line_ref = format_page_line_reference(
+                        qa['page'],
+                        qa['line'],
+                        qa.get('answer_end_page'),
+                        qa.get('answer_end_line')
+                    )
+                
                 summaries_with_citations.append(f"{citation_id} {qa['summary']}")
                 
                 citation_map[citation_id] = {
                     "id": qa['id'],
                     "page": qa['page'],
                     "line": qa['line'],
-                    "page_line_ref": qa['page_line_ref'],
+                    "page_line_ref": page_line_ref,
                     "summary": qa['summary']
                 }
             
