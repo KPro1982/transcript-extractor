@@ -404,17 +404,17 @@ export default function SelectPagesPage() {
                     
                     {/* Classification breakdown */}
                     <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                      {examinationDetection.frontpages_count > 0 && (
+                      {(examinationDetection.frontpages_count ?? 0) > 0 && (
                         <span className="text-gray-400">
                           📄 Frontpages: {examinationDetection.frontpages_count} (auto-excluded)
                         </span>
                       )}
-                      {examinationDetection.examination_count > 0 && (
+                      {(examinationDetection.examination_count ?? 0) > 0 && (
                         <span className="text-green-400">
                           ✅ Examination: {examinationDetection.examination_count} pages
                         </span>
                       )}
-                      {examinationDetection.backpages_count > 0 && (
+                      {(examinationDetection.backpages_count ?? 0) > 0 && (
                         <span className="text-gray-400">
                           📑 Backpages: {examinationDetection.backpages_count} (auto-excluded)
                         </span>
