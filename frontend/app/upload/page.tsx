@@ -13,6 +13,7 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null)
   const [qaTestResult, setQaTestResult] = useState<{
     passed: boolean
     pairsFound: number
@@ -40,11 +41,15 @@ export default function UploadPage() {
 
     setIsUploading(true)
     setQaTestResult(null) // Reset previous test results
+    setUploadedDocumentId(null)
 
     try {
       // Upload document
       const uploadResult = await uploadDocument(file)
       const documentId = uploadResult.document_id
+      
+      // Store document ID for later use
+      setUploadedDocumentId(documentId)
       
       // Store Q/A test results if available
       if (uploadResult.qa_test_passed !== undefined) {
@@ -56,8 +61,8 @@ export default function UploadPage() {
         })
       }
 
-      // Redirect to page selection
-      router.push(`/select-pages/${documentId}`)
+      // Don't redirect automatically - let user review Q/A test results first
+      setIsUploading(false)
     } catch (error: any) {
       console.error('Upload failed:', error)
       
@@ -80,6 +85,12 @@ export default function UploadPage() {
       
       alert(errorMessage)
       setIsUploading(false)
+    }
+  }
+  
+  const handleStartProcessing = () => {
+    if (uploadedDocumentId) {
+      router.push(`/select-pages/${uploadedDocumentId}`)
     }
   }
   
@@ -208,28 +219,53 @@ export default function UploadPage() {
               )}
 
               <div className="flex gap-4">
-                <button
-                  onClick={handleUpload}
-                  disabled={isUploading}
-                  className="flex-1 px-6 py-3 bg-accent hover:bg-accent-hover disabled:bg-gray-700 text-bg-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>Start Processing</>
-                  )}
-                </button>
+                {!uploadedDocumentId ? (
+                  // Initial upload button
+                  <>
+                    <button
+                      onClick={handleUpload}
+                      disabled={isUploading}
+                      className="flex-1 px-6 py-3 bg-accent hover:bg-accent-hover disabled:bg-gray-700 text-bg-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>Upload & Analyze</>
+                      )}
+                    </button>
 
-                {!isUploading && (
-                  <button
-                    onClick={() => router.push('/')}
-                    className="px-6 py-3 bg-bg-elevated hover:bg-gray-800 text-gray-300 font-semibold rounded-xl transition-all"
-                  >
-                    Cancel
-                  </button>
+                    {!isUploading && (
+                      <button
+                        onClick={() => router.push('/')}
+                        className="px-6 py-3 bg-bg-elevated hover:bg-gray-800 text-gray-300 font-semibold rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  // After upload complete - show Start Processing button
+                  <>
+                    <button
+                      onClick={handleStartProcessing}
+                      className="flex-1 px-6 py-3 bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-xl transition-all"
+                    >
+                      Start Processing
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFile(null)
+                        setUploadedDocumentId(null)
+                        setQaTestResult(null)
+                      }}
+                      className="px-6 py-3 bg-bg-elevated hover:bg-gray-800 text-gray-300 font-semibold rounded-xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </>
                 )}
               </div>
             </div>
