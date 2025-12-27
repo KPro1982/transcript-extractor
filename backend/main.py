@@ -1,6 +1,7 @@
 """Main FastAPI application entry point."""
 # Deploy trigger: Dec 21, 2025 - Reset to master baseline
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -54,7 +55,17 @@ app = FastAPI(
 )
 
 # CORS configuration
-cors_origins = settings.allowed_origins + [settings.frontend_url]
+# Add FRONTEND_URL from environment to allowed origins if not already present
+cors_origins = list(set(settings.allowed_origins + [settings.frontend_url]))
+
+# Also allow any Railway frontend URLs dynamically
+if os.environ.get("RAILWAY_ENVIRONMENT"):
+    # In Railway environment, be more permissive with Railway domains
+    railway_frontend = os.environ.get("FRONTEND_URL")
+    if railway_frontend and railway_frontend not in cors_origins:
+        cors_origins.append(railway_frontend)
+        logger.info(f"Added Railway frontend URL from env: {railway_frontend}")
+
 logger.info(f"Configuring CORS with origins: {cors_origins}")
 
 # Add SessionMiddleware (required for OAuth)
