@@ -116,9 +116,9 @@ async def upload_document(file: UploadFile = File(...)):
                 filename, file_hash, s3_key, total_pages,
                 case_name, case_number, deposition_date, attorneys, witness_name,
                 examination_first_page, examination_last_page, 
-                examination_detection_confidence, qa_test_log_file
+                examination_detection_confidence
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
             """,
             file.filename,
@@ -132,8 +132,7 @@ async def upload_document(file: UploadFile = File(...)):
             case_info.get('witness_name'),
             classification_result['examination_first_page'],
             classification_result['examination_last_page'],
-            'high',  # Page classifier always has high confidence (explicit Q+A check)
-            qa_test_result['log_file'] if qa_test_result else None
+            'high'  # Page classifier always has high confidence (explicit Q+A check)
         )
         
         # Store page classifications in database
@@ -161,6 +160,18 @@ async def upload_document(file: UploadFile = File(...)):
                 )
                 if qa_test_result['log_file']:
                     logger.warning(f"   Test log: {qa_test_result['log_file']}")
+            
+            # Update document with Q/A test log file path
+            if qa_test_result and qa_test_result.get('log_file'):
+                await db_service.execute(
+                    """
+                    UPDATE documents 
+                    SET qa_test_log_file = $1 
+                    WHERE id = $2
+                    """,
+                    qa_test_result['log_file'],
+                    doc_id
+                )
         else:
             logger.warning("No examination section detected - skipping Q/A extraction test")
         
