@@ -296,7 +296,7 @@ async def check_and_complete_parent(chunk_job_id: str):
             parent_job_id
         )
         
-        logger.info(f"Parent job {parent_job_id[:8]}... completed: {total_items} items processed")
+        logger.info(f"Parent job {str(parent_job_id)[:8]}... completed: {total_items} items processed")
         
         await cache_service.publish_job_update(
             str(parent_job_id),
