@@ -2,15 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, BookOpen, Upload, Shield, ChevronUp, ChevronDown, MessageSquare, FileText } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Upload, ChevronUp, ChevronDown } from 'lucide-react'
 import { getJobStatus, getQAItems, getDocument } from '@/lib/api'
 import { useKeyboardNav } from '@/hooks/useKeyboardNav'
 import { useAuth } from '@/contexts/AuthContext'
 import PDFViewer from '@/components/PDFViewer'
 import SummaryDisplay from '@/components/SummaryDisplay'
 import UserMenu from '@/components/UserMenu'
-import CaseInfoPanel from '@/components/CaseInfoPanel'
-import { ChatPanel } from '@/components/chat/ChatPanel'
 
 interface QAItem {
   id: string
@@ -45,8 +43,6 @@ export default function ResultsPage() {
   const [filename, setFilename] = useState<string>('')
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [caseInfo, setCaseInfo] = useState<any>(null)
-  const [showCaseInfo, setShowCaseInfo] = useState(true)
-  const [chatOpen, setChatOpen] = useState(false)
 
   // Keyboard navigation hook
   const { 
@@ -117,6 +113,22 @@ export default function ResultsPage() {
           if (response?.qa_items && response.qa_items.length > 0) {
             console.log('First item summary:', response.qa_items[0]?.summary || 'MISSING')
             console.log('First item:', response.qa_items[0])
+            
+            // Diagnostic: list all Q/A page:line ranges and save to file
+            const qaRanges = response.qa_items.map((item: any, idx: number) => 
+              `${idx + 1}. ${item.page_number}:${item.line_number}-${item.end_page || item.page_number}:${item.end_line || item.line_number}`
+            ).join('\n')
+            const logContent = `=== Q/A Page:Line Ranges ===\nDocument: ${docInfo.filename}\nTotal Q&A pairs: ${response.qa_items.length}\nGenerated: ${new Date().toISOString()}\n\n${qaRanges}`
+            console.log(logContent)
+            
+            // Auto-download as file
+            const blob = new Blob([logContent], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `qa-ranges-${jobId}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
           }
           setQAItems(response.qa_items || [])
         } catch (err: any) {
@@ -235,31 +247,6 @@ export default function ResultsPage() {
                 <span>{totalPages} pages</span>
               </div>
               
-              {/* Reports Button */}
-              {documentId && (
-                <button
-                  onClick={() => router.push(`/reports/${documentId}`)}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent/10 hover:bg-accent/20 border border-accent/30 rounded-lg transition-colors text-sm"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span className="hidden sm:inline">Reports</span>
-                </button>
-              )}
-              
-              {/* Chat Button */}
-              <button
-                onClick={() => setChatOpen(!chatOpen)}
-                className={`flex items-center gap-2 px-4 py-1.5 border rounded-xl transition-all text-sm ${
-                  chatOpen
-                    ? 'bg-blue-500 border-blue-500 text-white'
-                    : 'bg-bg-elevated hover:bg-accent/10 border-gray-700 hover:border-accent/50'
-                }`}
-                title="Chat with deposition"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">Chat</span>
-              </button>
-              
               <button
                 onClick={() => router.push('/upload')}
                 className="flex items-center gap-2 px-4 py-1.5 bg-bg-elevated hover:bg-accent/10 border border-gray-700 hover:border-accent/50 rounded-xl transition-all text-sm"
@@ -272,31 +259,6 @@ export default function ResultsPage() {
               <UserMenu />
             </div>
           </div>
-
-          {/* Case Information - Collapsible */}
-          {caseInfo && (caseInfo.case_name || caseInfo.case_number || caseInfo.deposition_date || caseInfo.witness_name || (caseInfo.attorneys && caseInfo.attorneys.length > 0)) && (
-            <div className="px-6 pb-3">
-              <button
-                onClick={() => setShowCaseInfo(!showCaseInfo)}
-                className="w-full flex items-center justify-between text-xs text-gray-400 hover:text-gray-300 py-2 border-t border-gray-800"
-              >
-                <span>Case Information</span>
-                {showCaseInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-              
-              {showCaseInfo && (
-                <div className="mt-2">
-                  <CaseInfoPanel
-                    documentId={documentId || ''}
-                    caseInfo={caseInfo}
-                    onUpdate={setCaseInfo}
-                    editable={true}
-                    compact={true}
-                  />
-                </div>
-              )}
-            </div>
-          )}
         </header>
 
         {/* Collapse Toggle Button */}
@@ -354,24 +316,6 @@ export default function ResultsPage() {
           style={{ width: `${((currentIndex + 1) / qaItems.length) * 100}%` }}
         />
       </div>
-      
-      {/* Chat Panel */}
-      {documentId && (
-        <ChatPanel
-          documentId={documentId}
-          isOpen={chatOpen}
-          onClose={() => setChatOpen(false)}
-          onCitationClick={(qaItemId, page, line) => {
-            // Find the Q&A item and navigate to it
-            const itemIndex = qaItems.findIndex(item => item.id === qaItemId);
-            if (itemIndex !== -1) {
-              setCurrentIndex(itemIndex);
-            }
-            // Optional: close chat after clicking citation
-            // setChatOpen(false);
-          }}
-        />
-      )}
     </div>
   )
 }
