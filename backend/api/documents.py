@@ -224,40 +224,47 @@ async def upload_document(file: UploadFile = File(...)):
             except Exception as e:
                 logger.error(f"Error detecting Q&A range: {e}", exc_info=True)
         
-        # Run Q/A test if we found a range
-        if test_first_page and test_last_page:
-            qa_test_result = await qa_test_service.test_qa_extraction(
-                temp_path,
-                str(doc_id),
-                test_first_page,
-                test_last_page
+        # Always run Q/A test - use detected range or fallback to first 20 pages
+        if not test_first_page or not test_last_page:
+            # Fallback: Test first 20 pages if no range detected
+            test_first_page = 1
+            test_last_page = min(20, pdf_info["total_pages"])
+            logger.info(f"No Q&A range detected - using fallback range (pages {test_first_page}-{test_last_page}) for Q/A test")
+        
+        # Always run Q/A extraction test
+        qa_test_result = await qa_test_service.test_qa_extraction(
+            temp_path,
+            str(doc_id),
+            test_first_page,
+            test_last_page
+        )
+        
+        if qa_test_result['success']:
+            logger.info(
+                f"✅ Q/A extraction test PASSED: {qa_test_result['qa_pairs_found']} pairs found"
             )
-            
-            if qa_test_result['success']:
-                logger.info(
-                    f"✅ Q/A extraction test PASSED: {qa_test_result['qa_pairs_found']} pairs found"
-                )
-                logger.info(f"   Test log: {qa_test_result['log_file']}")
-            else:
-                logger.warning(
-                    f"⚠️  Q/A extraction test FAILED: {', '.join(qa_test_result['errors'])}"
-                )
-                if qa_test_result['log_file']:
-                    logger.warning(f"   Test log: {qa_test_result['log_file']}")
-            
-            # Update document with Q/A test log file path
-            if qa_test_result and qa_test_result.get('log_file'):
-                await db_service.execute(
-                    """
-                    UPDATE documents 
-                    SET qa_test_log_file = $1 
-                    WHERE id = $2
-                    """,
-                    qa_test_result['log_file'],
-                    doc_id
-                )
+            logger.info(f"   Test log: {qa_test_result['log_file']}")
         else:
-            logger.warning("No Q&A range detected - skipping Q/A extraction test")
+            logger.warning(
+                f"⚠️  Q/A extraction test FAILED: {', '.join(qa_test_result['errors'])}"
+            )
+            if qa_test_result['log_file']:
+                logger.warning(f"   Test log: {qa_test_result['log_file']}")
+        
+        # Always update document with Q/A test log file path (even if test failed)
+        if qa_test_result and qa_test_result.get('log_file'):
+            await db_service.execute(
+                """
+                UPDATE documents 
+                SET qa_test_log_file = $1 
+                WHERE id = $2
+                """,
+                qa_test_result['log_file'],
+                doc_id
+            )
+            logger.info(f"✓ Q/A test log file saved: {qa_test_result['log_file']}")
+        else:
+            logger.warning("⚠️  Q/A test completed but no log file was created")
         
         doc_data = {
             "id": str(doc_id),
@@ -1025,8 +1032,11 @@ async def get_qa_test_log(log_file: str = Query(..., description="Path to the lo
         Plain text content of the log file
     """
     try:
+        logger.info(f"Q/A test log requested: {log_file}")
+        
         # Security: only allow files in /tmp/ with qa_test_ prefix
         if not log_file.startswith('/tmp/qa_test_') or '..' in log_file:
+            logger.warning(f"Invalid log file path requested: {log_file}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid log file path"
@@ -1034,20 +1044,25 @@ async def get_qa_test_log(log_file: str = Query(..., description="Path to the lo
         
         # Check if file exists
         if not os.path.exists(log_file):
+            logger.warning(f"Log file not found: {log_file}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Log file not found. It may have been cleaned up."
             )
         
         # Read file content
+        logger.info(f"Reading log file: {log_file}")
         async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
             content = await f.read()
+        
+        logger.info(f"Log file read successfully, size: {len(content)} bytes")
         
         return Response(
             content=content,
             media_type="text/plain",
             headers={
-                "Cache-Control": "no-cache"
+                "Cache-Control": "no-cache",
+                "Content-Disposition": f'inline; filename="{os.path.basename(log_file)}"'
             }
         )
         

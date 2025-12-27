@@ -287,20 +287,44 @@ export default function SelectPagesPage() {
   }
   
   const handleViewLog = async () => {
-    if (!qaTestLogFile) return
+    if (!qaTestLogFile) {
+      console.error('No log file path available')
+      return
+    }
     
+    console.log('Loading log file from:', qaTestLogFile)
     setLoadingLog(true)
     setShowLogModal(true)
     
     try {
       const content = await getQATestLog(qaTestLogFile)
-      setLogContent(content)
-    } catch (error) {
+      console.log('Log content loaded, length:', content?.length || 0)
+      if (!content) {
+        setLogContent('Error: Log file is empty or could not be read.')
+      } else {
+        setLogContent(content)
+      }
+    } catch (error: any) {
       console.error('Failed to load log:', error)
-      setLogContent('Error loading log file. The file may have been cleaned up.')
+      const errorMsg = error?.response?.data?.detail || error?.message || 'Unknown error'
+      setLogContent(`Error loading log file:\n\n${errorMsg}\n\nLog file path: ${qaTestLogFile}\n\nThe file may have been cleaned up or the backend may not have access to it.`)
     } finally {
       setLoadingLog(false)
     }
+  }
+  
+  const handleDownloadLog = () => {
+    if (!logContent) return
+    
+    const blob = new Blob([logContent], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `qa_test_log_${documentId}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const handleStartProcessing = async () => {
@@ -696,7 +720,17 @@ export default function SelectPagesPage() {
             </div>
             
             {/* Footer */}
-            <div className="p-6 border-t border-gray-800 flex justify-end">
+            <div className="p-6 border-t border-gray-800 flex justify-between items-center">
+              <button
+                onClick={handleDownloadLog}
+                disabled={!logContent || loadingLog}
+                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Log
+              </button>
               <button
                 onClick={() => setShowLogModal(false)}
                 className="px-6 py-2 bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg transition-all"
