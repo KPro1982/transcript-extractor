@@ -16,6 +16,7 @@ from services.cache_service import cache_service
 from services.pdf_service import pdf_service
 from services.case_info_extractor import case_info_extractor
 from services.page_classifier import page_classifier
+from services.qa_test_service import qa_test_service
 from models.document import Document, DocumentCreate, DocumentResponse
 
 router = APIRouter()
@@ -136,6 +137,31 @@ async def upload_document(file: UploadFile = File(...)):
         # Store page classifications in database
         await page_classifier.store_classifications(str(doc_id), classification_result)
         
+        # Run Q/A extraction test (if examination section was detected)
+        qa_test_result = None
+        if classification_result['examination_first_page'] and classification_result['examination_count'] > 0:
+            logger.info("Running Q/A extraction test on examination section...")
+            qa_test_result = await qa_test_service.test_qa_extraction(
+                temp_path,
+                str(doc_id),
+                classification_result['examination_first_page'],
+                classification_result['examination_last_page']
+            )
+            
+            if qa_test_result['success']:
+                logger.info(
+                    f"✅ Q/A extraction test PASSED: {qa_test_result['qa_pairs_found']} pairs found"
+                )
+                logger.info(f"   Test log: {qa_test_result['log_file']}")
+            else:
+                logger.warning(
+                    f"⚠️  Q/A extraction test FAILED: {', '.join(qa_test_result['errors'])}"
+                )
+                if qa_test_result['log_file']:
+                    logger.warning(f"   Test log: {qa_test_result['log_file']}")
+        else:
+            logger.warning("No examination section detected - skipping Q/A extraction test")
+        
         doc_data = {
             "id": str(doc_id),
             "filename": file.filename,
@@ -152,7 +178,7 @@ async def upload_document(file: UploadFile = File(...)):
         logger.info(f"  Total pages: {pdf_info['total_pages']}")
         logger.info(f"  Status: Fresh start with zero existing data")
         
-        return {
+        response_data = {
             "document_id": str(doc_id),
             "filename": file.filename,
             "total_pages": pdf_info["total_pages"],
@@ -169,6 +195,16 @@ async def upload_document(file: UploadFile = File(...)):
             "examination_count": classification_result['examination_count'],
             "backpages_count": classification_result['backpages_count']
         }
+        
+        # Add Q/A test results if available
+        if qa_test_result:
+            response_data['qa_test_passed'] = qa_test_result['success']
+            response_data['qa_test_pairs_found'] = qa_test_result['qa_pairs_found']
+            response_data['qa_test_log_file'] = qa_test_result['log_file']
+            if qa_test_result['errors']:
+                response_data['qa_test_errors'] = qa_test_result['errors']
+        
+        return response_data
         
     except Exception as e:
         logger.error(f"Document upload failed: {e}", exc_info=True)
