@@ -112,7 +112,7 @@ export default function SelectPagesPage() {
           setQATestLogFile(doc.qa_test_log_file)
           console.log('Q/A test log file found:', doc.qa_test_log_file)
         } else {
-          console.log('No Q/A test log file in document - document may need to be re-uploaded')
+          console.log('No Q/A test log file found in document. Document may have been uploaded before Q/A test feature was added.')
         }
         
         // Set default range to detected examination bounds
@@ -468,9 +468,8 @@ export default function SelectPagesPage() {
                       View Test Log
                     </button>
                   ) : (
-                    <div className="ml-auto text-xs text-gray-500 flex items-center gap-1.5 flex-shrink-0">
-                      <Eye className="w-3.5 h-3.5 opacity-50" />
-                      <span>No log available</span>
+                    <div className="ml-auto text-xs text-gray-500 flex-shrink-0">
+                      No test log available
                     </div>
                   )}
                 </div>
