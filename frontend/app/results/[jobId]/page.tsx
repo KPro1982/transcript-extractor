@@ -114,11 +114,21 @@ export default function ResultsPage() {
             console.log('First item summary:', response.qa_items[0]?.summary || 'MISSING')
             console.log('First item:', response.qa_items[0])
             
-            // Diagnostic: list all Q/A page:line ranges
+            // Diagnostic: list all Q/A page:line ranges and save to file
             const qaRanges = response.qa_items.map((item: any, idx: number) => 
               `${idx + 1}. ${item.page_number}:${item.line_number}-${item.end_page || item.page_number}:${item.end_line || item.line_number}`
             ).join('\n')
-            console.log('=== Q/A Page:Line Ranges ===\n' + qaRanges)
+            const logContent = `=== Q/A Page:Line Ranges ===\nDocument: ${docInfo.filename}\nTotal Q&A pairs: ${response.qa_items.length}\nGenerated: ${new Date().toISOString()}\n\n${qaRanges}`
+            console.log(logContent)
+            
+            // Auto-download as file
+            const blob = new Blob([logContent], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `qa-ranges-${jobId}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
           }
           setQAItems(response.qa_items || [])
         } catch (err: any) {
