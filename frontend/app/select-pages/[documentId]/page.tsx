@@ -110,6 +110,9 @@ export default function SelectPagesPage() {
         // Store Q/A test log file if available
         if (doc.qa_test_log_file) {
           setQATestLogFile(doc.qa_test_log_file)
+          console.log('Q/A test log file found:', doc.qa_test_log_file)
+        } else {
+          console.log('No Q/A test log file in document - document may need to be re-uploaded')
         }
         
         // Set default range to detected examination bounds
@@ -455,7 +458,7 @@ export default function SelectPagesPage() {
                   </div>
                   
                   {/* View Test Log Button */}
-                  {qaTestLogFile && (
+                  {qaTestLogFile ? (
                     <button
                       onClick={handleViewLog}
                       className="ml-auto px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0"
@@ -464,6 +467,11 @@ export default function SelectPagesPage() {
                       <Eye className="w-3.5 h-3.5" />
                       View Test Log
                     </button>
+                  ) : (
+                    <div className="ml-auto text-xs text-gray-500 flex items-center gap-1.5 flex-shrink-0">
+                      <Eye className="w-3.5 h-3.5 opacity-50" />
+                      <span>No log available</span>
+                    </div>
                   )}
                 </div>
               </div>
