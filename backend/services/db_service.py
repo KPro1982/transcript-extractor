@@ -206,6 +206,14 @@ async def init_db():
                 ) THEN
                     ALTER TABLE documents ADD COLUMN detection_method VARCHAR(50);
                 END IF;
+                
+                -- Add qa_test_log_file column if it doesn't exist (migration)
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'qa_test_log_file'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN qa_test_log_file VARCHAR(500);
+                END IF;
             END $$;
             
             CREATE TABLE IF NOT EXISTS qa_items (

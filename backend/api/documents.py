@@ -116,9 +116,9 @@ async def upload_document(file: UploadFile = File(...)):
                 filename, file_hash, s3_key, total_pages,
                 case_name, case_number, deposition_date, attorneys, witness_name,
                 examination_first_page, examination_last_page, 
-                examination_detection_confidence
+                examination_detection_confidence, qa_test_log_file
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
             """,
             file.filename,
@@ -132,7 +132,8 @@ async def upload_document(file: UploadFile = File(...)):
             case_info.get('witness_name'),
             classification_result['examination_first_page'],
             classification_result['examination_last_page'],
-            'high'  # Page classifier always has high confidence (explicit Q+A check)
+            'high',  # Page classifier always has high confidence (explicit Q+A check)
+            qa_test_result['log_file'] if qa_test_result else None
         )
         
         # Store page classifications in database
@@ -256,6 +257,7 @@ async def get_document(document_id: UUID):
         "examination_first_page": doc.get("examination_first_page"),
         "examination_last_page": doc.get("examination_last_page"),
         "examination_detection_confidence": doc.get("examination_detection_confidence"),
+        "qa_test_log_file": doc.get("qa_test_log_file"),
         "frontpages_count": classification_counts['frontpages_count'] if classification_counts else 0,
         "examination_count": classification_counts['examination_count'] if classification_counts else 0,
         "backpages_count": classification_counts['backpages_count'] if classification_counts else 0

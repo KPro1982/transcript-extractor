@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
-import { Loader2, ChevronLeft, ChevronRight, Plus, X, Play, FileText, BookOpen } from 'lucide-react'
-import { getDocument, getPDFPage, startJob, getQAPageRange } from '@/lib/api'
+import { Loader2, ChevronLeft, ChevronRight, Plus, X, Play, FileText, BookOpen, Eye } from 'lucide-react'
+import { getDocument, getPDFPage, startJob, getQAPageRange, getQATestLog } from '@/lib/api'
 import CaseInfoPanel from '@/components/CaseInfoPanel'
 
 interface PageRange {
@@ -42,6 +42,12 @@ export default function SelectPagesPage() {
     examination_count: number | null
     backpages_count: number | null
   } | null>(null)
+  
+  // Q/A test log viewing
+  const [qaTestLogFile, setQATestLogFile] = useState<string | null>(null)
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [logContent, setLogContent] = useState<string>('')
+  const [loadingLog, setLoadingLog] = useState(false)
 
   // Load document info and first page
   useEffect(() => {
@@ -100,6 +106,11 @@ export default function SelectPagesPage() {
           examination_count: doc.examination_count || 0,
           backpages_count: doc.backpages_count || 0
         })
+        
+        // Store Q/A test log file if available
+        if (doc.qa_test_log_file) {
+          setQATestLogFile(doc.qa_test_log_file)
+        }
         
         // Set default range to detected examination bounds
         setRangeInput(`${doc.examination_first_page}-${doc.examination_last_page}`)
@@ -271,6 +282,23 @@ export default function SelectPagesPage() {
   const calculateTotalPages = (): number => {
     return pageRanges.reduce((sum, range) => sum + (range.end - range.start + 1), 0)
   }
+  
+  const handleViewLog = async () => {
+    if (!qaTestLogFile) return
+    
+    setLoadingLog(true)
+    setShowLogModal(true)
+    
+    try {
+      const content = await getQATestLog(qaTestLogFile)
+      setLogContent(content)
+    } catch (error) {
+      console.error('Failed to load log:', error)
+      setLogContent('Error loading log file. The file may have been cleaned up.')
+    } finally {
+      setLoadingLog(false)
+    }
+  }
 
   const handleStartProcessing = async () => {
     if (pageRanges.length === 0) {
@@ -425,6 +453,18 @@ export default function SelectPagesPage() {
                       Pre-filled below. You can modify the range if needed.
                     </p>
                   </div>
+                  
+                  {/* View Test Log Button */}
+                  {qaTestLogFile && (
+                    <button
+                      onClick={handleViewLog}
+                      className="ml-auto px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0"
+                      title="View Q/A extraction test log"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      View Test Log
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -622,6 +662,47 @@ export default function SelectPagesPage() {
           )}
         </div>
       </div>
+      
+      {/* Q/A Test Log Modal */}
+      {showLogModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-bg-card border border-gray-800 rounded-2xl max-w-4xl w-full max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold">Q/A Extraction Test Log</h2>
+              <button
+                onClick={() => setShowLogModal(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-auto flex-1">
+              {loadingLog ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                </div>
+              ) : (
+                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono bg-bg-elevated p-4 rounded-lg">
+                  {logContent}
+                </pre>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={() => setShowLogModal(false)}
+                className="px-6 py-2 bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
