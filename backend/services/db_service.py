@@ -265,6 +265,17 @@ async def init_db():
                 END IF;
             END $$;
             
+            -- Add topic column if it doesn't exist (migration)
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'final_qa_items' AND column_name = 'topic'
+                ) THEN
+                    ALTER TABLE final_qa_items ADD COLUMN topic VARCHAR(255) DEFAULT 'Other';
+                END IF;
+            END $$;
+            
             -- Add event_date column if it doesn't exist (migration)
             DO $$ 
             BEGIN
