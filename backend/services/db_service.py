@@ -50,6 +50,11 @@ class DatabaseService:
         """Fetch single value."""
         async with self.pool.acquire() as conn:
             return await conn.fetchval(query, *args)
+    
+    async def executemany(self, query: str, records: list):
+        """Execute a query with multiple record sets."""
+        async with self.pool.acquire() as conn:
+            return await conn.executemany(query, records)
 
 
 class PersistentDatabaseService:
