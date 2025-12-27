@@ -96,6 +96,14 @@ export default function SelectPagesPage() {
         witness_name: doc.witness_name
       })
       
+      // Store Q/A test log file if available (always check, not just when examination detected)
+      if (doc.qa_test_log_file) {
+        setQATestLogFile(doc.qa_test_log_file)
+        console.log('Q/A test log file found:', doc.qa_test_log_file)
+      } else {
+        console.log('No Q/A test log file found in document. Document may have been uploaded before Q/A test feature was added.')
+      }
+      
       // Store examination detection data
       if (doc.examination_first_page && doc.examination_last_page) {
         setExaminationDetection({
@@ -106,14 +114,6 @@ export default function SelectPagesPage() {
           examination_count: doc.examination_count || 0,
           backpages_count: doc.backpages_count || 0
         })
-        
-        // Store Q/A test log file if available
-        if (doc.qa_test_log_file) {
-          setQATestLogFile(doc.qa_test_log_file)
-          console.log('Q/A test log file found:', doc.qa_test_log_file)
-        } else {
-          console.log('No Q/A test log file found in document. Document may have been uploaded before Q/A test feature was added.')
-        }
         
         // Set default range to detected examination bounds
         setRangeInput(`${doc.examination_first_page}-${doc.examination_last_page}`)
