@@ -273,7 +273,10 @@ async def init_db():
             END $$;
             
             -- Page classifications table for fast page-by-page analysis
-            CREATE TABLE IF NOT EXISTS page_classifications (
+            -- Drop old table if it exists with wrong schema
+            DROP TABLE IF EXISTS page_classifications CASCADE;
+            
+            CREATE TABLE page_classifications (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
                 page_number INT NOT NULL,
@@ -284,16 +287,10 @@ async def init_db():
                 UNIQUE(document_id, page_number)
             );
             
-            -- Create indexes only if table exists
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'page_classifications') THEN
-                    CREATE INDEX IF NOT EXISTS idx_page_classifications_doc 
-                        ON page_classifications(document_id);
-                    CREATE INDEX IF NOT EXISTS idx_page_classifications_type 
-                        ON page_classifications(document_id, classification);
-                END IF;
-            END $$;
+            CREATE INDEX idx_page_classifications_doc 
+                ON page_classifications(document_id);
+            CREATE INDEX idx_page_classifications_type 
+                ON page_classifications(document_id, classification);
             
             -- Create separate table for final Q/A pairs (distinct from interim/variables)
             CREATE TABLE IF NOT EXISTS final_qa_items (
