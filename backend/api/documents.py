@@ -4,8 +4,9 @@ import logging
 import re
 from typing import List, Optional
 from uuid import UUID
+import os
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 import aiofiles
@@ -913,6 +914,54 @@ async def get_qa_page_range(document_id: UUID):
             os.unlink(tmp_path)
         except:
             pass
+
+
+@router.get("/qa-test-log")
+async def get_qa_test_log(log_file: str = Query(..., description="Path to the log file")):
+    """
+    Retrieve Q/A test log content.
+    
+    Args:
+        log_file: Path to the log file (from upload response)
+        
+    Returns:
+        Plain text content of the log file
+    """
+    try:
+        # Security: only allow files in /tmp/ with qa_test_ prefix
+        if not log_file.startswith('/tmp/qa_test_') or '..' in log_file:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid log file path"
+            )
+        
+        # Check if file exists
+        if not os.path.exists(log_file):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Log file not found. It may have been cleaned up."
+            )
+        
+        # Read file content
+        async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
+            content = await f.read()
+        
+        return Response(
+            content=content,
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to read log file: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read log file: {str(e)}"
+        )
 
 
 

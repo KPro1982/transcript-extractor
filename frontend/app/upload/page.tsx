@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, Loader2, Settings } from 'lucide-react'
-import { uploadDocument, startJob } from '@/lib/api'
+import { Upload, FileText, Loader2, Settings, FileCheck, AlertTriangle } from 'lucide-react'
+import { uploadDocument, startJob, getQATestLog } from '@/lib/api'
 import UserSettingsModal from '@/components/UserSettingsModal'
 import UserMenu from '@/components/UserMenu'
 
@@ -13,6 +13,15 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [qaTestResult, setQaTestResult] = useState<{
+    passed: boolean
+    pairsFound: number
+    logFile: string | null
+    errors?: string[]
+  } | null>(null)
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [logContent, setLogContent] = useState<string>('')
+  const [loadingLog, setLoadingLog] = useState(false)
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -30,11 +39,22 @@ export default function UploadPage() {
     if (!file) return
 
     setIsUploading(true)
+    setQaTestResult(null) // Reset previous test results
 
     try {
       // Upload document
       const uploadResult = await uploadDocument(file)
       const documentId = uploadResult.document_id
+      
+      // Store Q/A test results if available
+      if (uploadResult.qa_test_passed !== undefined) {
+        setQaTestResult({
+          passed: uploadResult.qa_test_passed,
+          pairsFound: uploadResult.qa_test_pairs_found || 0,
+          logFile: uploadResult.qa_test_log_file || null,
+          errors: uploadResult.qa_test_errors || []
+        })
+      }
 
       // Redirect to page selection
       router.push(`/select-pages/${documentId}`)
@@ -60,6 +80,23 @@ export default function UploadPage() {
       
       alert(errorMessage)
       setIsUploading(false)
+    }
+  }
+  
+  const handleViewLog = async () => {
+    if (!qaTestResult?.logFile) return
+    
+    setLoadingLog(true)
+    setShowLogModal(true)
+    
+    try {
+      const content = await getQATestLog(qaTestResult.logFile)
+      setLogContent(content)
+    } catch (error) {
+      console.error('Failed to load log:', error)
+      setLogContent('Error loading log file. The file may have been cleaned up.')
+    } finally {
+      setLoadingLog(false)
     }
   }
 
@@ -124,6 +161,52 @@ export default function UploadPage() {
                 )}
               </div>
 
+              {/* Q/A Test Results */}
+              {qaTestResult && (
+                <div className={`p-4 rounded-xl border ${
+                  qaTestResult.passed 
+                    ? 'bg-green-500/10 border-green-500/30' 
+                    : 'bg-yellow-500/10 border-yellow-500/30'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    {qaTestResult.passed ? (
+                      <FileCheck className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <p className={`font-medium mb-1 ${
+                        qaTestResult.passed ? 'text-green-400' : 'text-yellow-400'
+                      }`}>
+                        {qaTestResult.passed 
+                          ? '✓ Q/A Extraction Test Passed' 
+                          : '⚠ Q/A Extraction Test Warning'}
+                      </p>
+                      <p className="text-sm text-gray-300 mb-2">
+                        {qaTestResult.passed 
+                          ? `Found ${qaTestResult.pairsFound} Q/A pairs in examination section.`
+                          : 'No Q/A pairs found. Check log for details.'}
+                      </p>
+                      {qaTestResult.logFile && (
+                        <button
+                          onClick={handleViewLog}
+                          className="text-sm text-accent hover:text-accent-hover underline"
+                        >
+                          View Test Log
+                        </button>
+                      )}
+                      {qaTestResult.errors && qaTestResult.errors.length > 0 && (
+                        <div className="mt-2 text-sm text-gray-400">
+                          {qaTestResult.errors.map((err, idx) => (
+                            <p key={idx}>• {err}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <button
                   onClick={handleUpload}
@@ -174,6 +257,47 @@ export default function UploadPage() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+      
+      {/* Q/A Test Log Modal */}
+      {showLogModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-bg-card border border-gray-800 rounded-2xl max-w-4xl w-full max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold">Q/A Extraction Test Log</h2>
+              <button
+                onClick={() => setShowLogModal(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-auto flex-1">
+              {loadingLog ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                </div>
+              ) : (
+                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono bg-bg-elevated p-4 rounded-lg">
+                  {logContent}
+                </pre>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={() => setShowLogModal(false)}
+                className="px-6 py-2 bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

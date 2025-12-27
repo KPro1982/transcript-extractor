@@ -130,6 +130,17 @@ export const updateCaseInfo = async (
   return response.data
 }
 
+/**
+ * Get Q/A test log content from the backend.
+ * Returns the raw text content of the log file.
+ */
+export const getQATestLog = async (logFilePath: string): Promise<string> => {
+  const response = await api.get('/api/documents/qa-test-log', {
+    params: { log_file: logFilePath }
+  })
+  return response.data
+}
+
 
 
 
