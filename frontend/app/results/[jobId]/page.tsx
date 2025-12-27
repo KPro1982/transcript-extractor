@@ -113,6 +113,12 @@ export default function ResultsPage() {
           if (response?.qa_items && response.qa_items.length > 0) {
             console.log('First item summary:', response.qa_items[0]?.summary || 'MISSING')
             console.log('First item:', response.qa_items[0])
+            
+            // Diagnostic: list all Q/A page:line ranges
+            const qaRanges = response.qa_items.map((item: any, idx: number) => 
+              `${idx + 1}. ${item.page_number}:${item.line_number}-${item.end_page || item.page_number}:${item.end_line || item.line_number}`
+            ).join('\n')
+            console.log('=== Q/A Page:Line Ranges ===\n' + qaRanges)
           }
           setQAItems(response.qa_items || [])
         } catch (err: any) {
