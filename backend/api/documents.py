@@ -138,15 +138,99 @@ async def upload_document(file: UploadFile = File(...)):
         # Store page classifications in database
         await page_classifier.store_classifications(str(doc_id), classification_result)
         
-        # Run Q/A extraction test (if examination section was detected)
+        # Run Q/A extraction test
         qa_test_result = None
+        test_first_page = None
+        test_last_page = None
+        
+        # Try examination section first
         if classification_result['examination_first_page'] and classification_result['examination_count'] > 0:
-            logger.info("Running Q/A extraction test on examination section...")
+            test_first_page = classification_result['examination_first_page']
+            test_last_page = classification_result['examination_last_page']
+            logger.info(f"Running Q/A extraction test on examination section (pages {test_first_page}-{test_last_page})...")
+        else:
+            # Fallback: Use qa-page-range detection
+            logger.info("No examination section detected - trying qa-page-range detection...")
+            try:
+                # Use the same detection logic as get_qa_page_range endpoint
+                question_patterns = [
+                    re.compile(r'^[·\s]*Q\.[·\s]*', re.IGNORECASE),
+                    re.compile(r'^\s*Q\.\s*', re.IGNORECASE),
+                    re.compile(r'^\s*Q:\s*', re.IGNORECASE),
+                    re.compile(r'^Q\s+[A-Z]', re.IGNORECASE),
+                    re.compile(r'^\s*QUESTION[:\s]+', re.IGNORECASE),
+                    re.compile(r'^BY\s+M[RS]\.\s+\w+:', re.IGNORECASE),
+                ]
+                
+                answer_patterns = [
+                    re.compile(r'^[·\s]*A\.[·\s]*', re.IGNORECASE),
+                    re.compile(r'^\s*A\.\s*', re.IGNORECASE),
+                    re.compile(r'^\s*A:\s*', re.IGNORECASE),
+                    re.compile(r'^A\s+[A-Z]', re.IGNORECASE),
+                    re.compile(r'^\s*ANSWER[:\s]+', re.IGNORECASE),
+                    re.compile(r'^[·\s]*THE\s+WITNESS:[·\s]*', re.IGNORECASE),
+                ]
+                
+                def has_qa_pattern(text: str) -> bool:
+                    text = text.strip()
+                    if not text:
+                        return False
+                    for pattern in question_patterns + answer_patterns:
+                        if pattern.match(text):
+                            return True
+                    return False
+                
+                def page_has_qa(page) -> bool:
+                    text = page.get_text()
+                    lines = text.split('\n')
+                    for line in lines:
+                        if has_qa_pattern(line):
+                            return True
+                    return False
+                
+                doc_pdf = fitz.open(temp_path)
+                
+                # Find first page with Q&A
+                first_qa_page = None
+                for page_num in range(min(30, pdf_info["total_pages"])):
+                    page = doc_pdf[page_num]
+                    if page_has_qa(page):
+                        first_qa_page = page_num + 1
+                        break
+                
+                if first_qa_page:
+                    # Find last page of continuous Q&A range
+                    last_qa_page = first_qa_page
+                    consecutive_empty_pages = 0
+                    max_gap = 2
+                    
+                    for page_num in range(first_qa_page - 1, pdf_info["total_pages"]):
+                        page = doc_pdf[page_num]
+                        if page_has_qa(page):
+                            last_qa_page = page_num + 1
+                            consecutive_empty_pages = 0
+                        else:
+                            consecutive_empty_pages += 1
+                            if consecutive_empty_pages >= max_gap:
+                                break
+                    
+                    test_first_page = first_qa_page
+                    test_last_page = last_qa_page
+                    logger.info(f"Found Q&A range via qa-page-range: pages {test_first_page}-{test_last_page}")
+                else:
+                    logger.warning("No Q&A pages found via qa-page-range detection")
+                
+                doc_pdf.close()
+            except Exception as e:
+                logger.error(f"Error detecting Q&A range: {e}", exc_info=True)
+        
+        # Run Q/A test if we found a range
+        if test_first_page and test_last_page:
             qa_test_result = await qa_test_service.test_qa_extraction(
                 temp_path,
                 str(doc_id),
-                classification_result['examination_first_page'],
-                classification_result['examination_last_page']
+                test_first_page,
+                test_last_page
             )
             
             if qa_test_result['success']:
@@ -173,7 +257,7 @@ async def upload_document(file: UploadFile = File(...)):
                     doc_id
                 )
         else:
-            logger.warning("No examination section detected - skipping Q/A extraction test")
+            logger.warning("No Q&A range detected - skipping Q/A extraction test")
         
         doc_data = {
             "id": str(doc_id),
