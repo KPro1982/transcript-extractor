@@ -284,10 +284,16 @@ async def init_db():
                 UNIQUE(document_id, page_number)
             );
             
-            CREATE INDEX IF NOT EXISTS idx_page_classifications_doc 
-                ON page_classifications(document_id);
-            CREATE INDEX IF NOT EXISTS idx_page_classifications_type 
-                ON page_classifications(document_id, classification);
+            -- Create indexes only if table exists
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'page_classifications') THEN
+                    CREATE INDEX IF NOT EXISTS idx_page_classifications_doc 
+                        ON page_classifications(document_id);
+                    CREATE INDEX IF NOT EXISTS idx_page_classifications_type 
+                        ON page_classifications(document_id, classification);
+                END IF;
+            END $$;
             
             -- Create separate table for final Q/A pairs (distinct from interim/variables)
             CREATE TABLE IF NOT EXISTS final_qa_items (
