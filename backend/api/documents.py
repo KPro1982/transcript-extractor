@@ -15,6 +15,7 @@ from services.db_service import db_service
 from services.cache_service import cache_service
 from services.pdf_service import pdf_service
 from services.case_info_extractor import case_info_extractor
+from services.page_classifier import page_classifier
 from models.document import Document, DocumentCreate, DocumentResponse
 
 router = APIRouter()
@@ -86,6 +87,22 @@ async def upload_document(file: UploadFile = File(...)):
         case_info = case_info_extractor.extract_case_info(temp_path, max_pages=10)
         logger.info(f"Case info extracted: {case_info}")
         
+        # Classify document pages (fast page-by-page analysis)
+        logger.info("Classifying document pages...")
+        classification_result = await page_classifier.classify_document(
+            temp_path, 
+            file_hash,  # Use file_hash as temporary ID
+            verbose=True  # Always verbose for diagnostics
+        )
+        logger.info(
+            f"Page classification complete: "
+            f"{classification_result['frontpages_count']} frontpages, "
+            f"{classification_result['examination_count']} examination, "
+            f"{classification_result['backpages_count']} backpages"
+        )
+        if classification_result.get('log_file'):
+            logger.info(f"Classification log: {classification_result['log_file']}")
+        
         # Store PDF content in Redis for worker access (24hr TTL)
         # This allows workers in different containers to access the file
         await cache_service.set_pdf_content(file_hash, content, ttl_hours=24)
@@ -95,9 +112,11 @@ async def upload_document(file: UploadFile = File(...)):
             """
             INSERT INTO documents (
                 filename, file_hash, s3_key, total_pages,
-                case_name, case_number, deposition_date, attorneys, witness_name
+                case_name, case_number, deposition_date, attorneys, witness_name,
+                examination_first_page, examination_last_page, 
+                examination_detection_confidence
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
             """,
             file.filename,
@@ -108,8 +127,14 @@ async def upload_document(file: UploadFile = File(...)):
             case_info.get('case_number'),
             case_info.get('deposition_date'),
             case_info.get('attorneys', []),
-            case_info.get('witness_name')
+            case_info.get('witness_name'),
+            classification_result['examination_first_page'],
+            classification_result['examination_last_page'],
+            'high'  # Page classifier always has high confidence (explicit Q+A check)
         )
+        
+        # Store page classifications in database
+        await page_classifier.store_classifications(str(doc_id), classification_result)
         
         doc_data = {
             "id": str(doc_id),
@@ -136,7 +161,13 @@ async def upload_document(file: UploadFile = File(...)):
             "case_number": case_info.get('case_number'),
             "deposition_date": case_info.get('deposition_date'),
             "attorneys": case_info.get('attorneys', []),
-            "witness_name": case_info.get('witness_name')
+            "witness_name": case_info.get('witness_name'),
+            "examination_first_page": classification_result['examination_first_page'],
+            "examination_last_page": classification_result['examination_last_page'],
+            "examination_detection_confidence": 'high',
+            "frontpages_count": classification_result['frontpages_count'],
+            "examination_count": classification_result['examination_count'],
+            "backpages_count": classification_result['backpages_count']
         }
         
     except Exception as e:
@@ -161,6 +192,19 @@ async def get_document(document_id: UUID):
             detail="Document not found"
         )
     
+    # Get classification counts from page_classifications table
+    classification_counts = await db_service.fetchrow(
+        """
+        SELECT 
+            COUNT(*) FILTER (WHERE classification = 'frontpages') as frontpages_count,
+            COUNT(*) FILTER (WHERE classification = 'examination') as examination_count,
+            COUNT(*) FILTER (WHERE classification = 'backpages') as backpages_count
+        FROM page_classifications
+        WHERE document_id = $1
+        """,
+        document_id
+    )
+    
     return {
         "document_id": str(doc["id"]),
         "filename": doc["filename"],
@@ -171,7 +215,13 @@ async def get_document(document_id: UUID):
         "deposition_date": doc.get("deposition_date"),
         "attorneys": doc.get("attorneys"),
         "witness_name": doc.get("witness_name"),
-        "created_at": doc["created_at"].isoformat()
+        "created_at": doc["created_at"].isoformat(),
+        "examination_first_page": doc.get("examination_first_page"),
+        "examination_last_page": doc.get("examination_last_page"),
+        "examination_detection_confidence": doc.get("examination_detection_confidence"),
+        "frontpages_count": classification_counts['frontpages_count'] if classification_counts else 0,
+        "examination_count": classification_counts['examination_count'] if classification_counts else 0,
+        "backpages_count": classification_counts['backpages_count'] if classification_counts else 0
     }
 
 

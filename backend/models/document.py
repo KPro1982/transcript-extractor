@@ -40,6 +40,14 @@ class DocumentResponse(BaseModel):
     attorneys: Optional[List[str]] = None
     witness_name: Optional[str] = None
     created_at: Optional[str] = None
+    # Examination section detection
+    examination_first_page: Optional[int] = None
+    examination_last_page: Optional[int] = None
+    examination_detection_confidence: Optional[str] = None
+    # Page classification counts
+    frontpages_count: Optional[int] = None
+    examination_count: Optional[int] = None
+    backpages_count: Optional[int] = None
 
 
 

@@ -32,6 +32,16 @@ export default function SelectPagesPage() {
   const [starting, setStarting] = useState(false)
   const [loadingQARange, setLoadingQARange] = useState(false)
   const [qaPageRange, setQAPageRange] = useState<{ first: number, last: number } | null>(null)
+  
+  // New: Examination detection data
+  const [examinationDetection, setExaminationDetection] = useState<{
+    first_page: number | null
+    last_page: number | null
+    confidence: string | null
+    frontpages_count: number | null
+    examination_count: number | null
+    backpages_count: number | null
+  } | null>(null)
 
   // Load document info and first page
   useEffect(() => {
@@ -80,10 +90,35 @@ export default function SelectPagesPage() {
         witness_name: doc.witness_name
       })
       
+      // Store examination detection data
+      if (doc.examination_first_page && doc.examination_last_page) {
+        setExaminationDetection({
+          first_page: doc.examination_first_page,
+          last_page: doc.examination_last_page,
+          confidence: doc.examination_detection_confidence,
+          frontpages_count: doc.frontpages_count || 0,
+          examination_count: doc.examination_count || 0,
+          backpages_count: doc.backpages_count || 0
+        })
+        
+        // Set default range to detected examination bounds
+        setRangeInput(`${doc.examination_first_page}-${doc.examination_last_page}`)
+        
+        // Auto-parse to show preview
+        try {
+          const ranges = parseRangeInput(`${doc.examination_first_page}-${doc.examination_last_page}`)
+          setPageRanges(ranges)
+        } catch (err) {
+          // Ignore parsing errors on initial load
+        }
+      }
+      
       if (doc.total_pages > 0) {
         loadPDFPage(1)
-        // Load Q/A page range for smart defaults
-        loadQAPageRange()
+        // Load Q/A page range for smart defaults (backward compatibility)
+        if (!doc.examination_first_page) {
+          loadQAPageRange()
+        }
       }
     } catch (error) {
       console.error('Failed to load document:', error)
@@ -343,6 +378,57 @@ export default function SelectPagesPage() {
           <div className="bg-bg-card border border-gray-800 rounded-2xl p-6 mb-6">
             <h3 className="text-lg font-semibold mb-4">Enter Page Ranges</h3>
             
+            {/* Examination Detection Info */}
+            {examinationDetection && examinationDetection.first_page && (
+              <div className="mb-4 p-4 bg-blue-950/30 border border-blue-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm font-semibold text-blue-300">
+                        Auto-detected Q&A Section
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        examinationDetection.confidence === 'high' 
+                          ? 'bg-green-900/50 text-green-300' 
+                          : examinationDetection.confidence === 'medium'
+                          ? 'bg-yellow-900/50 text-yellow-300'
+                          : 'bg-gray-800 text-gray-400'
+                      }`}>
+                        {examinationDetection.confidence} confidence
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-300">
+                      Pages {examinationDetection.first_page}-{examinationDetection.last_page}
+                    </p>
+                    
+                    {/* Classification breakdown */}
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      {examinationDetection.frontpages_count > 0 && (
+                        <span className="text-gray-400">
+                          📄 Frontpages: {examinationDetection.frontpages_count} (auto-excluded)
+                        </span>
+                      )}
+                      {examinationDetection.examination_count > 0 && (
+                        <span className="text-green-400">
+                          ✅ Examination: {examinationDetection.examination_count} pages
+                        </span>
+                      )}
+                      {examinationDetection.backpages_count > 0 && (
+                        <span className="text-gray-400">
+                          📑 Backpages: {examinationDetection.backpages_count} (auto-excluded)
+                        </span>
+                      )}
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mt-2">
+                      Pre-filled below. You can modify the range if needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="mb-4">
               <label className="block text-sm text-gray-400 mb-2">
                 Format: &quot;5-10&quot; or &quot;5-10; 15-20; 30-50&quot;
@@ -377,39 +463,79 @@ export default function SelectPagesPage() {
             </div>
 
             <div className="space-y-2">
-              {/* Q/A Detection Buttons */}
-              {qaPageRange && (
-                <button
-                  onClick={handleSetQARange}
-                  disabled={loadingQARange}
-                  className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all flex items-center justify-center gap-2 font-medium"
-                  title={`Detected Q&A on pages ${qaPageRange.first}-${qaPageRange.last}`}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Q&A Pages ({qaPageRange.first}-{qaPageRange.last})
-                </button>
+              {/* Examination Detection Buttons (new) */}
+              {examinationDetection && examinationDetection.first_page && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (examinationDetection.first_page && examinationDetection.last_page) {
+                        setRangeInput(`${examinationDetection.first_page}-${examinationDetection.last_page}`)
+                        setParseError('')
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all flex items-center justify-center gap-2 font-medium"
+                    title={`Use detected examination range: ${examinationDetection.first_page}-${examinationDetection.last_page}`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Use Detected Range ({examinationDetection.first_page}-{examinationDetection.last_page})
+                  </button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => examinationDetection.first_page && jumpToPage(examinationDetection.first_page)}
+                      className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                      title={`Jump to examination start (page ${examinationDetection.first_page})`}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      First Q&A ({examinationDetection.first_page})
+                    </button>
+                    <button
+                      onClick={() => examinationDetection.last_page && jumpToPage(examinationDetection.last_page)}
+                      className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                      title={`Jump to examination end (page ${examinationDetection.last_page})`}
+                    >
+                      Last Q&A ({examinationDetection.last_page})
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
               )}
               
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleJumpToFirstQA}
-                  disabled={!qaPageRange || loadingQARange}
-                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
-                  title={qaPageRange ? `Jump to first Q&A (page ${qaPageRange.first})` : 'Detecting Q&A pages...'}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  First Q&A
-                </button>
-                <button
-                  onClick={handleJumpToLastQA}
-                  disabled={!qaPageRange || loadingQARange}
-                  className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
-                  title={qaPageRange ? `Jump to last Q&A (page ${qaPageRange.last})` : 'Detecting Q&A pages...'}
-                >
-                  Last Q&A
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              {/* Q/A Detection Buttons (legacy - show only if no examination detection) */}
+              {!examinationDetection && qaPageRange && (
+                <>
+                  <button
+                    onClick={handleSetQARange}
+                    disabled={loadingQARange}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all flex items-center justify-center gap-2 font-medium"
+                    title={`Detected Q&A on pages ${qaPageRange.first}-${qaPageRange.last}`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Q&A Pages ({qaPageRange.first}-{qaPageRange.last})
+                  </button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleJumpToFirstQA}
+                      disabled={!qaPageRange || loadingQARange}
+                      className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                      title={qaPageRange ? `Jump to first Q&A (page ${qaPageRange.first})` : 'Detecting Q&A pages...'}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      First Q&A
+                    </button>
+                    <button
+                      onClick={handleJumpToLastQA}
+                      disabled={!qaPageRange || loadingQARange}
+                      className="px-3 py-2 bg-bg-elevated hover:bg-gray-700 disabled:bg-gray-800 disabled:opacity-50 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                      title={qaPageRange ? `Jump to last Q&A (page ${qaPageRange.last})` : 'Detecting Q&A pages...'}
+                    >
+                      Last Q&A
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <button

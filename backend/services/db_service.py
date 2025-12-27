@@ -160,6 +160,42 @@ async def init_db():
                 ) THEN
                     ALTER TABLE documents ADD COLUMN witness_name VARCHAR(255);
                 END IF;
+                
+                -- Examination section detection columns
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'examination_first_page'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN examination_first_page INT;
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'examination_last_page'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN examination_last_page INT;
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'examination_detection_confidence'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN examination_detection_confidence VARCHAR(20);
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'word_index_first_page'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN word_index_first_page INT;
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'documents' AND column_name = 'detection_method'
+                ) THEN
+                    ALTER TABLE documents ADD COLUMN detection_method VARCHAR(50);
+                END IF;
             END $$;
             
             CREATE TABLE IF NOT EXISTS qa_items (
@@ -235,6 +271,23 @@ async def init_db():
                     CREATE INDEX IF NOT EXISTS idx_qa_items_is_final ON qa_items(document_id, is_final);
                 END IF;
             END $$;
+            
+            -- Page classifications table for fast page-by-page analysis
+            CREATE TABLE IF NOT EXISTS page_classifications (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+                page_number INT NOT NULL,
+                classification VARCHAR(20) NOT NULL,
+                has_question BOOLEAN NOT NULL,
+                has_answer BOOLEAN NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(document_id, page_number)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_page_classifications_doc 
+                ON page_classifications(document_id);
+            CREATE INDEX IF NOT EXISTS idx_page_classifications_type 
+                ON page_classifications(document_id, classification);
             
             -- Create separate table for final Q/A pairs (distinct from interim/variables)
             CREATE TABLE IF NOT EXISTS final_qa_items (

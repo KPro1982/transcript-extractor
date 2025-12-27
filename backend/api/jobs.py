@@ -130,9 +130,12 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
     - Single range via first_page/last_page (backward compat)
     - Multiple ranges via page_ranges parameter
     """
-    # Verify document exists
+    # Verify document exists and get examination bounds
     doc = await db_service.fetchrow(
-        "SELECT id, filename, total_pages, file_hash FROM documents WHERE id = $1",
+        """SELECT id, filename, total_pages, file_hash, 
+           examination_first_page, examination_last_page, 
+           examination_detection_confidence 
+           FROM documents WHERE id = $1""",
         request.document_id
     )
     
@@ -153,9 +156,20 @@ async def start_job(request: JobRequest, user_id: Optional[str] = None):
         ranges_str = "; ".join([f"{r.start}-{r.end}" for r in request.page_ranges])
         logger.info(f"Processing page ranges: {ranges_str}")
     else:
-        # Use traditional first_page/last_page
-        first_page = request.first_page
-        last_page = request.last_page if request.last_page else total_pages
+        # If user didn't specify pages, use detected examination bounds
+        if not request.first_page and not request.last_page:
+            # Use detected bounds (backpages auto-excluded by classifier)
+            first_page = doc['examination_first_page'] or 1
+            last_page = doc['examination_last_page'] or total_pages
+            
+            logger.info(
+                f"Using detected examination bounds: pages {first_page}-{last_page} "
+                f"(confidence: {doc['examination_detection_confidence']})"
+            )
+        else:
+            # Use traditional first_page/last_page from request
+            first_page = request.first_page
+            last_page = request.last_page if request.last_page else total_pages
     
     # Estimate Q&A pairs for chunking decision (rough: 5 pairs per page)
     # Only count pages that will be processed
