@@ -409,6 +409,19 @@ export default function SelectPagesPage() {
           <div className="bg-bg-card border border-gray-800 rounded-2xl p-6 mb-6">
             <h3 className="text-lg font-semibold mb-4">Enter Page Ranges</h3>
             
+            {/* Q/A Test Log Button - Always visible */}
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={handleViewLog}
+                disabled={!qaTestLogFile}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-all flex items-center gap-2"
+                title={qaTestLogFile ? "View Q/A extraction test log" : "No Q/A test log available for this document"}
+              >
+                <Eye className="w-4 h-4" />
+                View Q/A Test Log
+              </button>
+            </div>
+
             {/* Examination Detection Info */}
             {examinationDetection && examinationDetection.first_page && (
               <div className="mb-4 p-4 bg-blue-950/30 border border-blue-800/50 rounded-lg">
@@ -456,22 +469,6 @@ export default function SelectPagesPage() {
                       Pre-filled below. You can modify the range if needed.
                     </p>
                   </div>
-                  
-                  {/* View Test Log Button */}
-                  {qaTestLogFile ? (
-                    <button
-                      onClick={handleViewLog}
-                      className="ml-auto px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0"
-                      title="View Q/A extraction test log"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      View Test Log
-                    </button>
-                  ) : (
-                    <div className="ml-auto text-xs text-gray-500 flex-shrink-0">
-                      No test log available
-                    </div>
-                  )}
                 </div>
               </div>
             )}
