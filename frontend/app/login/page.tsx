@@ -10,6 +10,7 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const [bypassLoading, setBypassLoading] = useState<'admin' | 'user' | null>(null)
 
   useEffect(() => {
     // Check for error in URL
@@ -30,8 +31,11 @@ function LoginContent() {
   }
   
   const handleBypassAdmin = async () => {
+    if (bypassLoading) return // Prevent multiple clicks
+    
     try {
       setError(null)
+      setBypassLoading('admin')
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       console.log('Fetching admin bypass from:', `${apiUrl}/api/auth/dev/bypass-admin`)
       const response = await fetch(`${apiUrl}/api/auth/dev/bypass-admin`)
@@ -40,6 +44,7 @@ function LoginContent() {
         const errorText = await response.text()
         console.error('Bypass admin error:', errorText)
         setError(`Failed to bypass login: ${errorText}`)
+        setBypassLoading(null)
         return
       }
       
@@ -55,16 +60,21 @@ function LoginContent() {
         window.location.href = '/'
       } else {
         setError('Failed to bypass login - no tokens received')
+        setBypassLoading(null)
       }
     } catch (err: any) {
       console.error('Bypass admin login error:', err)
       setError(`Failed to bypass login: ${err.message}`)
+      setBypassLoading(null)
     }
   }
   
   const handleBypassUser = async () => {
+    if (bypassLoading) return // Prevent multiple clicks
+    
     try {
       setError(null)
+      setBypassLoading('user')
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       console.log('Fetching user bypass from:', `${apiUrl}/api/auth/dev/bypass-user`)
       const response = await fetch(`${apiUrl}/api/auth/dev/bypass-user`)
@@ -73,6 +83,7 @@ function LoginContent() {
         const errorText = await response.text()
         console.error('Bypass user error:', errorText)
         setError(`Failed to bypass login: ${errorText}`)
+        setBypassLoading(null)
         return
       }
       
@@ -88,10 +99,12 @@ function LoginContent() {
         window.location.href = '/'
       } else {
         setError('Failed to bypass login - no tokens received')
+        setBypassLoading(null)
       }
     } catch (err: any) {
       console.error('Bypass user login error:', err)
       setError(`Failed to bypass login: ${err.message}`)
+      setBypassLoading(null)
     }
   }
 
@@ -153,15 +166,31 @@ function LoginContent() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleBypassAdmin}
-                className="px-4 py-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-semibold rounded-xl transition-all text-sm"
+                disabled={bypassLoading !== null}
+                className="px-4 py-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-semibold rounded-xl transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Admin
+                {bypassLoading === 'admin' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  'Admin'
+                )}
               </button>
               <button
                 onClick={handleBypassUser}
-                className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 font-semibold rounded-xl transition-all text-sm"
+                disabled={bypassLoading !== null}
+                className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 font-semibold rounded-xl transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                User
+                {bypassLoading === 'user' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  'User'
+                )}
               </button>
             </div>
             <p className="text-xs text-gray-600 mt-2 text-center">
